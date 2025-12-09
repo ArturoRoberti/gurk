@@ -30,15 +30,22 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-      # Set the matrix config file as 'config.yaml'
     - name: Copy config file
-      run: |
-        # Set the matrix config file as 'config.yaml'
-        cp .github/ci_configs/${{ matrix.config_file }} config.yaml
+      run: cp .github/ci_configs/${{ matrix.config_file }} config.yaml
 
-      # Main installations
-    - name: Run main script with matrix config
-      run: ./install.bash
+    - name: Install pipx
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --user pipx
+        python3 -m pipx ensurepath
+        # You may need to update PATH to use pipx immediately
+        echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+    - name: Install cmstp via pipx
+      run: pipx install cmstp
+
+    - name: Run cmstp setup
+      run: cmstp setup -f config.yaml
 
   check-results:
     runs-on: ubuntu-latest

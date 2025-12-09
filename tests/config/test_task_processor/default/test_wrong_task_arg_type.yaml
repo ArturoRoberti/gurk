@@ -1,7 +1,7 @@
 # Test task with an arg of wrong type (e.g. 'default' being a str instead of a list)
 some-task:
   type: wrong-type
-  script: package://cstp/../../tests/config/test_task_processor/dummy_script.py
+  script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
   function: null
   depends_on: []
   args:

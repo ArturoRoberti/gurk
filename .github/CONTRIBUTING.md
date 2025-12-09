@@ -1,14 +1,14 @@
-# Contributing to cstp
+# Contributing to cmstp
 Thank you for your interest in contributing! Your help is appreciated.
 
 ## How to Contribute
 For new feature suggestions or bug fixes, please
 
-1. **Create an issue** using a proposed issue template in the [Issues](https://github.com/ArturoRoberti/cstp/issues) tab
+1. **Create an issue** using a proposed issue template in the [Issues](https://github.com/ArturoRoberti/cmstp/issues) tab
 2. **Create a branch** following the naming convention `(feature|fix)/<description>`
 3. **Test your changes** to ensure nothing is broken. Make sure to install and use the pre-commit hooks to ensure no issues on the CI (see the [pre-commit hooks](#pre-commit-hooks) section)
 4. **Commit and push your changes** with clear, descriptive messages
-5. **Create a pull request** using a proposed pull request template in the [Pull Requests](https://github.com/ArturoRoberti/cstp/pulls) tab. As github only allows one PR template (see [issue](https://github.com/refined-github/refined-github/issues/1621)), please follow its instructions guiding you to the other templates. Also, please add applicable labels to your PR.
+5. **Create a pull request** using a proposed pull request template in the [Pull Requests](https://github.com/ArturoRoberti/cmstp/pulls) tab. As github only allows one PR template (see [issue](https://github.com/refined-github/refined-github/issues/1621)), please follow its instructions guiding you to the other templates. Also, please add applicable labels to your PR.
 
 Furthermore, feel free to fork this repo to implement more personal touches. If you do something you think others may benefit from, please contribute back to this main repository.
 
@@ -26,7 +26,7 @@ Please install the pre-commit hooks for this repo, to ensure code quality. The p
 To install the pre-commit hooks, use
 ```bash
 pipx install pre-commit
-cd <cstp-path> && pre-commit install
+cd <cmstp-path> && pre-commit install
 ```
 The hooks will then run on each commit. You can also run the hooks manually via
 ```bash

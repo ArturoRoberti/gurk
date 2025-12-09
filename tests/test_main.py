@@ -3,9 +3,9 @@ import tempfile
 
 from ruamel.yaml import YAML
 
-from cstp.utils.tasks import HARDWARE_SPECIFIC_TASKS
+from cmstp.utils.tasks import HARDWARE_SPECIFIC_TASKS
 
-# from cstp.main import main
+# from cmstp.main import main
 
 
 def test_main():

@@ -3,10 +3,11 @@ requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cstp"
-version = "0.1.0"
-description = "A test package for pipx with configs, bash scripts, and a CLI"
+name = "cmstp"
+version = "1.0.0"
+description = "Contains anything related to setting up a new computer (desktop) system"
 authors = [{ name = "Arturo Roberti", email = "arturo.roberti@outlook.com" }]
+license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [ # TODO: pin versions
@@ -20,6 +21,20 @@ dependencies = [ # TODO: pin versions
     "requests",
     "packaging"
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: System :: Installation/Setup",
+    "Intended Audience :: End Users/Desktop",
+]
+
+[project.urls]
+Homepage = "https://github.com/ArturoRoberti/cmstp"
+Repository = "https://github.com/ArturoRoberti/cmstp"
+Issues = "https://github.com/ArturoRoberti/cmstp/issues"
+Documentation = "https://github.com/ArturoRoberti/cmstp#readme"
 
 [project.optional-dependencies]
 test = [
@@ -27,13 +42,13 @@ test = [
 ]
 
 [project.scripts]
-cstp = "cstp.main:main"
+cmstp = "cmstp.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"cstp" = ["config/**", "scripts/**"]
+"cmstp" = ["config/**", "scripts/**"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

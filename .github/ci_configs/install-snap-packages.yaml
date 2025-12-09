@@ -1,0 +1,2 @@
+install-snap-packages:
+  enabled: true

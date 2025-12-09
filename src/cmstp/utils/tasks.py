@@ -1,0 +1,193 @@
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
+
+from cmstp.utils.command import Command
+
+FieldTypeDict = Dict[str, List[Optional[type]]]
+
+# Required in default config - "'script': None" is actually not allowed, but defaults to None if nonexistent package is used
+TASK_ARGS_DEFAULT: FieldTypeDict = {
+    "allowed": [None, list],
+    "default": [list],
+}
+TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
+    "description": [str],  # TODO: Use and add pytest
+    "script": [None, str],
+    "function": [None, str],
+    "config_file": [None, str],  # TODO: Use and add pytest
+    "depends_on": [list],
+    "supercedes": [None, list],  # TODO: Use and add pytest
+}
+
+# Optional in custom config
+TASK_ARGS_CUSTOM: FieldTypeDict = {
+    "custom": [list],
+    "override_default": [bool],
+}
+TASK_PROPERTIES_CUSTOM: FieldTypeDict = {
+    "enabled": [bool],
+    "config_file": [None, str],  # TODO: Use and add pytest
+}
+
+HARDWARE_SPECIFIC_TASKS = ["install-nvidia-driver", "install-cuda"]
+
+
+def print_expected_task_fields(
+    args_types: FieldTypeDict, keys_types: FieldTypeDict
+) -> str:
+    """
+    Returns a YAML-like string with a top-level task name, first-level
+    properties and and second-level args, along with their expected types.
+    """
+
+    def format_value(value):
+        formatted_items = []
+        for v in value:
+            if isinstance(v, type):
+                formatted = v.__name__
+            elif v is None:
+                formatted = "null"
+            else:
+                formatted = str(v)
+            formatted_items.append(formatted)
+
+        return ", ".join(formatted_items)
+
+    # Prepare key width for alignment (including indented args keys)
+    all_keys = list(keys_types.keys()) + [f"  {k}" for k in args_types.keys()]
+    max_key_len = max(len(k) for k in all_keys) + 2
+
+    lines = ["<task-name>:"]
+    indent = "  "  # base indent for content under task
+
+    # Add top-level keys
+    for key, value in keys_types.items():
+        lines.append(
+            f"{indent}{key}:{' ' * (max_key_len - len(key))}{format_value(value)}"
+        )
+
+    # Add args section
+    if args_types:
+        lines.append(f"{indent}args:")
+        for key, value in args_types.items():
+            indented_key = f"{indent}  {key}"
+            lines.append(
+                f"{indented_key}:{' ' * (max_key_len - len(f'  {key}'))}{format_value(value)}"
+            )
+
+    return "\n".join(lines)
+
+
+def check_structure(obj: Any, expected: FieldTypeDict) -> bool:
+    """Check if an object matches its expected structure"""
+    if not isinstance(obj, dict):
+        return False
+    if set(obj.keys()) != set(expected.keys()):
+        return False
+    for key, types in expected.items():
+        if None in types and obj[key] is None:
+            continue
+        if type(obj[key]) not in types:
+            return False
+    return True
+
+
+class ArgsDict(TypedDict):
+    # fmt: off
+    allowed:          Optional[List[str]]
+    custom:           List[str]
+    default:          List[str]
+    override_default: bool
+    # fmt: on
+
+
+def is_args_dict(
+    obj: Any, include_default: bool = True, include_custom: bool = False
+) -> bool:
+    """Check if an object is a valid ArgsDict"""
+    expected_args = dict()
+    if include_default:
+        expected_args |= TASK_ARGS_DEFAULT
+    if include_custom:
+        expected_args |= TASK_ARGS_CUSTOM
+
+    return check_structure(obj, expected_args)
+
+
+class TaskDict(TypedDict):
+    # fmt: off
+    enabled:        bool
+    description:    str
+    script:         str
+    function:       Optional[str]
+    config_file:    Optional[str]
+    depends_on:     List[str]
+    supercedes:     Optional[List[str]]
+    args:           ArgsDict
+
+    _resolved_args: List[str]
+    # fmt: on
+
+
+def is_task_dict(
+    obj: Any, include_default: bool = True, include_custom: bool = False
+) -> bool:
+    """Check if an object is a valid TaskDict"""
+    expected_keys = dict()
+    if include_default:
+        expected_keys |= TASK_PROPERTIES_DEFAULT
+    if include_custom:
+        expected_keys |= TASK_PROPERTIES_CUSTOM
+
+    if not isinstance(obj, dict):
+        return False
+    obj_noargs = {k: v for k, v in obj.items() if k != "args"}
+    obj_args = obj.get("args")
+
+    return check_structure(obj_noargs, expected_keys) and is_args_dict(
+        obj_args,
+        include_default=include_default,
+        include_custom=include_custom,
+    )
+
+
+TaskDictCollection = Dict[str, TaskDict]
+
+
+def get_invalid_tasks_from_task_dict_collection(
+    obj: Dict[Any, Any],
+    include_default: bool = True,
+    include_custom: bool = False,
+) -> Optional[List[str]]:
+    """
+    Check if an object is a valid collection of TaskDicts.
+    Returns a list of invalid task names.
+    If the entire object is not the required input type (dict), returns None.
+
+    NOTE: This allows empty dicts (no tasks) as valid input
+    """
+    if not isinstance(obj, dict):
+        return None
+
+    invalid_tasks = []
+    for key, value in obj.items():
+        if not isinstance(key, str) or not is_task_dict(
+            value,
+            include_default=include_default,
+            include_custom=include_custom,
+        ):
+            invalid_tasks.append(key)
+    return invalid_tasks
+
+
+@dataclass(frozen=True)
+class ResolvedTask:
+    """Represents a resolved task with its name, command, dependencies, and arguments."""
+
+    # fmt: off
+    name:        str           = field()
+    command:     Command       = field()
+    config_file: Optional[str] = field(default=None)
+    depends_on:  Tuple[str]    = field(default_factory=tuple)
+    args:        Tuple[str]    = field(default_factory=tuple)
+    # fmt: on

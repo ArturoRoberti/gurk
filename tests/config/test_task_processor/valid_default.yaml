@@ -1,20 +1,20 @@
 # Template default config file
 some-task:
-  script: package://cstp/../../tests/config/test_task_processor/dummy_script.py
+  script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
   function: null
   depends_on: []
   args:
     allowed: null
     default: []
 some-other-task:
-  script: package://cstp/../../tests/config/test_task_processor/dummy_script.py
+  script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
   function: some_function
   depends_on: [some-task]
   args:
     allowed: [some_arg, another_arg]
     default: [some_arg]
 some-third-task:
-  script: package://cstp/../../tests/config/test_task_processor/dummy_script.py
+  script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
   function: some_other_function
   depends_on: [some-other-task]
   args:

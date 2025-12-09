@@ -5,9 +5,9 @@ from unittest.mock import patch
 import pytest
 from _pytest.capture import CaptureFixture
 
-from cstp.core.logger import Logger
-from cstp.core.task_processor import TaskProcessor
-from cstp.utils.common import (
+from cmstp.core.logger import Logger
+from cmstp.core.task_processor import TaskProcessor
+from cmstp.utils.common import (
     PACKAGE_CONFIG_PATH,
     PACKAGE_TESTS_PATH,
     generate_random_path,

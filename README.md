@@ -1,8 +1,10 @@
 [![Contributing](https://img.shields.io/badge/contributing-guidelines-blue.svg)](.github/CONTRIBUTING.md)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/cmstp)
 
-# cstp - computer setup
+
+# cmstp - computer setup
 
 Contains anything related to setting up a new computer (desktop) system.
 
@@ -32,9 +34,9 @@ Not supported yet.
 Not supported yet.
 
 ## Main Installation
-Then, install `cstp` via `pipx`:
+Then, install `cmstp` via `pipx`:
 ```bash
-pipx install cstp
+pipx install cmstp
 ```
 
 # Usage
@@ -45,7 +47,7 @@ We recommend setting up the following before running the main installation/confi
 
 You can use the provided helper to guide you through these steps:
 ```
-cstp pre-setup [-s] [-g]
+cmstp pre-setup [-s] [-g]
 ```
 
 The helper also provides further possible manual setup steps for configuring fresh systems.
@@ -55,24 +57,24 @@ The helper also provides further possible manual setup steps for configuring fre
 ## Main Installations/Configurations
 To use default installations/configurations, simply use (without any flags):
 ```
-cstp setup [-h] [-t TASKS [TASKS ...]] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [-p] [-v]
+cmstp setup [-h] [-t TASKS [TASKS ...]] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [-p] [-v]
 ```
 
 To use custom config installation/configuration config files, use (flag shorthand: `-d`)
 ```bash
-cstp --config-directory </path/to/configs/ | git_url>
+cmstp --config-directory </path/to/configs/ | git_url>
 ```
-where `/path/to/configs/` is a directory containing multiple txt/json(c)/yaml/... configuration files (to be used by tasks as defined in this repo's `config/default.yaml` file) following this package's default `config/` directory. Each file in that directory should have the same name and structure as in the default. We **STRONGLY RECOMMEND** saving a personalized config directory as a git repository and providing the git URL instead of a local path. The repository will be cloned and used for the configurations. For more details and examples of configs, see [this README](src/cstp/config/README.md).
+where `/path/to/configs/` is a directory containing multiple txt/json(c)/yaml/... configuration files (to be used by tasks as defined in this repo's `config/default.yaml` file) following this package's default `config/` directory. Each file in that directory should have the same name and structure as in the default. We **STRONGLY RECOMMEND** saving a personalized config directory as a git repository and providing the git URL instead of a local path. The repository will be cloned and used for the configurations. For more details and examples of configs, see [this README](src/cmstp/config/README.md).
 
 To easily specify multiple tasks to be run, use (flag shorthand: `-f`)
 ```bash
-cstp --config-file /path/to/config.yaml
+cmstp --config-file /path/to/config.yaml
 ```
 where the config file should be a yaml file following the structure of the `config/enabled.yaml` file in this package. That config file contains detailed explanations. Should a relative path be provided, the file will first be searched for locally and then in the config directory.
 
 To simply enable tasks with their default configurations, use (flag shorthand: `-t`)
 ```bash
-cstp --tasks TASK1 TASK2 ...
+cmstp --tasks TASK1 TASK2 ...
 ```
 where `TASK1`, `TASK2`, ... are the task names as specified in the `config/enabled.yaml` file in this package. If both `--config-directory` and `--tasks` are provided, the `--tasks` flag takes precedence for enabling tasks.
 
@@ -83,11 +85,11 @@ Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) for contribution guideline
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 # Possible Future Features
-- Add uninstallations/deconfigurations and seprate configurations from installations. That could result in multiple entrypoints (instead of the current single `cstp setup`):
-    - `cstp install` - for installations only
-    - `cstp configure` - for configurations only
-    - `cstp uninstall` - for uninstallations only
-    - Possibly, a `cstp deconfigure` for deconfigurations only
+- Add uninstallations/deconfigurations and seprate configurations from installations. That could result in multiple entrypoints (instead of the current single `cmstp setup`):
+    - `cmstp install` - for installations only
+    - `cmstp configure` - for configurations only
+    - `cmstp uninstall` - for uninstallations only
+    - Possibly, a `cmstp deconfigure` for deconfigurations only
 - Setup Browser Bookmarks
 - Setup Autocompletions
 
@@ -99,18 +101,19 @@ Look for TODOs in code. Otherwise, look at:
 - Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` in output)
 - Add descriptions to each function (inputs, outputs, what it does) both for python and bash
 - Have a `--force` (and/or `--reinstall`) argument to override checks (i.e. run even if already installed/configured)
+- See where `revert_sudo_permission` is necessary (isaac*, miniconda, .virtualenvs, configure-filestructure, ...) - include parent folders
 ## Minor
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)
 - (If possible) Only run CI on new or edited tasks
 - Add file with list of debian file links (then get and dpkg (or step apt?) them)
-- Maybe, when cstp is run for the very first time, propose to do pre-setup first (then create mock file in pkg or so to mark that cstp was already run once)
+- Maybe, when cmstp is run for the very first time, propose to do pre-setup first (then create mock file in pkg or so to mark that cmstp was already run once)
     - Or just add big NOTE in README -> but that may not be seen by those installing via pipx
 - Define and document behaviour of using none, one of, or both `--config-file` and `--config-directory`
     - How can a config file in a config dir repo be specified?
         - (Maybe) If it's an absolute path, look there. If it is relative, look locally and then in the repo
 - Reduce the config files here to the most basic, non-invasive ones (just to have some example)
 - Test cyclic `supercedes` fields
-- Update logging to file (i.e. `CSTP START ...`) to only have a single CSTP section, and fill stuff in there
+- Update logging to file (i.e. `CMSTP START ...`) to only have a single CMSTP section, and fill stuff in there
 - Remove uninstallations from "enable_all" etc. Or better, have a "counterpart" field or similar and if both install/uninstall are enabled, disable uninstall (say this in debug, not info/warning message)
 - It seems that something may suspend all tasks running (if many are running)
     - Maybe this is caused by one task failing?
@@ -118,6 +121,5 @@ Look for TODOs in code. Otherwise, look at:
 - Maybe add a `requires-restart` flag or so to each task and make final message depend on that
 - If a dependency task fails, downstream tasks should not be run
 - If verbose is set, save the modified scripts in log dir
-- See where `revert_sudo_permission` is necessary
 - Make dev instructions (e.g. to add a task, edit <...>; to add a field to tasks, edit <...>; to add a test, edit <...>; etc.)
 - Remove `sudo: mon_handle_sigchld: waitpid: No child processes` outputs
