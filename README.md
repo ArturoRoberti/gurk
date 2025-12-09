@@ -1,5 +1,5 @@
-[![Contributing](https://img.shields.io/badge/contributing-guidelines-blue.svg)](.github/CONTRIBUTING.md)
-[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![Contributing](https://img.shields.io/badge/contributing-guidelines-blue.svg)](https://github.com/ArturoRoberti/cmstp/blob/main/.github/CONTRIBUTING.md)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/ArturoRoberti/cmstp/blob/main/LICENSE)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/cmstp)
 
@@ -9,7 +9,7 @@
 Contains anything related to setting up a new computer (desktop) system.
 
 # Disclaimer - Use at your own risk
-This project is currently (12.2025) coded solely by me. As a junior developer, there is probably a lot that can be improved and although I have tested each task, there may be some unforeseen issues. Please use with caution and report any issues you find (see the [contributing](#contributing) section).
+This project is currently (12.2025) coded solely by me. As a junior developer, there is probably a lot that can be improved and although I have tested each task, there may be some unforeseen issues. Please use with caution and report any issues you find (see the [contributing](https://github.com/ArturoRoberti/cmstp/blob/main/README.md#contributing) section).
 
 During this project's initial development, I recommend using it solely on fresh machines.
 
@@ -64,7 +64,7 @@ To use custom config installation/configuration config files, use (flag shorthan
 ```bash
 cmstp --config-directory </path/to/configs/ | git_url>
 ```
-where `/path/to/configs/` is a directory containing multiple txt/json(c)/yaml/... configuration files (to be used by tasks as defined in this repo's `config/default.yaml` file) following this package's default `config/` directory. Each file in that directory should have the same name and structure as in the default. We **STRONGLY RECOMMEND** saving a personalized config directory as a git repository and providing the git URL instead of a local path. The repository will be cloned and used for the configurations. For more details and examples of configs, see [this README](src/cmstp/config/README.md).
+where `/path/to/configs/` is a directory containing multiple txt/json(c)/yaml/... configuration files (to be used by tasks as defined in this repo's `config/default.yaml` file) following this package's default `config/` directory. Each file in that directory should have the same name and structure as in the default. We **STRONGLY RECOMMEND** saving a personalized config directory as a git repository and providing the git URL instead of a local path. The repository will be cloned and used for the configurations. For more details and examples of configs, see [this README](https://github.com/ArturoRoberti/cmstp/blob/main/src/cmstp/config/README.md).
 
 To easily specify multiple tasks to be run, use (flag shorthand: `-f`)
 ```bash
@@ -79,10 +79,10 @@ cmstp --tasks TASK1 TASK2 ...
 where `TASK1`, `TASK2`, ... are the task names as specified in the `config/enabled.yaml` file in this package. If both `--config-directory` and `--tasks` are provided, the `--tasks` flag takes precedence for enabling tasks.
 
 # Contributing
-Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) for contribution guidelines.
+Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/cmstp/blob/main/.github/CONTRIBUTING.md) for contribution guidelines.
 
 # License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/ArturoRoberti/cmstp/blob/main/LICENSE) file for details.
 
 # Possible Future Features
 - Add uninstallations/deconfigurations and seprate configurations from installations. That could result in multiple entrypoints (instead of the current single `cmstp setup`):
@@ -94,4 +94,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Setup Autocompletions
 
 # TODO
-Please see [TODO.md](TODO.md) for a list of planned improvements.
+Please see [TODO.md](https://github.com/ArturoRoberti/cmstp/blob/main/TODO.md) for a list of planned improvements.
