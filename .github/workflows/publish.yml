@@ -1,10 +1,9 @@
 name: Publish to PyPI
 
 on:
-  workflow_call:
-    secrets:
-      PAT:
-        required: true
+  push:
+    branches:
+    - main
 
 jobs:
   build:
@@ -18,5 +17,5 @@ jobs:
     - run: python -m build
     - env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PAT }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: twine upload dist/*

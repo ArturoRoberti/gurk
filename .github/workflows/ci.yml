@@ -18,12 +18,3 @@ jobs:
     # Avoid double runs if pre-commit pushed changes
     if: ${{ needs.ci-pre-commit.outputs.HAS_PUSHED != 'true' }}
     uses: ./.github/workflows/reusable-main-script.yml
-  publish-to-pypi:
-    needs:
-    - ci-main-script
-    - ci-pre-commit
-    # Avoid double runs if pre-commit pushed changes
-    if: ${{ needs.ci-pre-commit.outputs.HAS_PUSHED != 'true' }}
-    uses: ./.github/workflows/reusable-publish.yml
-    secrets:
-      PAT: ${{ secrets.PYPI_API_TOKEN }}
