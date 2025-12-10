@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cmstp"
-version = "1.0.3"
+version = "1.0.4"
 description = "Contains anything related to setting up a new computer (desktop) system"
 authors = [{ name = "Arturo Roberti", email = "arturo.roberti@outlook.com" }]
 license = { file = "LICENSE" }

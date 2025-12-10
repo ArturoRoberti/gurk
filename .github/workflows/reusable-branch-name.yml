@@ -49,10 +49,10 @@ jobs:
           console.log("Extracted codeowners:", codeowners);
 
           // ------------------------------------------------------------
-          // Build allowed dev/codeowner patterns
-          // dev/codeowner<owner>*
+          // Build allowed dev/ patterns
+          // dev/<owner>*
           // ------------------------------------------------------------
-          const devPatterns = codeowners.map(o => new RegExp(`^dev/codeowner${o}.*$`));
+          const devPatterns = codeowners.map(o => new RegExp(`^dev/${o}.*$`));
 
           let valid = true;
 
