@@ -46,14 +46,18 @@ jobs:
           git commit -m "Auto-bump version"
           git push origin HEAD:"${BRANCH}"
           echo "Committed version bump"
+          echo "COMMITTED_CHANGES=true" >> $GITHUB_ENV
         else
           echo "No changes to commit"
+          echo "COMMITTED_CHANGES=false" >> $GITHUB_ENV
         fi
 
     - name: Build package
+      if: ${{ env.COMMITTED_CHANGES == 'true' }}
       run: python -m build
 
     - name: Publish to PyPI
+      if: ${{ env.COMMITTED_CHANGES == 'true' }}
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
