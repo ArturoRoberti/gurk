@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 import git
 
-from cmstp.utils.common import revert_sudo_permission
+from cmstp.utils.interface import revert_sudo_permissions
 
 
 def run_git_command(command, timeout=300) -> subprocess.CompletedProcess:
@@ -143,7 +143,7 @@ def clone_git_repo(
         if result.returncode != 0:
             print(f"Git clone failed for {parsed['url']}")
             return None
-        revert_sudo_permission(dest_path)
+        revert_sudo_permissions(dest_path)
         repo_obj = git.Repo(dest_path)
 
         if parsed["commit"]:

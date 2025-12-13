@@ -151,3 +151,19 @@ apt_install() {
     '
   _wait_dpkg sudo apt-get install -y "$@"
 }
+
+#################################################################################################################
+##################################################### Other #####################################################
+#################################################################################################################
+revert_sudo_permissions() {
+  target="$1"
+
+  # Change ownership
+  sudo chown -R "$SUDO_USER:$SUDO_USER" "$target"
+
+  # Directories: 775
+  sudo find "$target" -type d -exec chmod 775 {} +
+
+  # Files: 664
+  sudo find "$target" -type f -exec chmod 664 {} +
+}

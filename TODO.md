@@ -8,6 +8,7 @@ Look for TODOs in code. Otherwise, look at:
 - Have a `--force` (and/or `--reinstall`) argument to override checks (i.e. run even if already installed/configured)
 - See where `revert_sudo_permissions` is necessary (isaac*, miniconda, .virtualenvs, configure-filestructure, ...) - include parent folders
     - Also, possibly no more "sudo" is necessary in any script; test
+    - Otherwise, what would be better is to run scripts without sudo, unless required (i.e. via field in `default.yaml`)
 
 # Minor
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)

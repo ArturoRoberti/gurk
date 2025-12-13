@@ -307,6 +307,11 @@ class Scheduler:
                     # Already unlinked
                     pass
 
+        # Create args
+        args = task.args + ("--system-info", json.dumps(get_system_info()))
+        if task.config_file:
+            args += ("--config-file", task.config_file)
+
         # Create temporary file that will run script/call function
         try:
             # Create
@@ -320,7 +325,10 @@ class Scheduler:
 
             # Write
             wrapper_src = run_script_function(
-                modified_script, function=task.command.function, run=False
+                script=modified_script,
+                function=task.command.function,
+                args=args,
+                run=False,
             )
             tmpwrap.write(wrapper_src)
             tmpwrap.flush()
@@ -330,11 +338,6 @@ class Scheduler:
             safe_unlink(tmpwrap_path)
             raise
 
-        # Add system info as an arg
-        args = task.args + ("--system-info", json.dumps(get_system_info()))
-        if task.config_file:
-            args += ("--config-file", task.config_file)
-
         # Get executable to run file. Also, use unbuffered output
         if task.command.kind == CommandKind.PYTHON:
             exe_cmd = [task.command.kind.exe, "-u"]
@@ -342,7 +345,7 @@ class Scheduler:
             exe_cmd = ["stdbuf", "-oL", "-eL", task.command.kind.exe]
 
         # Combine files and args into a runnable command
-        proc_cmd = [*exe_cmd, tmpwrap.name, *args]
+        proc_cmd = [*exe_cmd, tmpwrap.name]
         self.logger.debug(
             f"Running task '{task.name}' with command:\n"
             f"'{' '.join(proc_cmd)}'"

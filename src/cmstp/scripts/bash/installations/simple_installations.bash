@@ -45,7 +45,9 @@ install_fzf() {
 
   # (STEP) Installing fzf
   # TODO: Still seems to fail, although it works
-  git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf && ~/.fzf/install --all
+  git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+  revert_sudo_permissions "$HOME/.fzf"
+  ~/.fzf/install --all
 
   # Verify installation
   check_install_fzf
@@ -68,7 +70,9 @@ install_loki_shell() {
   apt_install git
 
   # (STEP) Installing loki-shell (with docker)
-  git clone --depth 1 https://github.com/slim-bean/loki-shell.git ~/.loki-shell && printf "y\ny\n\n" | ~/.loki-shell/install
+  git clone --depth 1 https://github.com/slim-bean/loki-shell.git ~/.loki-shell
+  revert_sudo_permissions "$HOME/.loki-shell"
+  printf "y\ny\n\n" | ~/.loki-shell/install
 
   # Verify installation
   check_install_loki_shell

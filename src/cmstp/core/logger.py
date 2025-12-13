@@ -15,7 +15,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from cmstp.utils.common import revert_sudo_permission
+from cmstp.utils.interface import revert_sudo_permissions
 from cmstp.utils.logger import (
     LoggerEnum,
     LoggerSeverity,
@@ -69,7 +69,7 @@ class Logger:
     def create_log_dir(self):
         """Create the log directory if it does not exist."""
         self.logdir.mkdir(parents=True, exist_ok=True)
-        revert_sudo_permission(self.logdir.parent)  # Make logdir(s) non-root
+        revert_sudo_permissions(self.logdir.parent)
 
     def add_task(self, task_name: str, total: int = 1) -> TaskID:
         """Add a new task to the progress tracker."""

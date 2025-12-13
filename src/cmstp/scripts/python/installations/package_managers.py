@@ -12,7 +12,7 @@ from cmstp.scripts.python.helpers.processing import (
     install_packages_from_list,
     install_packages_from_txt_file,
 )
-from cmstp.utils.interface import bash_check
+from cmstp.utils.interface import bash_check, revert_sudo_permissions
 
 
 def add_alias(command: str):
@@ -24,6 +24,7 @@ def add_alias(command: str):
             return  # Alias already exists
     with open(bashrc_path, "a", encoding="utf-8") as bashrc:
         bashrc.write(f"\n{alias_cmd}\n")
+        revert_sudo_permissions(bashrc_path)
 
 
 def install_apt_packages(*args):

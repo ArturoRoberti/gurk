@@ -70,6 +70,7 @@ install_conda() {
 
   # (STEP) Installing Conda
   bash $conda_script -b -p $conda_install_path
+  revert_sudo_permissions "$conda_install_path"
 
   # (STEP) Setting up Conda
   $conda_install_path/bin/conda init
@@ -123,6 +124,7 @@ _install_micromamba() {
 
   # (STEP_NO_PROGRESS) Installing Micromamba
   curl -L https://micro.mamba.pm/install.sh | PREFIX_LOCATION="$HOME/.micromamba" "${SHELL}"
+  revert_sudo_permissions "$HOME/.micromamba"
 
   # Verify installation
   check_install_mamba
