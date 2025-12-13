@@ -1,34 +1,21 @@
 [build-system]
-requires = ["setuptools>=66.1.0"]
+requires = [ "setuptools>=66.1.0",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cmstp"
-version = "1.0.4"
+version = "1.0.6"
 description = "Contains anything related to setting up a new computer (desktop) system"
-authors = [{ name = "Arturo Roberti", email = "arturo.roberti@outlook.com" }]
-license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = [ # TODO: pin versions
-    "click",
-    "rich",
-    "distro",
-    "ruamel.yaml",
-    "commentjson",
-    "networkx",
-    "GitPython",
-    "requests",
-    "packaging"
-]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Environment :: Console",
-    "Topic :: System :: Installation/Setup",
-    "Intended Audience :: End Users/Desktop",
-]
+dependencies = [ "click", "rich", "distro", "ruamel.yaml", "commentjson", "networkx", "GitPython", "requests", "packaging",]
+classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: OS Independent", "Environment :: Console", "Topic :: System :: Installation/Setup", "Intended Audience :: End Users/Desktop",]
+[[project.authors]]
+name = "Arturo Roberti"
+email = "arturo.roberti@outlook.com"
+
+[project.license]
+file = "LICENSE"
 
 [project.urls]
 Homepage = "https://github.com/ArturoRoberti/cmstp"
@@ -37,20 +24,18 @@ Issues = "https://github.com/ArturoRoberti/cmstp/issues"
 Documentation = "https://github.com/ArturoRoberti/cmstp#readme"
 
 [project.optional-dependencies]
-test = [
-    "pytest>=7.0",
-]
+test = [ "pytest>=7.0",]
 
 [project.scripts]
 cmstp = "cmstp.main:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.setuptools.package-data]
-"cmstp" = ["config/**", "scripts/**"]
+cmstp = [ "config/**", "scripts/**",]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
-addopts = ["--import-mode=importlib"]
+pythonpath = [ "src",]
+testpaths = [ "tests",]
+addopts = [ "--import-mode=importlib",]
+
+[tool.setuptools.packages.find]
+where = [ "src",]
