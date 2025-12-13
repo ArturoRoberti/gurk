@@ -44,7 +44,6 @@ def install_pip_environments(*args):
 
     # (STEP) Creating virtual environments in {Path.home() / '.virtualenvs'}
     env_dir = Path.home() / ".virtualenvs"
-    env_dir.mkdir(exist_ok=True)
     for env_name, packages in pip_envs.items():
         if not packages:
             Logger.step(

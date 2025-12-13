@@ -6,7 +6,8 @@ Look for TODOs in code. Otherwise, look at:
 - Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` in output)
 - Add descriptions to each function (inputs, outputs, what it does) both for python and bash
 - Have a `--force` (and/or `--reinstall`) argument to override checks (i.e. run even if already installed/configured)
-- See where `revert_sudo_permission` is necessary (isaac*, miniconda, .virtualenvs, configure-filestructure, ...) - include parent folders
+- See where `revert_sudo_permissions` is necessary (isaac*, miniconda, .virtualenvs, configure-filestructure, ...) - include parent folders
+    - Also, possibly no more "sudo" is necessary in any script; test
 
 # Minor
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)

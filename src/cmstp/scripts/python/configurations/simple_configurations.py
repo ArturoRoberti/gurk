@@ -112,7 +112,9 @@ def configure_filestructure(*args):
                         pass
                 elif string_type == "url":
                     # (STEP_NO_PROGRESS) Downloading file from {content} to {dest_path}...
-                    response = requests.get(content, timeout=60)
+                    response = requests.get(
+                        content, timeout=60, headers={"Accept-Encoding": "*"}
+                    )
                     if response.status_code == 200:
                         dest_path.write_bytes(response.content)
                     else:

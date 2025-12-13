@@ -23,3 +23,9 @@ done
 # Source check scripts
 source "${PACKAGE_SRC_PATH}/scripts/bash/configurations/checks.bash"
 source "${PACKAGE_SRC_PATH}/scripts/bash/installations/checks.bash"
+
+# Ensure this script is not run directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  echo "This is a collection of helpers and cannot be run directly - source it instead" >&2
+  exit 1
+fi

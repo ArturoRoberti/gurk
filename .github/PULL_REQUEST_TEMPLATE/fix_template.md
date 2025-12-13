@@ -4,4 +4,4 @@
 
 Fixes #[issue]
 
-<!-- Please add a "fix" label (and other applicable ones) via the UI -->
+<!-- Please add a "bug" label (and other applicable ones) via the UI -->
