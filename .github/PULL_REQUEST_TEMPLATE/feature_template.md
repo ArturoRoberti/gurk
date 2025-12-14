@@ -4,4 +4,4 @@
 
 Implements #[issue]
 
-<!-- Please add a "feature" label (and other applicable ones) via the UI -->
+<!-- Please add an "enhancement" label (and other applicable ones) via the UI -->

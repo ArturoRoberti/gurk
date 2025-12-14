@@ -89,7 +89,7 @@ def install_flatpak_packages(*args):
     install_packages_from_txt_file(InstallCommands.FLATPAK, config_file)
 
     # Add aliases for flatpak packages
-    if "create-aliases" in remaining_args:
+    if "--create-aliases" in remaining_args:
         # (STEP_NO_PROGRESS) Adding aliases for flatpak packages
         for pkg in get_clean_lines(config_file):
             pkg_name = pkg.split(".")[

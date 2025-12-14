@@ -112,6 +112,7 @@ run_bash_script_function() {
   fi
 }
 
+# TODO: Allow running with sudo too. How to differentiate "sudo" arg from other args?
 run_python_script_function() {
   : '
     Runs a Python script, optionally invoking a specific function within it.

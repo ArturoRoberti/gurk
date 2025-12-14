@@ -7,15 +7,16 @@ FieldTypeDict = Dict[str, List[Optional[type]]]
 
 # Required in default config - "'script': None" is actually not allowed, but defaults to None if nonexistent package is used
 TASK_ARGS_DEFAULT: FieldTypeDict = {
-    "allowed": [None, list],
+    "allowed": [list, None],
     "default": [list],
 }
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
     "description": [str],  # TODO: Use and add pytest
-    "script": [None, str],
+    "script": [str],
     "function": [None, str],
     "config_file": [None, str],  # TODO: Use and add pytest
     "depends_on": [list],
+    "privileged": [bool],
     "supercedes": [None, list],  # TODO: Use and add pytest
 }
 
@@ -122,6 +123,7 @@ class TaskDict(TypedDict):
     function:       Optional[str]
     config_file:    Optional[str]
     depends_on:     List[str]
+    privileged:     bool
     supercedes:     Optional[List[str]]
     args:           ArgsDict
 
@@ -189,5 +191,6 @@ class ResolvedTask:
     command:     Command       = field()
     config_file: Optional[str] = field(default=None)
     depends_on:  Tuple[str]    = field(default_factory=tuple)
+    privileged:  bool          = field(default=False)
     args:        Tuple[str]    = field(default_factory=tuple)
     # fmt: on

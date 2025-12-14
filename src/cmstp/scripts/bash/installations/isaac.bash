@@ -64,7 +64,7 @@ install_isaacsim() {
     download_url="${base_download_url}-${isaacsim_version}-${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.zip"
   fi
   local download_path=$(mktemp --suffix=".zip")
-  if ! wget -O "$download_path" "$download_url"; then
+  if ! wget "$download_url" -O "$download_path"; then
     error_msg "Failed to download IsaacSim version ${isaacsim_version} from ${download_url}"
     return 1
   fi
@@ -163,7 +163,7 @@ install_isaaclab() {
   # (STEP) Downloading IsaacLab version $isaaclab_version (this may take a while)...
   local download_url="https://github.com/isaac-sim/IsaacLab/archive/refs/tags/${isaaclab_version}.zip"
   local download_path=$(mktemp --suffix=".zip")
-  if ! wget -O "$download_path" "$download_url"; then
+  if ! wget "$download_url" -O "$download_path"; then
     error_msg "Failed to download IsaacLab version ${isaaclab_version} from ${download_url}"
     return 1
   fi

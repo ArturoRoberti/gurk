@@ -5,7 +5,6 @@ from cmstp.cli.utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
     get_prog,
-    get_sudo_access,
 )
 
 
@@ -19,7 +18,6 @@ def main():
 @click.pass_context
 def setup_cmd(ctx):
     """Main setup utility - Set up your computer based on a provided configuration (or defaults)"""
-    get_sudo_access()
     main_setup.main(ctx.args, prog=get_prog(ctx.info_name))
 
 

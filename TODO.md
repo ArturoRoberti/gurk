@@ -1,12 +1,11 @@
 Look for TODOs in code. Otherwise, look at:
 
 # !!! Major !!!
-- Update this README
+- Update the README with proper documentation
 - When using `-t task`, allow args to be passed, e.g. via `-t task:arg1:arg2`. Also, allow e.g. `enable_deps` to be passed
 - Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` in output)
 - Add descriptions to each function (inputs, outputs, what it does) both for python and bash
 - Have a `--force` (and/or `--reinstall`) argument to override checks (i.e. run even if already installed/configured)
-- See where `revert_sudo_permission` is necessary (isaac*, miniconda, .virtualenvs, configure-filestructure, ...) - include parent folders
 
 # Minor
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)
@@ -29,4 +28,9 @@ Look for TODOs in code. Otherwise, look at:
 - If verbose is set, save the modified scripts in log dir
 - Make dev instructions (e.g. to add a task, edit <...>; to add a field to tasks, edit <...>; to add a test, edit <...>; etc.)
 - Remove `sudo: mon_handle_sigchld: waitpid: No child processes` outputs
-- (If possible) Add a workflow that checks that there is a version bump in pyproject.toml
+- (If possible) Add checks to PyPI workflow to perform a version bump in pyproject.toml if necessary
+- Allow user creation (incl. permission)
+    - Read out and automatically add to all groups (except sudo) and if `--sudo` flag is given, also add to sudo group
+- Restructure `default.yaml` 'file' field, to specify one for each OS type (ubuntu, macos, windows)
+    - If null, then skip with warning via scheduler
+    - Shell scripts will be OS-specific. Question is, should python scripts be so too or rather made cross-platform?

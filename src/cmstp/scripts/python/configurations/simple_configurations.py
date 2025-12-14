@@ -10,7 +10,7 @@ from cmstp.core.logger import Logger, LoggerSeverity
 from cmstp.scripts.python.helpers._parsing import get_config_args
 from cmstp.scripts.python.helpers.processing import get_clean_lines
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
-from cmstp.utils.interface import bash_check
+from cmstp.utils.interface import bash_check, revert_sudo_permissions
 from cmstp.utils.patterns import PatternCollection
 from cmstp.utils.yaml import load_yaml
 
@@ -39,7 +39,6 @@ def configure_pinned_apps(*args):
 
 
 # TODO: Expand any "[/].../.../..." paths to dicts. Pay attention not to merge with existing dicts.
-# TODO: If "sudo" is not passed, use "revert_sudo_permission" util after creating files
 def configure_filestructure(*args):
     """Create a predefined file structure based on a YAML mapping."""
     # Parse config args
@@ -112,7 +111,9 @@ def configure_filestructure(*args):
                         pass
                 elif string_type == "url":
                     # (STEP_NO_PROGRESS) Downloading file from {content} to {dest_path}...
-                    response = requests.get(content, timeout=60)
+                    response = requests.get(
+                        content, timeout=60, headers={"Accept-Encoding": "*"}
+                    )
                     if response.status_code == 200:
                         dest_path.write_bytes(response.content)
                     else:
@@ -139,6 +140,10 @@ def configure_filestructure(*args):
                 Logger.step(
                     f"Unsupported entry type '{type(content)}' for {content}. Skipping..."
                 )
+
+            # Revert to user permissions if under HOME directory
+            if not sudo:
+                revert_sudo_permissions(dest_path)
 
     # Check file structure
     config_data = load_yaml(config_file)

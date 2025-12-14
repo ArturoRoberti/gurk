@@ -1,6 +1,4 @@
-import grp
 import os
-import pwd
 import shutil
 import sys
 from importlib import resources
@@ -73,25 +71,3 @@ def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
         return Path(resolved_path)
     else:  # str
         return str(resolved_path)
-
-
-def revert_sudo_permission(path: FilePath) -> None:
-    # Determine the real user who invoked sudo
-    user = os.environ.get("SUDO_USER") or os.environ["USER"]
-    uid = pwd.getpwnam(user).pw_uid
-    gid = grp.getgrnam(user).gr_gid
-
-    for root, dirs, files in os.walk(path):
-        for d in dirs:
-            full = os.path.join(root, d)
-            os.chown(full, uid, gid)
-            os.chmod(full, 0o775)  # drwxrwxr-x
-
-        for f in files:
-            full = os.path.join(root, f)
-            os.chown(full, uid, gid)
-            os.chmod(full, 0o664)  # -rw-rw-r--
-
-    # Also fix the top-level directory
-    os.chown(path, uid, gid)
-    os.chmod(path, 0o775)
