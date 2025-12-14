@@ -118,6 +118,7 @@ class TaskProcessor:
                 command=Command(task["script"], task["function"]),
                 config_file=task["config_file"],
                 depends_on=tuple(task["depends_on"]),
+                privileged=task["privileged"],
                 args=tuple(task["_resolved_args"]),
             )
             self.resolved_tasks.append(resolved_task)
@@ -145,6 +146,7 @@ class TaskProcessor:
 
         return tasks
 
+    # TODO: Much of this should be doable easier via "overlay_dicts" with "_defaults" for each task
     def fill_missing_fields(
         self,
         tasks: TaskDictCollection,

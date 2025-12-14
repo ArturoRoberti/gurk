@@ -13,7 +13,7 @@ from cmstp.scripts.python.helpers.processing import (
     InstallCommands,
     install_packages_from_list,
 )
-from cmstp.utils.interface import bash_check, revert_sudo_permissions
+from cmstp.utils.interface import bash_check
 
 
 def install_pip_environments(*args):
@@ -69,9 +69,6 @@ def install_pip_environments(*args):
                 f"Successfully installed packages for environment '{env_name}'"
             )
             pass
-
-    # Cleanup
-    revert_sudo_permissions(env_dir)
 
 
 # TODO: Test, especially the sourcing of bashrc stuff

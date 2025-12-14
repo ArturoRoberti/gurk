@@ -1,14 +1,11 @@
 Look for TODOs in code. Otherwise, look at:
 
 # !!! Major !!!
-- Update this README
+- Update the README with proper documentation
 - When using `-t task`, allow args to be passed, e.g. via `-t task:arg1:arg2`. Also, allow e.g. `enable_deps` to be passed
 - Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` in output)
 - Add descriptions to each function (inputs, outputs, what it does) both for python and bash
 - Have a `--force` (and/or `--reinstall`) argument to override checks (i.e. run even if already installed/configured)
-- See where `revert_sudo_permissions` is necessary (isaac*, miniconda, .virtualenvs, configure-filestructure, ...) - include parent folders
-    - Also, possibly no more "sudo" is necessary in any script; test
-    - Otherwise, what would be better is to run scripts without sudo, unless required (i.e. via field in `default.yaml`)
 
 # Minor
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)

@@ -11,6 +11,8 @@
 #   - If null, no configuration file is used                                                                    #
 #   - The config directory (default or specified) is prepended to the config_file path at runtime               #
 # - (list) 'depends_on' specifies a list of tasks that must be completed before the task can run                #
+# - (bool) 'privileged' specifies whether the task needs to be run with elevated privileges (sudo). This is     #
+#           only needed for python scripts that need sudo permissions without calling "sudo" via a subprocess   #
 # - (list) 'supercedes' specifies a list of tasks that are disabled if this task is enabled (as conflicting)    #
 # - (dict) 'args' specifies arguments for the task                                                              #
 #     - (list|null) 'allowed' specifies a list of allowed args                                                  #
@@ -48,6 +50,7 @@ install-apt-packages:
   function: install_apt_packages
   config_file: installations/install_apt_packages.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 install-conda:
@@ -56,6 +59,7 @@ install-conda:
   function: install_conda
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [miniconda, anaconda]
@@ -66,6 +70,7 @@ install-conda-environments:
   function: install_conda_environments
   config_file: installations/install_conda_environments.jsonc
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [--update]
@@ -76,6 +81,7 @@ install-cuda:  # TODO: Allow version specification, and then adapt driver versio
   script: !join [*bash_scripts, "installations/nvidia.bash"]
   function: install_cuda
   config_file: null
+  privileged: false
   supercedes: [install-nvidia-driver]
   depends_on: []
   args: *empty_args
@@ -86,6 +92,7 @@ install-docker:
   function: null
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [nvidia-container-toolkit, devcontainers-cli, distrobox]
@@ -96,6 +103,7 @@ install-docker-images:
   function: install_docker_images
   config_file: installations/install_docker_images.jsonc
   depends_on: [install-docker]
+  privileged: false
   supercedes: null
   args: *empty_args
 install-flatpak-packages:
@@ -105,6 +113,7 @@ install-flatpak-packages:
   function: install_flatpak_packages
   config_file: installations/install_flatpak_packages.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [create-aliases]
@@ -115,6 +124,7 @@ install-fzf:
   function: install_fzf
   config_file: null
   depends_on: [install-docker]
+  privileged: false
   supercedes: null
   args: *empty_args
 install-isaaclab:
@@ -123,6 +133,7 @@ install-isaaclab:
   function: install_isaaclab
   config_file: null
   depends_on: [install-isaacsim, install-conda]
+  privileged: false
   supercedes: null
   args:
     allowed: [recommended, latest, v2.*]
@@ -133,6 +144,7 @@ install-isaacsim:
   function: install_isaacsim
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [latest, 4.*, 5.*]
@@ -144,6 +156,7 @@ install-js-repositories:
   function: install_js_repositories
   config_file: installations/install_js_repositories.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [create-aliases]
@@ -155,6 +168,7 @@ install-loki-shell:
   function: install_loki_shell
   config_file: null
   depends_on: [install-fzf]
+  privileged: false
   supercedes: null
   args: *empty_args
 install-mamba:
@@ -163,6 +177,7 @@ install-mamba:
   function: install_mamba
   config_file: null
   depends_on: []  # "mamba" requires conda, "micromamba" does not (is standalone)
+  privileged: false
   supercedes: null
   args:
     allowed: [micromamba, mamba]
@@ -173,6 +188,7 @@ install-npm-packages:
   function: install_npm_packages
   config_file: installations/install_npm_packages.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 install-nvidia-driver:
@@ -182,6 +198,7 @@ install-nvidia-driver:
   function: install_nvidia_driver
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [recommended, latest, nvidia-driver-*, --include-server,
@@ -193,6 +210,7 @@ install-pip-environments:
   function: install_pip_environments
   config_file: installations/install_pip_environments.jsonc
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 install-pipx-packages:
@@ -201,6 +219,7 @@ install-pipx-packages:
   function: install_pipx_packages
   config_file: installations/install_pipx_packages.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 install-ros:
@@ -209,6 +228,7 @@ install-ros:
   function: null
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args:
     allowed: [latest, --include-future, ardent, bouncy, crystal, dashing,
@@ -220,6 +240,7 @@ install-snap-packages:
   function: install_snap_packages
   config_file: installations/install_snap_packages.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 install-vscode:
@@ -228,6 +249,7 @@ install-vscode:
   function: install_vscode
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 install-vscode-extensions:
@@ -236,6 +258,7 @@ install-vscode-extensions:
   function: install_vscode_extensions
   config_file: installations/install_vscode_extensions.txt
   depends_on: [install-vscode]
+  privileged: false
   supercedes: null
   args: *empty_args
 
@@ -248,6 +271,7 @@ uninstall-fzf:
   function: uninstall_fzf
   config_file: null
   depends_on: [uninstall-loki-shell]
+  privileged: false
   supercedes: null
   args: *empty_args
 uninstall-loki-shell:
@@ -256,6 +280,7 @@ uninstall-loki-shell:
   function: uninstall_loki_shell
   config_file: null
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 
@@ -268,6 +293,7 @@ configure-bashrc:
   function: configure_bashrc
   config_file: configurations/configure_bashrc.bash
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 configure-filestructure:
@@ -276,6 +302,7 @@ configure-filestructure:
   function: configure_filestructure
   config_file: configurations/configure_filestructure.yaml
   depends_on: []
+  privileged: true
   supercedes: null
   args:
     allowed: [--root, --overwrite]  # TODO: Repace "--overwrite" with general "--force" option
@@ -286,6 +313,7 @@ configure-pinned-apps:
   function: configure_pinned_apps
   config_file: configurations/configure_pinned_apps.txt
   depends_on: []
+  privileged: false
   supercedes: null
   args: *empty_args
 configure-vscode-keybindings:
@@ -294,5 +322,6 @@ configure-vscode-keybindings:
   function: configure_vscode_keybindings
   config_file: configurations/configure_vscode_keybindings.jsonc
   depends_on: [install-vscode]
+  privileged: false
   supercedes: null
   args: *empty_args

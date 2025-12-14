@@ -12,12 +12,14 @@ from cmstp.utils.common import (
 )
 
 
+# TODO: Make sure that "args" does not change over function calls
 def run_script_function(
     script: FilePath,
     function: Optional[str] = None,
     args: List[str] = [],
     run: bool = True,
     capture_output: bool = False,
+    sudo: bool = False,
 ) -> Union[str, subprocess.CompletedProcess]:
     """
     Build a wrapper script string for the specified command kind and possibly execute it.
@@ -41,7 +43,7 @@ def run_script_function(
         )
     elif kind == CommandKind.PYTHON:
         return _run_python_script_function(
-            script, function, args, run, capture_output
+            script, function, args, run, capture_output, sudo
         )
     else:
         raise ValueError(
@@ -51,10 +53,10 @@ def run_script_function(
 
 def _run_bash_script_function(
     script: FilePath,
-    function: Optional[str] = None,
-    args: List[str] = [],
-    run: bool = True,
-    capture_output: bool = False,
+    function: Optional[str],
+    args: List[str],
+    run: bool,
+    capture_output: bool,
 ) -> Union[str, subprocess.CompletedProcess]:
     """
     Build a bash wrapper script string and possibly execute it.
@@ -123,10 +125,11 @@ def _run_bash_script_function(
 
 def _run_python_script_function(
     script: FilePath,
-    function: Optional[str] = None,
-    args: List[str] = [],
-    run: bool = True,
-    capture_output: bool = False,
+    function: Optional[str],
+    args: List[str],
+    run: bool,
+    capture_output: bool,
+    sudo: bool,
 ) -> Union[str, subprocess.CompletedProcess]:
     """
     Build a Python wrapper script string and possibly execute it.
@@ -170,8 +173,9 @@ def _run_python_script_function(
         )
 
     if run:
+        sudo_prefix = ["sudo", "-E"] if sudo else []
         return subprocess.run(
-            [CommandKind.PYTHON.exe, "-c", wrapper_src],
+            [*sudo_prefix, CommandKind.PYTHON.exe, "-c", wrapper_src],
             capture_output=capture_output,
             text=True,
         )
@@ -191,7 +195,10 @@ def bash_check(check_name: str) -> subprocess.CompletedProcess:
     try:
         # Try running the helper function
         return run_script_function(
-            tmp_file_path, check_name, run=True, capture_output=True
+            script=tmp_file_path,
+            function=check_name,
+            run=True,
+            capture_output=True,
         )
     except Exception as e:
         # Return a failed CompletedProcess instead of None
@@ -213,5 +220,4 @@ def revert_sudo_permissions(path: FilePath) -> None:
         function="revert_sudo_permissions",
         args=[str(path)],
         run=True,
-        capture_output=False,
     )

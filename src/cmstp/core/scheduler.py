@@ -340,7 +340,8 @@ class Scheduler:
 
         # Get executable to run file. Also, use unbuffered output
         if task.command.kind == CommandKind.PYTHON:
-            exe_cmd = [task.command.kind.exe, "-u"]
+            sudo_prefix = ["sudo", "-E"] if task.privileged else []
+            exe_cmd = [*sudo_prefix, task.command.kind.exe, "-u"]
         else:  # Bash
             exe_cmd = ["stdbuf", "-oL", "-eL", task.command.kind.exe]
 

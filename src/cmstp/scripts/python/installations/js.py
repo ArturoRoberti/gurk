@@ -134,7 +134,7 @@ def install_js_repositories(*args):
             )
 
             # Add alias
-            if "create-aliases" in remaining_args:
+            if "--create-aliases" in remaining_args:
                 add_alias(
                     f"{pkg_name}='(cd {target} && {package_manager} start > /dev/null &)'"
                 )

@@ -12,7 +12,7 @@ from cmstp.scripts.python.helpers.processing import (
     install_packages_from_list,
     install_packages_from_txt_file,
 )
-from cmstp.utils.interface import bash_check, revert_sudo_permissions
+from cmstp.utils.interface import bash_check
 
 
 def add_alias(command: str):
@@ -24,7 +24,6 @@ def add_alias(command: str):
             return  # Alias already exists
     with open(bashrc_path, "a", encoding="utf-8") as bashrc:
         bashrc.write(f"\n{alias_cmd}\n")
-        revert_sudo_permissions(bashrc_path)
 
 
 def install_apt_packages(*args):
@@ -90,7 +89,7 @@ def install_flatpak_packages(*args):
     install_packages_from_txt_file(InstallCommands.FLATPAK, config_file)
 
     # Add aliases for flatpak packages
-    if "create-aliases" in remaining_args:
+    if "--create-aliases" in remaining_args:
         # (STEP_NO_PROGRESS) Adding aliases for flatpak packages
         for pkg in get_clean_lines(config_file):
             pkg_name = pkg.split(".")[
