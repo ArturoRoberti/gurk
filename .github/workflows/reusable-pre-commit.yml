@@ -96,7 +96,7 @@ jobs:
         # This is strict — if this fails the job fails and we will NOT push
         pre-commit run --all-files --show-diff-on-failure
 
-      # Push auto-fixes back to the branch (if final check passed) - TODO: Does this cause two CI runs?
+      # Push auto-fixes back to the branch (if final check passed)
     - name: Push auto-fixes (if any)
       if: ${{ env.SKIP_WORKFLOW != 'true' }}
       id: possible-push

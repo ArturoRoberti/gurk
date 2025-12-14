@@ -11,7 +11,7 @@ jobs:
   ci-pre-commit:
     uses: ./.github/workflows/reusable-pre-commit.yml
     secrets:
-      PAT: ${{ secrets.PRE_COMMIT_REPO_PAT }}
+      PAT: ${{ secrets.COMMIT_TOKEN }}
   # TODO: Add step here that checks if all yaml files are valid (i.e. all steps are part of allowed steps, all steps are defined in tree.yaml, etc.)
   ci-main-script:
     needs: ci-pre-commit

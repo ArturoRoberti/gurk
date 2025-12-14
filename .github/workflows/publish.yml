@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PRE_COMMIT_REPO_PAT }}
+        token: ${{ secrets.COMMIT_TOKEN }}
         fetch-depth: 0
         ref: ${{ github.ref }}
         persist-credentials: true
@@ -39,27 +39,23 @@ jobs:
       run: |
         python .github/scripts/bump_version.py
 
+    - name: Publish to PyPI (if no bump required)
+      run: |
+        if [ -z "$(git status --porcelain)" ]; then
+          python -m build
+          twine upload dist/*
+          echo "Published to PyPI"
+        else
+          echo "Version bump required, skipping publish"
+        fi
+
     - name: Commit bumped version
       run: |
-        # Commit any changes made by pre-commit (if any)
         if [ -n "$(git status --porcelain)" ]; then
           git add pyproject.toml
           git commit -m "Auto-bump version"
           git push origin HEAD:"${BRANCH}"
           echo "Committed version bump"
-          echo "COMMITTED_CHANGES=true" >> $GITHUB_ENV
         else
           echo "No changes to commit"
-          echo "COMMITTED_CHANGES=false" >> $GITHUB_ENV
         fi
-
-    - name: Build package
-      if: ${{ env.COMMITTED_CHANGES == 'true' }}
-      run: python -m build
-
-    - name: Publish to PyPI
-      if: ${{ env.COMMITTED_CHANGES == 'true' }}
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: twine upload dist/*
