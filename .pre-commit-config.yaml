@@ -82,3 +82,11 @@ repos:
   hooks:
   - id: gitleaks
     args: ["--no-banner", "protect", "--staged"]
+# Bump pyproject.toml version (if necessary)
+- repo: local
+  hooks:
+  - id: bump-version
+    name: Bump version in pyproject.toml
+    entry: python3 .github/scripts/bump_version.py
+    language: python
+    additional_dependencies: [packaging, requests, toml]

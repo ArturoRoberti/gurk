@@ -44,7 +44,6 @@ jobs:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        echo "Changed: $(git status --porcelain)"
         if [ -z "$(git status --porcelain)" ]; then
           python -m build
           twine upload dist/*
