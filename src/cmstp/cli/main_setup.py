@@ -78,8 +78,12 @@ def main(argv, prog):
         subprocess.run(["sudo", "-v"], check=True)
 
         with Logger(args.verbose) as logger:
-            # Process args
             setup_processor = MainSetupProcessor(logger, args, argv)
+
+            # Prompt pre-setup if this was never run before
+            setup_processor.prompt_pre_setup()
+
+            # Process args
             processed_args, cloned_config_dir = setup_processor.process_args()
 
             # Check system information

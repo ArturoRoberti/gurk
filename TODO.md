@@ -8,8 +8,7 @@ Look for TODOs in code. Otherwise, look at:
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)
 - (If possible) Only run CI on new or edited tasks
 - Add file with list of debian file links (then get and dpkg (or step apt?) them)
-- Maybe, when cmstp is run for the very first time, propose to do pre-setup first (then create mock file in pkg or so to mark that cmstp was already run once)
-    - Or just add big NOTE in README -> but that may not be seen by those installing via pipx
+    - How to specify pkg? Via url, gitref, local path, package path, ...?
 - Define and document behaviour of using none, one of, or both `--config-file` and `--config-directory`
     - How can a config file in a config dir repo be specified?
         - (Maybe) If it's an absolute path, look there. If it is relative, look locally and then in the repo

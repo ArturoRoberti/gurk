@@ -130,8 +130,9 @@ class PatternCollection(Enum):
             "UNTIL":    None,  # Python has no "until"
         },
     }
+    # TODO: Remove "path" - instead, only make it a link if "link://" is prepended. Also, allow concatenation of "link://package://"
     PATH: EnumValue[PathPatterns] = {
-        "path":         re.compile(r"^package://(.*)$"),
+        "path":         re.compile(r"^path://(.*)$"),
         "link":         re.compile(r"^link://(.*)$"),
         "package":      re.compile(r"^package://([^/]+)/(.*)$"),
         "url":          re.compile(r"^https?://[^\s]+$"),

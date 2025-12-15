@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from cmstp.core.logger import Logger
 from cmstp.utils.common import generate_random_path, resolve_package_path
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
+from cmstp.utils.interface import promt_bool
 from cmstp.utils.system_info import get_system_info
 from cmstp.utils.yaml import load_yaml
 
@@ -37,6 +38,26 @@ class MainSetupProcessor:
     args:   MainSetupArgs = field(repr=False)
     argv:   List[str]     = field(repr=False)
     # fmt: on
+
+    def prompt_pre_setup(self) -> None:
+        pre_setup_done_file = Path.home() / ".cmstp" / "pre_setup.done"
+        if not pre_setup_done_file.exists():
+            print(
+                "It seems that this is the first time you are running cmstp. "
+                "It is recommended to run the pre-setup first to ensure all "
+                "possible manual steps are taken care of."
+            )
+            if promt_bool("Would you like to run the pre-setup now?"):
+                from cmstp.cli.pre_setup import main as pre_setup_main
+
+                pre_setup_main([], prog="cmstp pre-setup")
+                self.logger.info("Pre-setup completed")
+            else:
+                self.logger.warning("Skipping pre-setup")
+
+            # Mark pre-setup as done
+            pre_setup_done_file.parent.mkdir(parents=True, exist_ok=True)
+            pre_setup_done_file.touch()
 
     def process_args(self) -> Tuple[MainSetupArgs, Optional[Path]]:
         """

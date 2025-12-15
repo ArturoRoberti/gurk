@@ -7,27 +7,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from rich import print as richprint
-
 from cmstp.core.logger import Logger, LoggerSeverity
+from cmstp.utils.interface import promt_bool
 from cmstp.utils.system_info import get_manufacturer
-
-
-def promt_bool(message: str) -> bool:
-    """
-    Prompt the user for a yes/no response.
-
-    :param message: The prompt message.
-    :type message: str
-    :return: True if the user responds with 'y', False for 'n'.
-    :rtype: bool
-    """
-    while True:
-        response = input(f"{message} (y/n): ").strip().lower()
-        if response in ["y", "n"]:
-            return response == "y"
-        else:
-            richprint("Invalid input. Please enter 'y' or 'n'")
 
 
 @dataclass
@@ -339,7 +321,7 @@ def main(argv, prog):
             or (
                 git_credentials_exist
                 and promt_bool(
-                    f"Git user name/email already set (to {git_credentials_manager.user_name} resp. {git_credentials_manager.user_email}). Would you like to update them?"
+                    f"Git user name/email already set (to '{git_credentials_manager.user_name}' resp. '{git_credentials_manager.user_email}'). Would you like to update them?"
                 )
             )
         ):

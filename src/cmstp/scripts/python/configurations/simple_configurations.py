@@ -84,6 +84,7 @@ def configure_filestructure(*args: List[str]) -> None:
                 link_match = PatternCollection.PATH.patterns["link"].match(
                     content
                 )
+                # TODO: Add package pattern. Also, see PatternCollection for related ToDo
                 if is_git_repo(content):
                     string_type = "git"
                 elif url_match:
