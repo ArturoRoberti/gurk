@@ -5,19 +5,15 @@
 #     enabled: true                                                                                             #
 #   """""""""""""""""""""                                                                                       #
 #   You can also enable ALL tasks via setting 'enable_all: true' or (recursively) enable all                    #
-#     dependencies of enabled tasks via setting 'enable_deps: true' as top-level fields                         #
+#     dependencies of enabled tasks via setting 'enable_dependencies: true' as top-level fields                 #
 #   If a task is also explicitly disabled, it will remain disabled.                                             #
 #                                                                                                               #
 # - You can specify custom args via e.g.                                                                        #
 #   """"""""""""""""""""""""""                                                                                  #
 #   install-apt-packages:                                                                                       #
 #     enabled: true                                                                                             #
-#     args:                                                                                                     #
-#       custom: [pkg1, pkg2]    # (optional)                                                                    #
-#       override_default: true  # (optional, default: false)                                                    #
+#     args: [pkg1, pkg2]    # (optional)                                                                        #
 #   """"""""""""""""""""""""""                                                                                  #
-#   If 'override_default' is true, only the 'custom' args will be used                                          #
-#   If 'override_default' is false, the 'default' args will be used in addition to the 'custom' ones            #
 #                                                                                                               #
 # - !!! If any arguments are passed that are not in the 'allowed' list, the task will be disabled !!!           #
 #################################################################################################################
@@ -26,6 +22,10 @@
 # In the enabled.yaml file, enable all tasks by default
 enable_all: true
 
+# Enable dependencies of enabled tasks automatically # Default: false
+enable_dependencies: true
+
+# Enable/disable single tasks and pass custom args below
 # In the enabled.yaml file disable all major tasks by default, as users may not want all of them
 install-cuda:
   enabled: false
@@ -39,9 +39,3 @@ install-nvidia-driver:
   enabled: false
 install-ros:
   enabled: false
-
-# Enable dependencies of enabled tasks automatically # Default: false
-# enable_deps: false
-
-# Enable/disable single tasks and pass custom args below
-# ...

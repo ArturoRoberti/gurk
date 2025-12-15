@@ -276,7 +276,10 @@ def main(argv, prog):
     parser = ArgumentParser(
         prog=prog,
         description="Prepare some manual setups",
-        formatter_class=ArgumentDefaultsHelpFormatter,
+        formatter_class=lambda prog: ArgumentDefaultsHelpFormatter(
+            prog=prog,
+            max_help_position=30,
+        ),
     )
     # Flags to short-circuit specific pre-setup tasks
     parser.add_argument(

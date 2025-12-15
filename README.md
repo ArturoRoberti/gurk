@@ -46,7 +46,7 @@ We recommend setting up the following before running the main installation/confi
 - Disabling Secure Boot (e.g. for installing NVIDIA drivers)
 
 You can use the provided helper to guide you through these steps:
-```
+```bash
 cmstp pre-setup [-s] [-g]
 ```
 
@@ -62,21 +62,27 @@ cmstp setup [-h] [-t TASKS [TASKS ...]] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [
 
 To use custom config installation/configuration config files, use (flag shorthand: `-d`)
 ```bash
-cmstp --config-directory </path/to/configs/ | git_url>
+cmstp setup --config-directory </path/to/configs/ | git_url>
 ```
 where `/path/to/configs/` is a directory containing multiple txt/json(c)/yaml/... configuration files (to be used by tasks as defined in this repo's `config/default.yaml` file) following this package's default `config/` directory. Each file in that directory should have the same name and structure as in the default. We **STRONGLY RECOMMEND** saving a personalized config directory as a git repository and providing the git URL instead of a local path. The repository will be cloned and used for the configurations. For more details and examples of configs, see [this README](https://github.com/ArturoRoberti/cmstp/blob/main/src/cmstp/config/README.md).
 
 To easily specify multiple tasks to be run, use (flag shorthand: `-f`)
 ```bash
-cmstp --config-file /path/to/config.yaml
+cmstp setup --config-file /path/to/config.yaml
 ```
 where the config file should be a yaml file following the structure of the `config/enabled.yaml` file in this package. That config file contains detailed explanations. Should a relative path be provided, the file will first be searched for locally and then in the config directory.
 
 To simply enable tasks with their default configurations, use (flag shorthand: `-t`)
 ```bash
-cmstp --tasks TASK1 TASK2 ...
+cmstp setup --tasks TASK1 TASK2 ...
 ```
-where `TASK1`, `TASK2`, ... are the task names as specified in the `config/enabled.yaml` file in this package. If both `--config-directory` and `--tasks` are provided, the `--tasks` flag takes precedence for enabling tasks.
+where `TASK1`, `TASK2`, ... are the task names as specified in the `config/enabled.yaml` file in this package. Task arguments may optionally be passed via colon separation, e.g. `--tasks task1:arg1:arg2 task2:arg1`, in which case they will override any existing arguments for those tasks. Note that the precedence for any fields passed to tasks is as follows: `CLI tasks` > `config file` > `default config`.
+
+Further options are
+- `--enable-all` to enable all tasks (takes precedence over config file)
+- `--enable-dependencies` to automatically enable dependencies of enabled tasks (takes precedence over config file)
+- `--disable-preparation` to disable updating/upgrading apt beforehand (not recommended)
+- `-v, --verbose` to enable verbose logging
 
 # Contributing
 Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/cmstp/blob/main/.github/CONTRIBUTING.md) for contribution guidelines.

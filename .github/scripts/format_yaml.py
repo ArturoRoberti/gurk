@@ -32,19 +32,25 @@ def compress_comments(file_path: Path):
 
 
 def strip_trailing_whitespace(file_path: Path):
+    # Ensure whitespace consistency
     lines = file_path.read_text(encoding="utf-8").splitlines()
     stripped = [ln.rstrip() for ln in lines]
     file_path.write_text("\n".join(stripped) + "\n", encoding="utf-8")
 
 
 def format_file(file_path: Path):
+    text = file_path.read_text(encoding="utf-8")
+    if text == "":
+        # Leave empty files completely untouched
+        return
+
     if not file_path.parent == Path(".github/workflows"):
         compress_comments(file_path)
 
     with file_path.open("r", encoding="utf-8") as f:
         data = yaml.load(f)
 
-    if data is None:
+    if data is not None:
         # Only comments exist; leave as-is
         return
 

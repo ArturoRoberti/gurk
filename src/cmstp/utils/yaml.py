@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from ruamel.yaml import YAML
 
@@ -82,37 +82,65 @@ def load_yaml(yaml_file: Path) -> Optional[Dict[str, Any]]:
     return normalize_yaml(content)
 
 
-def overlay_dicts(
-    base: Dict, overlay: Dict, allow_default: bool = False
-) -> Dict:
+def overlay_dicts(dicts: List[Dict], allow_default: bool = False) -> Dict:
     """
-    Recursively overlay overlay-dict onto base-dict.
-    Keys in overlay replace or update those in base, unless the value is "default".
+    Overlay multiple dictionaries in order, with later dictionaries
+    replacing or updating keys in earlier ones. If allow_default is True,
+    keys with the value "default" in overlaying dictionaries will keep
+    the value from the base dictionary.
 
-    :param base: The base dictionary to overlay onto
-    :type base: Dict
-    :param overlay: The overlay dictionary with updates
-    :type overlay: Dict
+    :param dicts: List of dictionaries to overlay
+    :type dicts: List[Dict]
     :param allow_default: Whether to allow "default" values to keep base values
     :type allow_default: bool
-    :return: The resulting dictionary after overlay
+    :return: The resulting overlaid dictionary
     :rtype: Dict
     """
-    overlayed_dict = deepcopy(base)
-    for key, value in overlay.items():
-        if allow_default and key in overlayed_dict and value == "default":
-            # Keep base value
-            continue
-        elif (
-            key in overlayed_dict
-            and isinstance(overlayed_dict[key], dict)
-            and isinstance(value, dict)
-        ):
-            # Recursively overlay nested dicts
-            overlayed_dict[key] = overlay_dicts(
-                overlayed_dict[key], value, allow_default
-            )
-        else:
-            # Directly set/replace value
-            overlayed_dict[key] = value
+
+    def _overlay_two_dicts(
+        base: Dict, overlay: Dict, allow_default: bool = False
+    ) -> Dict:
+        """
+        Recursively overlay overlay-dict onto base-dict.
+        Keys in overlay replace or update those in base, unless the value is "default".
+
+        :param base: The base dictionary to overlay onto
+        :type base: Dict
+        :param overlay: The overlay dictionary with updates
+        :type overlay: Dict
+        :param allow_default: Whether to allow "default" values to keep base values
+        :type allow_default: bool
+        :return: The resulting dictionary after overlay
+        :rtype: Dict
+        """
+        overlayed = deepcopy(base)
+        for key, value in overlay.items():
+            if allow_default and key in overlayed and value == "default":
+                # Keep base value
+                continue
+            elif (
+                key in overlayed
+                and isinstance(overlayed[key], dict)
+                and isinstance(value, dict)
+            ):
+                # Recursively overlay nested dicts
+                overlayed[key] = _overlay_two_dicts(
+                    overlayed[key], value, allow_default
+                )
+            else:
+                # Directly set/replace value
+                overlayed[key] = value
+        return overlayed
+
+    # Check input
+    if not all(isinstance(d, dict) for d in dicts):
+        raise ValueError("Input 'dicts' must be a list of dictionaries.")
+
+    # Overlay all dictionaries in order
+    overlayed_dict = deepcopy(dicts[0])
+    for current_dict in dicts[1:]:
+        overlayed_dict = _overlay_two_dicts(
+            overlayed_dict, current_dict, allow_default
+        )
+
     return overlayed_dict

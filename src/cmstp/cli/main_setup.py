@@ -15,16 +15,14 @@ from cmstp.utils.common import PACKAGE_CONFIG_PATH
 def main(argv, prog):
     parser = ArgumentParser(
         prog=prog,
-        description="Main setup utility - Set up your computer based on a provided configuration (or defaults)",
-        formatter_class=ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "-t",
-        "--tasks",
-        type=str,
-        nargs="+",
-        default=None,
-        help="Specify the tasks to run (default: all enabled tasks in the config file)",
+        description=(
+            "Main setup utility - Set up your computer based on a provided "
+            "configuration (or defaults)"
+        ),
+        formatter_class=lambda prog: ArgumentDefaultsHelpFormatter(
+            prog=prog,
+            max_help_position=60,
+        ),
     )
     parser.add_argument(
         "-f",
@@ -41,7 +39,25 @@ def main(argv, prog):
         help="Path to the configuration directory",
     )
     parser.add_argument(
-        "-p",
+        "-t",
+        "--tasks",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Specify the tasks to run (default: all enabled tasks in the config file)",
+    )
+    # Add '--enable-all' and '--enable-dependencies'
+    parser.add_argument(
+        "--enable-all",
+        action="store_true",
+        help="Enable all tasks in the configuration file, unless explicitly disabled",
+    )
+    parser.add_argument(
+        "--enable-dependencies",
+        action="store_true",
+        help="Enable all dependencies of the specified tasks, even if they are disabled",
+    )
+    parser.add_argument(
         "--disable-preparation",
         action="store_true",
         help="(Not recommended) Disable updating/upgrading apt beforehand",
@@ -75,6 +91,8 @@ def main(argv, prog):
                 processed_args.config_file,
                 processed_args.config_directory,
                 processed_args.tasks,
+                processed_args.enable_all,
+                processed_args.enable_dependencies,
             )
 
             # Pre-setup

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from cmstp.utils.command import Command
 
@@ -21,20 +21,18 @@ TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
 }
 
 # Optional in custom config
-TASK_ARGS_CUSTOM: FieldTypeDict = {
-    "custom": [list],
-    "override_default": [bool],
-}
 TASK_PROPERTIES_CUSTOM: FieldTypeDict = {
     "enabled": [bool],
     "config_file": [None, str],  # TODO: Use and add pytest
+    "args": [list],
 }
 
+# TODO: Auto-detect via flag in default config?
 HARDWARE_SPECIFIC_TASKS = ["install-nvidia-driver", "install-cuda"]
 
 
 def print_expected_task_fields(
-    args_types: FieldTypeDict, keys_types: FieldTypeDict
+    keys_types: FieldTypeDict, args_types: Optional[FieldTypeDict] = None
 ) -> str:
     """
     Returns a YAML-like string with a top-level task name, first-level
@@ -62,7 +60,9 @@ def print_expected_task_fields(
         return ", ".join(formatted_items)
 
     # Prepare key width for alignment (including indented args keys)
-    all_keys = list(keys_types.keys()) + [f"  {k}" for k in args_types.keys()]
+    all_keys = list(keys_types.keys())
+    if args_types:
+        all_keys += [f"  {k}" for k in args_types.keys()]
     max_key_len = max(len(k) for k in all_keys) + 2
 
     lines = ["<task-name>:"]
@@ -110,13 +110,11 @@ def check_structure(obj: Any, expected: FieldTypeDict) -> bool:
 
 
 class ArgsDict(TypedDict):
-    """Dictionary representing task arguments."""
+    """Dictionary representing task arguments in the default config file."""
 
     # fmt: off
     allowed:          Optional[List[str]]
-    custom:           List[str]
     default:          List[str]
-    override_default: bool
     # fmt: on
 
 
@@ -135,13 +133,16 @@ def is_args_dict(
     :return: True if the object is a valid ArgsDict, False otherwise
     :rtype: bool
     """
-    expected_args = dict()
-    if include_default:
-        expected_args |= TASK_ARGS_DEFAULT
     if include_custom:
-        expected_args |= TASK_ARGS_CUSTOM
+        return isinstance(obj, list) and all(
+            isinstance(arg, str) for arg in obj
+        )
+    else:
+        expected_args = dict()
+        if include_default:
+            expected_args |= TASK_ARGS_DEFAULT
 
-    return check_structure(obj, expected_args)
+        return check_structure(obj, expected_args)
 
 
 class TaskDict(TypedDict):
@@ -156,9 +157,7 @@ class TaskDict(TypedDict):
     depends_on:     List[str]
     privileged:     bool
     supercedes:     Optional[List[str]]
-    args:           ArgsDict
-
-    _resolved_args: List[str]
+    args:           Union[ArgsDict, List[str]]
     # fmt: on
 
 
@@ -185,14 +184,17 @@ def is_task_dict(
 
     if not isinstance(obj, dict):
         return False
-    obj_noargs = {k: v for k, v in obj.items() if k != "args"}
-    obj_args = obj.get("args")
 
-    return check_structure(obj_noargs, expected_keys) and is_args_dict(
-        obj_args,
-        include_default=include_default,
-        include_custom=include_custom,
-    )
+    if not include_custom:
+        obj_noargs = {k: v for k, v in obj.items() if k != "args"}
+        obj_args = obj.get("args")
+        return check_structure(obj_noargs, expected_keys) and is_args_dict(
+            obj_args,
+            include_default=include_default,
+            include_custom=include_custom,
+        )
+    else:
+        return check_structure(obj, expected_keys)
 
 
 TaskDictCollection = Dict[str, TaskDict]

@@ -7,6 +7,7 @@ from cmstp.core.logger import Logger
 from cmstp.utils.common import generate_random_path, resolve_package_path
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
 from cmstp.utils.system_info import get_system_info
+from cmstp.utils.yaml import load_yaml
 
 
 @dataclass
@@ -16,9 +17,11 @@ class MainSetupArgs:
     """
 
     # fmt: off
-    tasks:               List[str] = field(init=False, default_factory=list)
     config_file:         Path      = field(init=False, default=None)
     config_directory:    Path      = field(init=False, default=None)
+    tasks:               List[str] = field(init=False, default_factory=list)
+    enable_all:          bool      = field(init=False, default=False)
+    enable_dependencies: bool      = field(init=False, default=False)
     disable_preparation: bool      = field(init=False, default=False)
     # fmt: on
 
@@ -85,6 +88,7 @@ class MainSetupProcessor:
         main_setup_args.config_directory = self.args.config_directory
 
         # Config file
+        ## Check existence
         if self.args.tasks and not any(
             arg in self.argv for arg in ("-f", "--config-file")
         ):
@@ -99,9 +103,36 @@ class MainSetupProcessor:
                 self.args.config_file = possible_config_file
             else:
                 self.logger.fatal(
-                    f"Config file not found: {self.args.config_file}",
+                    f"Config file '{self.args.config_file}' not found",
                 )
-        main_setup_args.config_file = self.args.config_file
+        ## Validate
+        resolved_config_file = resolve_package_path(self.args.config_file)
+        if resolved_config_file is not None:
+            config = load_yaml(resolved_config_file)
+            if config is None:
+                self.logger.warning(
+                    "Config file does not exist or is not valid YAML - skipping it"
+                )
+            if not config:
+                self.logger.warning("Config file is empty")
+            if not isinstance(config, dict):
+                self.logger.fatal(
+                    "Config file does not define a dict, "
+                    f"but a {type(config).__name__}"
+                )
+        main_setup_args.config_file = resolved_config_file
+
+        # Enable all
+        main_setup_args.enable_all = (
+            self.args.enable_all if self.args.enable_all else None
+        )
+
+        # Enable dependencies
+        main_setup_args.enable_dependencies = (
+            self.args.enable_dependencies
+            if self.args.enable_dependencies
+            else None
+        )
 
         # Disable preparation
         main_setup_args.disable_preparation = self.args.disable_preparation

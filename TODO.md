@@ -2,7 +2,6 @@ Look for TODOs in code. Otherwise, look at:
 
 # !!! Major !!!
 - Update the README with proper documentation
-- When using `-t task`, allow args to be passed, e.g. via `-t task:arg1:arg2`. Also, allow e.g. `enable_deps` to be passed
 - Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` in output)
 - Have a `--force` (and/or `--reinstall`) argument to override checks (i.e. run even if already installed/configured)
 - Issue assignee workflow seems to trigger twice on each issue creation, if no assignee is given
