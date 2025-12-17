@@ -70,7 +70,7 @@ To easily specify multiple tasks to be run, use (flag shorthand: `-f`)
 ```bash
 cmstp setup --config-file /path/to/config.yaml
 ```
-where the config file should be a yaml file following the structure of the `config/enabled.yaml` file in this package. That config file contains detailed explanations. Should a relative path be provided, the file will first be searched for locally and then in the config directory.
+where the config file should be a yaml file following the structure of the `config/enabled.yaml` file in this package. That config file contains detailed explanations. Should a relative path be provided, the file will first be searched for locally and then in the config directory. Should a git reference be provided, the repository will be cloned and the file searched for there, as specified in the git reference.
 
 To simply enable tasks with their default configurations, use (flag shorthand: `-t`)
 ```bash
@@ -83,6 +83,25 @@ Further options are
 - `--enable-dependencies` to automatically enable dependencies of enabled tasks (takes precedence over config file)
 - `--disable-preparation` to disable updating/upgrading apt beforehand (not recommended)
 - `-v, --verbose` to enable verbose logging
+
+## Note on Git References
+When providing a git reference (for `--config-directory`, `--config-file` or anywhere else), the format is as follows:
+```bash
+<git_url>[?<param>=<value>&...]
+```
+
+with supported query parameters:
+- branch: branch name
+- commit: commit hash (overrides branch if both provided)
+- path: subdirectory path within the repo
+- depth: clone depth (integer)
+
+Examples are
+```
+https://github.com/user/repo.git
+https://github.com/user/repo.git?branch=main
+https://github.com/user/repo.git?commit=abc123&branch=dev&depth=1
+```
 
 # Contributing
 Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/cmstp/blob/main/.github/CONTRIBUTING.md) for contribution guidelines.

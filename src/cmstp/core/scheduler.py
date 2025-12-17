@@ -408,6 +408,9 @@ class Scheduler:
         self.logger.debug(
             f"Prepared modified script for task '{task.name}' at {modified_script} with {n_steps} steps"
         )
+        self.logger.log_script(
+            modified_script, task.name, ext=task.command.kind.ext
+        )
 
         def safe_unlink(path: Optional[Path]) -> None:
             """

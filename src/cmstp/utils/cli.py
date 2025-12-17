@@ -126,27 +126,26 @@ class MainSetupProcessor:
                     f"Failed to clone config directory "
                     f"git repo '{self.args.config_directory}'",
                 )
-            self.args.config_directory = cloned_path
+            elif not cloned_path.is_dir():
+                self.logger.fatal(
+                    "Specified '--config-directory' is ",
+                    f"actually not a directory: {cloned_path}",
+                )
+            else:
+                main_setup_args.config_directory = cloned_path
         else:
             # Local path
-            self.args.config_directory = resolve_package_path(
-                self.args.config_directory
-            )
-            if (
-                self.args.config_directory is not None
-                and self.args.config_directory.exists()
-            ):
-                if self.args.config_directory.is_file():
-                    # If a file is specified, use its parent directory
-                    self.args.config_directory = (
-                        self.args.config_directory.parent
-                    )
-                # else: It's a directory, use as is
-            else:
+            config_directory = resolve_package_path(self.args.config_directory)
+            if config_directory is None:
                 self.logger.fatal(
-                    f"Config directory not found: {self.args.config_directory}",
+                    f"Config directory '{self.args.config_directory}' not found",
                 )
-        main_setup_args.config_directory = self.args.config_directory
+            elif not config_directory.is_dir():
+                self.logger.fatal(
+                    f"Config directory '{self.args.config_directory}' is not a directory",
+                )
+            else:
+                main_setup_args.config_directory = config_directory
 
         # Config file
         ## Check existence
@@ -162,6 +161,18 @@ class MainSetupProcessor:
             )
             if possible_config_file.exists():
                 self.args.config_file = possible_config_file
+            elif is_git_repo(str(self.args.config_file)):
+                # Git repo
+                cloned_path = clone_git_files(
+                    str(self.args.config_file),
+                )
+                if cloned_path is None:
+                    self.logger.fatal(
+                        f"Failed to clone config file git repo "
+                        f"'{self.args.config_file}'",
+                    )
+                else:
+                    self.args.config_file = cloned_path
             else:
                 self.logger.fatal(
                     f"Config file '{self.args.config_file}' not found",

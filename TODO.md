@@ -1,22 +1,17 @@
 Look for TODOs in code. Otherwise, look at:
 
 # !!! Major !!!
-- Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` in output)
+- Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` or `⚠ Partial` in output)
 - Find a safer way than to use askpass file for scripts
 
 # Minor
 ## CI
 - (If possible) Only run CI on new or edited tasks
 ## Core
-- Define and document behaviour of using none, one of, or both `--config-file` and `--config-directory`
-    - How can a config file in a config dir repo be specified?
-        - (Maybe) If it's an absolute path, look there. If it is relative, look locally and then in the repo
-    - Update README too
 - Test cyclic `supercedes` fields
 - Update logging to file (i.e. `CMSTP START ...`) to only have a single CMSTP section, and fill stuff in there
 - Remove uninstallations from "enable_all" etc. Or better, have a "counterpart" field or similar and if both install/uninstall are enabled, disable uninstall (say this in debug, not info/warning message)
 - Maybe add a `requires-restart` flag or so to each task and make final message depend on that
-- If verbose is set, save the modified scripts in log dir
 - Make dev instructions (e.g. to add a task, edit <...>; to add a field to tasks, edit <...>; to add a test, edit <...>; etc.)
 - Restructure `default.yaml` 'file' field, to specify one for each OS type (ubuntu, macos, windows)
     - If null, then skip with warning via scheduler

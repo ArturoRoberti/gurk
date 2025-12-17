@@ -1,3 +1,4 @@
+import shutil
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -71,6 +72,28 @@ class Logger:
     def create_log_dir(self) -> None:
         """Create the log directory if it does not exist."""
         self.logdir.mkdir(parents=True, exist_ok=True)
+        if self.verbose:
+            script_logdir = self.logdir / "modified_scripts"
+            script_logdir.mkdir(parents=True, exist_ok=True)
+
+    def log_script(self, script: Path, task_name: str, ext: str) -> None:
+        """
+        Save the given script to the log directory under 'modified_scripts'.
+
+        :param script: Content of the script to log
+        :type script: Path
+        :param task_name: Name of the script file
+        :type task_name: str
+        :param ext: Extension of the script file (e.g., 'sh', 'py')
+        :type ext: str
+        """
+        if not self.verbose:
+            # Don't log scripts if not in verbose mode
+            return
+
+        shutil.copy2(
+            script, self.logdir / "modified_scripts" / f"{task_name}.{ext}"
+        )
 
     def add_task(self, task_name: str, total: int = 1) -> TaskID:
         """

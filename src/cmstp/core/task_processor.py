@@ -289,6 +289,8 @@ class TaskProcessor:
             self._allowed_args[task_name] = task["args"]["allowed"]
             task["args"] = task["args"]["default"]
 
+        # TODO: Check for cycles in dependencies and supercedes here (instead)
+
         self.logger.debug("Default config file is valid")
         return default_config
 
@@ -561,7 +563,7 @@ class TaskProcessor:
             for conflicted_task in task["supercedes"]:
                 if tasks[conflicted_task]["enabled"]:
                     tasks[conflicted_task]["enabled"] = False
-                    self.logger.debug(
+                    self.logger.warning(
                         f"Disabling task '{conflicted_task}' because it "
                         f"conflicts with superceding task '{task_name}'"
                     )
