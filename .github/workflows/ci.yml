@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
     - main
-    types: [opened, edited, synchronize, reopened] # TODO: Test if this works with pre-commit pushing changes
+    types: [opened, edited, synchronize, reopened]
   workflow_dispatch: null
 
 jobs:
@@ -12,7 +12,6 @@ jobs:
     uses: ./.github/workflows/reusable-pre-commit.yml
     secrets:
       PAT: ${{ secrets.COMMIT_TOKEN }}
-  # TODO: Add step here that checks if all yaml files are valid (i.e. all steps are part of allowed steps, all steps are defined in tree.yaml, etc.)
   ci-main-script:
     needs: ci-pre-commit
     # Avoid double runs if pre-commit pushed changes

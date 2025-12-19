@@ -214,7 +214,7 @@ _add_graphics_drivers_ppa() {
     sudo add-apt-repository -y ppa:graphics-drivers/ppa
   fi
 
-  if [[ "$prime_select" == "true" ]]; then
+  if [[ "$prime_select" == true ]]; then
     # TODO: May not work - in that case remove /etc/apt/.../cuda* files instead (pin and list)
     # Prioritize graphics-drivers PPA for NVIDIA driver packages (over CUDA repo)
     sudo tee /etc/apt/preferences.d/cmstp-nvidia-driver-pin >/dev/null <<'EOF'
@@ -246,24 +246,24 @@ _install_nvidia_driver() {
 
   #Install Requirement(s)
   apt_install mokutil
-  if [[ "$prime_select" == "true" ]]; then
+  if [[ "$prime_select" == true ]]; then
     apt_install nvidia-prime
   fi
 
   # Check if secure boot is enabled
   output=$(mokutil --sb-state 2>/dev/null)
   if echo "$output" | grep -q "enabled"; then
-    log_step "Aborting NVIDIA driver installation, as Secure Boot is ENABLED. Please disable Secure Boot via your BIOS menu and try again."
+    log_step "Aborting NVIDIA driver installation, as Secure Boot is ENABLED. Please disable Secure Boot via your BIOS menu and try again." true
     return 1
   elif ! echo "$output" | grep -q "disabled"; then
-    log_step "Could not determine Secure Boot state - assuming it is disabled."
+    log_step "Could not determine Secure Boot state - assuming it is disabled." true
   fi
 
   # Install Driver
   apt_install "$driver_version"
 
   # Prioritizing NVIDIA GPU
-  if [[ "$prime_select" == "true" ]]; then
+  if [[ "$prime_select" == true ]]; then
     sudo prime-select nvidia
   fi
 }
@@ -286,7 +286,7 @@ install_nvidia_driver() {
   get_config_args "$@"
 
   # Check if NVIDIA Driver is already installed
-  if check_install_nvidia_driver; then
+  if check_install_nvidia_driver && [[ "$FORCE" == false ]]; then
     # TODO: Check if version matches the recommended/requested one?
     # TODO: Check if prime-select is set (if requested)?
     log_step "NVIDIA Driver is already installed - Exiting"
@@ -327,7 +327,7 @@ install_nvidia_driver() {
     done
   fi
   if [[ -z "$driver_version" ]]; then
-    error_msg "No (valid) NVIDIA driver specified (recommended, latest, nvidia-driver-*)"
+    log_step "No (valid) NVIDIA driver specified (recommended, latest, nvidia-driver-*)" true
     return 1
   fi
 
@@ -421,19 +421,19 @@ install_cuda() {
   get_config_args "$@"
 
   # Check if CUDA is already installed
-  if check_install_cuda; then
+  if check_install_cuda && [[ "$FORCE" == false ]]; then
     if ! check_install_nvidia_driver; then
       log_step "CUDA is already installed, but a (compatible) NVIDIA Driver is missing - Installing again with recommended driver"
     else
       # TODO: Check if driver is compatible with installed CUDA
-      log_step "CUDA and NVIDIA Driver are already installed - Exiting"
+      log_step "CUDA and NVIDIA Driver are already installed - Exiting" true
       return 0
     fi
   fi
 
   # Check GCC version compatibility
   if ! check_gcc_version; then
-    log_step "ERROR: Incompatibility between current default GCC version and kernel CC version detected (see previous logs)."
+    log_step "ERROR: Incompatibility between current default GCC version and kernel CC version detected (see previous logs)." true
     echo "Consider using the following to install the correct version:"
     echo "sudo apt update && sudo apt install gcc-<kernel-major-version> g++-<kernel-major-version>"
     echo "sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-<CURRENT-GCC-MAJOR-VERSION> 10"
@@ -447,7 +447,7 @@ install_cuda() {
 
   # (STEP) Detecting GPU
   if ! lspci | grep -i VGA | grep -iq nvidia; then
-    error_msg "No NVIDIA GPU detected - skipping CUDA installation"
+    log_step "No NVIDIA GPU detected - skipping CUDA installation"
     return 0
   fi
 

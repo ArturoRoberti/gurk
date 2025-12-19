@@ -12,7 +12,7 @@ configure_bashrc() {
       0 if configured, 1 otherwise
     '
   # Check if already configured
-  if check_configure_bashrc; then
+  if check_configure_bashrc && [[ "$FORCE" == false ]]; then
     log_step "~/.bashrc is already configured - Exiting"
     return 0
   fi
@@ -21,7 +21,7 @@ configure_bashrc() {
   # Parse config args
   get_config_args "$@"
   if [ -z "$CONFIG_FILE" ]; then
-    log_step "Skipping configuration of the ~/.bashrc, as no task config file is provided" false
+    log_step "Skipping configuration of the ~/.bashrc, as no task config file is provided" true
     return 0
   fi
 

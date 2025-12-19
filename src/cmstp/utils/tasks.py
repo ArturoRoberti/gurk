@@ -5,26 +5,31 @@ from cmstp.utils.command import Command
 
 FieldTypeDict = Dict[str, List[Optional[type]]]
 
-# Required in default config - "'script': None" is actually not allowed, but defaults to None if nonexistent package is used
+# Required in default config. NOTE:
+# - "'script': None" is actually not allowed, but defaults to None if nonexistent package is used
 TASK_ARGS_DEFAULT: FieldTypeDict = {
     "allowed": [list, None],
     "default": [list],
 }
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
-    "description": [str],  # TODO: Use and add pytest
+    "description": [str],
     "script": [str],
     "function": [None, str],
-    "config_file": [None, str],  # TODO: Use and add pytest
+    "config_file": [None, str],
     "depends_on": [list],
     "privileged": [bool],
-    "supercedes": [None, list],  # TODO: Use and add pytest
+    "supercedes": [list],
 }
 
 # Optional in custom config
 TASK_PROPERTIES_CUSTOM: FieldTypeDict = {
     "enabled": [bool],
-    "config_file": [None, str],  # TODO: Use and add pytest
+    "config_file": [None, str],
     "args": [list],
+}
+DEFAULT_CUSTOM_CONFIG = {
+    key: val[0]() if callable(val[0]) else val[0]
+    for key, val in TASK_PROPERTIES_CUSTOM.items()
 }
 
 # TODO: Auto-detect via flag in default config?
@@ -32,16 +37,14 @@ HARDWARE_SPECIFIC_TASKS = ["install-nvidia-driver", "install-cuda"]
 
 
 def print_expected_task_fields(
-    keys_types: FieldTypeDict, args_types: Optional[FieldTypeDict] = None
+    default: bool = False,
 ) -> str:
     """
     Returns a YAML-like string with a top-level task name, first-level
     properties and and second-level args, along with their expected types.
 
-    :param args_types: Types for args fields
-    :type args_types: FieldTypeDict
-    :param keys_types: Types for top-level task fields
-    :type keys_types: FieldTypeDict
+    :param default: Whether to use default task fields or custom task fields
+    :type default: bool
     :return: Formatted string representing expected task fields
     :rtype: str
     """
@@ -58,6 +61,13 @@ def print_expected_task_fields(
             formatted_items.append(formatted)
 
         return ", ".join(formatted_items)
+
+    if default:
+        keys_types = TASK_PROPERTIES_DEFAULT
+        args_types = TASK_ARGS_DEFAULT
+    else:
+        keys_types = TASK_PROPERTIES_CUSTOM
+        args_types = None
 
     # Prepare key width for alignment (including indented args keys)
     all_keys = list(keys_types.keys())
@@ -86,14 +96,18 @@ def print_expected_task_fields(
     return "\n".join(lines)
 
 
-def check_structure(obj: Any, expected: FieldTypeDict) -> bool:
+def check_structure(
+    obj: Any, expected: FieldTypeDict, allow_default: bool = False
+) -> bool:
     """
-    Check if an object matches its expected structure.
+    Check if an object matches its expected structure (or is 'default').
 
     :param obj: The object to check
     :type obj: Any
     :param expected: Expected structure description
     :type expected: FieldTypeDict
+    :param allow_default: Whether to allow 'default' as a valid value
+    :type allow_default: bool
     :return: True if the object matches the expected structure, False otherwise
     :rtype: bool
     """
@@ -103,6 +117,8 @@ def check_structure(obj: Any, expected: FieldTypeDict) -> bool:
         return False
     for key, types in expected.items():
         if None in types and obj[key] is None:
+            continue
+        if allow_default and obj[key] == "default":
             continue
         if type(obj[key]) not in types:
             return False
@@ -142,7 +158,7 @@ def is_args_dict(
         if include_default:
             expected_args |= TASK_ARGS_DEFAULT
 
-        return check_structure(obj, expected_args)
+        return check_structure(obj, expected_args, include_custom)
 
 
 class TaskDict(TypedDict):
@@ -194,7 +210,7 @@ def is_task_dict(
             include_custom=include_custom,
         )
     else:
-        return check_structure(obj, expected_keys)
+        return check_structure(obj, expected_keys, include_custom)
 
 
 TaskDictCollection = Dict[str, TaskDict]

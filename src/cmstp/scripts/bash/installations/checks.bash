@@ -232,7 +232,8 @@ check_install_isaacsim() {
   # ${ISAACSIM_PYTHON_EXE} ${ISAACSIM_PATH}/standalone_examples/api/isaacsim.core.api/add_cubes.py
 }
 
-# TODO (test install without starting window etc.)
+# TODO: (test install without starting window etc.)
+# TODO: Maybe return path to env (given by conda cmd) or somehow path to installation directory?
 check_install_isaaclab() {
   : '
     Check if NVIDIA Isaac Lab is installed.
@@ -240,11 +241,15 @@ check_install_isaaclab() {
     Args:
       None
     Outputs:
-      Path to the Isaac Lab installation if installed.
+      None
     Returns:
-      0 if installed, 1 otherwise
+      0 if installed (with conda), 1 otherwise
     '
-  # python scripts/tutorials/00_sim/create_empty.py
+  if bash -ic "conda env list" | grep isaaclab; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 check_gcc_version() {

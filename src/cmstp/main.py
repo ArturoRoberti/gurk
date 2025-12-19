@@ -4,11 +4,13 @@ from cmstp.cli import info, main_setup, pre_setup
 from cmstp.cli.utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
+    VERSION,
     get_prog,
 )
 
 
 @click.group(context_settings=GROUP_CONTEXT_SETTINGS)
+@click.version_option(version=VERSION, prog_name="cmstp")
 def main():
     """cmstp - Package allowing a simple, automatic computer setup"""
     pass

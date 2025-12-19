@@ -22,6 +22,7 @@ def get_config_args(
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--system-info", type=str, default=None)
     parser.add_argument("--config-file", type=Path, default=None)
+    parser.add_argument("--force", action="store_true")
     args, remaining = parser.parse_known_args(args)
 
     # System info
@@ -42,4 +43,4 @@ def get_config_args(
         )
         raise FileNotFoundError
 
-    return system_info, args.config_file, remaining
+    return system_info, args.config_file, args.force, remaining

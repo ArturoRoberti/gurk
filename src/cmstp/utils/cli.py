@@ -1,13 +1,54 @@
+import getpass
+import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import List, Optional, Tuple
 
 from cmstp.core.logger import Logger
 from cmstp.utils.common import generate_random_path, resolve_package_path
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
+from cmstp.utils.interface import promt_bool
+from cmstp.utils.logger import TaskTerminationType
 from cmstp.utils.system_info import get_system_info
 from cmstp.utils.yaml import load_yaml
+
+
+def get_sudo_askpass() -> Path:
+    # Reset sudo permissions
+    subprocess.run(["sudo", "-k"])
+
+    # Create temporary askpass file
+    with NamedTemporaryFile(mode="w", delete=False) as askpass_file:
+        attempts = 3
+        while attempts > 0:
+            response = getpass.getpass(
+                "[sudo] password for {}: ".format(getpass.getuser())
+            )
+            test_response = subprocess.run(
+                ["sudo", "-S", "-v"],
+                input=response + "\n",
+                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if test_response.returncode == 0:
+                break
+            else:
+                if attempts != 1:
+                    print("Sorry, try again.")
+                attempts -= 1
+        else:
+            print("sudo: 3 incorrect password attempts")
+            sys.exit(1)
+
+        askpass_file.write("#!/bin/sh\n" f"echo '{response}'\n")
+        askpass_path = askpass_file.name
+
+    os.chmod(askpass_path, 0o700)
+    return askpass_path
 
 
 @dataclass
@@ -38,6 +79,26 @@ class MainSetupProcessor:
     argv:   List[str]     = field(repr=False)
     # fmt: on
 
+    def prompt_pre_setup(self) -> None:
+        pre_setup_done_file = Path.home() / ".cmstp" / "pre_setup.done"
+        if not pre_setup_done_file.exists():
+            print(
+                "It seems that this is the first time you are running cmstp. "
+                "It is recommended to run the pre-setup first to ensure all "
+                "possible manual steps are taken care of."
+            )
+            if promt_bool("Would you like to run the pre-setup now?"):
+                from cmstp.cli.pre_setup import main as pre_setup_main
+
+                pre_setup_main([], prog="cmstp pre-setup")
+                self.logger.info("Pre-setup completed")
+            else:
+                self.logger.warning("Skipping pre-setup")
+
+            # Mark pre-setup as done
+            pre_setup_done_file.parent.mkdir(parents=True, exist_ok=True)
+            pre_setup_done_file.touch()
+
     def process_args(self) -> Tuple[MainSetupArgs, Optional[Path]]:
         """
         Docstring for process_args
@@ -65,27 +126,26 @@ class MainSetupProcessor:
                     f"Failed to clone config directory "
                     f"git repo '{self.args.config_directory}'",
                 )
-            self.args.config_directory = cloned_path
+            elif not cloned_path.is_dir():
+                self.logger.fatal(
+                    "Specified '--config-directory' is ",
+                    f"actually not a directory: {cloned_path}",
+                )
+            else:
+                main_setup_args.config_directory = cloned_path
         else:
             # Local path
-            self.args.config_directory = resolve_package_path(
-                self.args.config_directory
-            )
-            if (
-                self.args.config_directory is not None
-                and self.args.config_directory.exists()
-            ):
-                if self.args.config_directory.is_file():
-                    # If a file is specified, use its parent directory
-                    self.args.config_directory = (
-                        self.args.config_directory.parent
-                    )
-                # else: It's a directory, use as is
-            else:
+            config_directory = resolve_package_path(self.args.config_directory)
+            if config_directory is None:
                 self.logger.fatal(
-                    f"Config directory not found: {self.args.config_directory}",
+                    f"Config directory '{self.args.config_directory}' not found",
                 )
-        main_setup_args.config_directory = self.args.config_directory
+            elif not config_directory.is_dir():
+                self.logger.fatal(
+                    f"Config directory '{self.args.config_directory}' is not a directory",
+                )
+            else:
+                main_setup_args.config_directory = config_directory
 
         # Config file
         ## Check existence
@@ -101,6 +161,18 @@ class MainSetupProcessor:
             )
             if possible_config_file.exists():
                 self.args.config_file = possible_config_file
+            elif is_git_repo(str(self.args.config_file)):
+                # Git repo
+                cloned_path = clone_git_files(
+                    str(self.args.config_file),
+                )
+                if cloned_path is None:
+                    self.logger.fatal(
+                        f"Failed to clone config file git repo "
+                        f"'{self.args.config_file}'",
+                    )
+                else:
+                    self.args.config_file = cloned_path
             else:
                 self.logger.fatal(
                     f"Config file '{self.args.config_file}' not found",
@@ -113,9 +185,10 @@ class MainSetupProcessor:
                 self.logger.warning(
                     "Config file does not exist or is not valid YAML - skipping it"
                 )
-            if not config:
+                resolved_config_file = None
+            elif not config:
                 self.logger.warning("Config file is empty")
-            if not isinstance(config, dict):
+            elif not isinstance(config, dict):
                 self.logger.fatal(
                     "Config file does not define a dict, "
                     f"but a {type(config).__name__}"
@@ -168,6 +241,9 @@ class MainSetupProcessor:
             text=True,
         )
         self.logger.update_task(requirements_id, "Updated apt packages")
+        self.logger.debug(
+            f"Preparation apt update output:\n{result_update.stdout}\n{result_update.stderr}"
+        )
 
         result_upgrade = subprocess.run(
             ["sudo", "apt-get", "-y", "upgrade"],
@@ -175,11 +251,19 @@ class MainSetupProcessor:
             text=True,
         )
         self.logger.update_task(requirements_id, "Upgraded apt packages")
+        self.logger.debug(
+            f"Preparation apt upgrade output:\n{result_upgrade.stdout}\n{result_upgrade.stderr}"
+        )
 
         success = (
             result_update.returncode == 0 and result_upgrade.returncode == 0
         )
-        self.logger.finish_task(requirements_id, success=success)
+        self.logger.finish_task(
+            requirements_id,
+            success=TaskTerminationType.SUCCESS
+            if success
+            else TaskTerminationType.FAILURE,
+        )
 
         if not success:
             error_msg = "Failed to update/upgrade apt packages"

@@ -13,7 +13,7 @@ install_vscode() {
   get_config_args "$@"
 
   # Check if VSCode is already installed
-  if check_install_vscode; then
+  if check_install_vscode && [[ "$FORCE" == false ]]; then
     log_step "VSCode is already installed - Exiting"
     return 0
   fi
@@ -49,7 +49,7 @@ install_fzf() {
       0 if successful (or already installed), 1 otherwise
     '
   # Test if fzf is already installed
-  if check_install_fzf; then
+  if check_install_fzf && [[ "$FORCE" == false ]]; then
     log_step "fzf is already installed - Exiting"
     return 0
   fi
@@ -78,11 +78,11 @@ install_loki_shell() {
       0 if successful (or already installed), 1 otherwise
     '
   # Test if loki-shell is already installed
-  if check_install_loki_shell; then
+  if check_install_loki_shell && [[ "$FORCE" == false ]]; then
     log_step "loki-shell is already installed - Exiting"
     return 0
   elif ! check_install_docker; then
-    error_msg "Docker must be installed before installing loki-shell"
+    log_step "Docker must be installed before installing loki-shell" true
     return 1
   fi
 

@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import toml
+
 GROUP_CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
     "max_content_width": 200,
@@ -10,6 +12,9 @@ SUBCOMMAND_CONTEXT_SETTINGS = {
     "allow_extra_args": True,
     "help_option_names": [],
 }
+VERSION = toml.load(f"{Path(__file__).parents[3]}/pyproject.toml")["project"][
+    "version"
+]
 
 
 def get_prog(info_name: str) -> str:

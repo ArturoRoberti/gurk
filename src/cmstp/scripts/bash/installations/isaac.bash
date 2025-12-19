@@ -1,4 +1,4 @@
-get_latest_isaacsim_version() {
+_get_latest_isaacsim_version() {
   : '
     Function to get the latest Isaac Sim version from release notes
 
@@ -32,14 +32,14 @@ install_isaacsim() {
   get_config_args "$@"
 
   # Check if IsaacSim is already installed
-  if check_install_isaacsim; then
+  if check_install_isaacsim && [[ "$FORCE" == false ]]; then
     log_step "IsaacSim is already installed - Exiting"
     return 0
   fi
 
   # Check OS type
   if [[ "${SYSTEM_INFO[type]}" != "linux" && "${SYSTEM_INFO[type]}" != "windows" ]]; then
-    error_msg "Unsupported OS type for IsaacSim: ${SYSTEM_INFO[type]} (only linux/windows supported)"
+    log_step "Unsupported OS type for IsaacSim: ${SYSTEM_INFO[type]} (only linux/windows supported)" true
     return 1
   fi
 
@@ -50,7 +50,7 @@ install_isaacsim() {
   local isaacsim_version=""
   if _contains REMAINING_ARGS "latest"; then
     # (1st Priority) Use latest available version
-    isaacsim_version=$(get_latest_isaacsim_version)
+    isaacsim_version=$(_get_latest_isaacsim_version)
   else
     # (2nd Priority) Use specified version
     for version in "${REMAINING_ARGS[@]}"; do
@@ -61,7 +61,7 @@ install_isaacsim() {
     done
   fi
   if [ -z "$isaacsim_version" ]; then
-    error_msg "No (valid) IsaacSim version specified (latest, 4.*, 5.*)"
+    log_step "No (valid) IsaacSim version specified (latest, 4.*, 5.*)" true
     return 1
   fi
 
@@ -79,7 +79,7 @@ install_isaacsim() {
   fi
   local download_path=$(mktemp --suffix=".zip")
   if ! wget "$download_url" -O "$download_path"; then
-    error_msg "Failed to download IsaacSim version ${isaacsim_version} from ${download_url}"
+    log_step "Failed to download IsaacSim version ${isaacsim_version} from ${download_url}" true
     return 1
   fi
 
@@ -87,9 +87,10 @@ install_isaacsim() {
   local install_path="$HOME/isaac/isaacsim"
   mkdir -p "$install_path"
   if ! unzip "$download_path" -d "$install_path"; then
-    error_msg "Failed to unzip IsaacSim version ${isaacsim_version} to ${install_path}"
+    log_step "Failed to unzip IsaacSim version ${isaacsim_version} to ${install_path}" true
     return 1
   fi
+  rm "$download_path"
 
   # Add environment variables to bashrc - TODO: Use util for this
   local bashrc_path="${HOME}/.bashrc"
@@ -104,121 +105,7 @@ install_isaacsim() {
   check_install_isaacsim
 }
 
-get_latest_isaaclab_version() {
-  : '
-    Function to get the latest IsaacLab version from the version dropdown
-
-    Args:
-      None
-    Outputs:
-      Latest Isaac Lab version string
-    Returns:
-      0 (unless an unexpected error occurs)
-    '
-  local URL="https://isaac-sim.github.io/IsaacLab/main/index.html"
-  curl -s "$URL" |
-    grep -Eo '>[v]?[0-9]+\.[0-9]+\.[0-9]+<' |
-    sed -E 's/[><]//g' |
-    sort -V |
-    tail -n1
-}
-
-# TODO: Test
-install_isaaclab() {
-  : '
-    Function to install Isaac Lab (only officially supported versions)
-
-    Args:
-      - Configuration Args
-    Outputs:
-      Log messages indicating the current progress and installation outputs
-    Returns:
-      0 if successful (or already installed), 1 otherwise
-    '
-  # Parse config args
-  get_config_args "$@"
-
-  # Check if IsaacLab is already installed
-  if check_install_isaaclab; then
-    log_step "IsaacLab is already installed - Exiting"
-    return 0
-  elif ! check_install_isaacsim || ! check_install_conda; then
-    error_msg "IsaacSim and Conda must be installed before installing IsaacLab"
-    return 1
-  fi
-  local isaacsim_path=$(check_install_isaacsim)
-
-  # (STEP) Installing Requirement(s)
-  apt_install wget unzip
-  apt_install cmake build-essential # required for isaaclab
-
-  # (STEP) Determining requested IsaacLab version
-  local isaaclab_version=""
-  if _contains REMAINING_ARGS "recommended"; then
-    # (1st Priority) Find best matching version for installed IsaacSim
-    local isaacsim_version=$(head -n1 "${isaacsim_path}/VERSION" || true)
-    if [[ -z "$isaacsim_version" ]]; then
-      error_msg "Failed to determine installed IsaacSim version from ${isaacsim_path}/VERSION"
-      return 1
-    elif [[ "$isaacsim_version" != 4.* && "$isaacsim_version" != 5.* ]]; then
-      error_msg "Unsupported IsaacSim version for IsaacLab: ${isaacsim_version} (only 4.*, 5.* supported)"
-      return 1
-    elif [[ "$isaacsim_version" == 4.0.0 || "$isaacsim_version" == 4.1.0 || "$isaacsim_version" == 4.2.0 ]]; then
-      error_msg "IsaacSim versions older than 4.5.0 are not supported for the IsaacLab installation in this repo - please find and install a fitting IsaacLab version manually (see 'https://isaac-sim.github.io/IsaacLab' and use the toggle for older versions of IsaacLab)"
-      return 1
-    fi
-    isaaclab_version=$(find_best_isaaclab "$isaacsim_version")
-  else
-    if _contains REMAINING_ARGS "latest"; then
-      # (2nd Priority) Use latest available version
-      isaaclab_version=$(get_latest_isaaclab_version)
-    else
-      # (Last Priority) Use specified version
-      for version in "${REMAINING_ARGS[@]}"; do
-        if [[ "$version" == v2.* ]]; then
-          isaaclab_version="$version"
-          break
-        fi
-      done
-    fi
-    # TODO: Test if the version works with installed isaacsim version
-  fi
-  if [ -z "$isaaclab_version" ]; then
-    error_msg "No (valid) IsaacLab version found/specified (latest, v2.*)"
-    return 1
-  fi
-
-  # (STEP) Downloading IsaacLab version $isaaclab_version (this may take a while)...
-  local download_url="https://github.com/isaac-sim/IsaacLab/archive/refs/tags/${isaaclab_version}.zip"
-  local download_path=$(mktemp --suffix=".zip")
-  if ! wget "$download_url" -O "$download_path"; then
-    error_msg "Failed to download IsaacLab version ${isaaclab_version} from ${download_url}"
-    return 1
-  fi
-
-  # (STEP) Unzipping IsaacLab to $HOME/isaac/isaaclab
-  local install_path="$HOME/isaac/isaaclab"
-  local unzipped=$(mktemp -d)
-  if ! unzip "$download_path" -d "$unzipped"; then
-    error_msg "Failed to unzip IsaacLab version ${isaaclab_version} to ${install_path}"
-    return 1
-  fi
-  mv "$unzipped"/* "$install_path"
-
-  # Create symlink to isaacsim
-  ln -s "${isaacsim_path}" "${install_path}/_isaac_sim"
-
-  # (STEP) Creating conda environment
-  bash -i ${install_path}/isaaclab.sh --conda
-
-  # (STEP) Installing IsaacLab into conda environment
-  bash -ic "conda run -n env_isaaclab ${install_path}/isaaclab.sh --install"
-
-  # Verify installation
-  check_install_isaaclab
-}
-
-find_best_isaaclab() {
+_find_best_isaaclab() {
   : '
     Function to find the best matching IsaacLab version for a given IsaacSim version
 
@@ -270,4 +157,122 @@ find_best_isaaclab() {
     sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/X/0/g' |
     sort -V |
     tail -1
+}
+
+_get_latest_isaaclab_version() {
+  : '
+    Function to get the latest IsaacLab version from the version dropdown
+
+    Args:
+      None
+    Outputs:
+      Latest Isaac Lab version string
+    Returns:
+      0 (unless an unexpected error occurs)
+    '
+  local URL="https://isaac-sim.github.io/IsaacLab/main/index.html"
+  curl -s "$URL" |
+    grep -Eo '>[v]?[0-9]+\.[0-9]+\.[0-9]+<' |
+    sed -E 's/[><]//g' |
+    sort -V |
+    tail -n1
+}
+
+# TODO: Test
+install_isaaclab() {
+  : '
+    Function to install Isaac Lab (only officially supported versions)
+
+    Args:
+      - Configuration Args
+    Outputs:
+      Log messages indicating the current progress and installation outputs
+    Returns:
+      0 if successful (or already installed), 1 otherwise
+    '
+  # Parse config args
+  get_config_args "$@"
+
+  # Check if IsaacLab is already installed
+  if check_install_isaaclab && [[ "$FORCE" == false ]]; then
+    log_step "IsaacLab is already installed - Exiting"
+    return 0
+  elif ! check_install_isaacsim || ! check_install_conda; then
+    log_step "IsaacSim and Conda must be installed before installing IsaacLab" true
+    return 1
+  fi
+  local isaacsim_path=$(check_install_isaacsim)
+
+  # (STEP) Installing Requirement(s)
+  apt_install wget unzip
+  apt_install cmake build-essential # required for isaaclab
+
+  # (STEP) Determining requested IsaacLab version
+  local isaaclab_version=""
+  if _contains REMAINING_ARGS "recommended"; then
+    # (1st Priority) Find best matching version for installed IsaacSim
+    local isaacsim_version=$(head -n1 "${isaacsim_path}/VERSION" || true)
+    if [[ -z "$isaacsim_version" ]]; then
+      log_step "Failed to determine installed IsaacSim version from ${isaacsim_path}/VERSION" true
+      return 1
+    elif [[ "$isaacsim_version" != 4.* && "$isaacsim_version" != 5.* ]]; then
+      log_step "Unsupported IsaacSim version for IsaacLab: ${isaacsim_version} (only 4.*, 5.* supported)" true
+      return 1
+    elif [[ "$isaacsim_version" == 4.0.0 || "$isaacsim_version" == 4.1.0 || "$isaacsim_version" == 4.2.0 ]]; then
+      log_step "IsaacSim versions older than 4.5.0 are not supported for the IsaacLab installation in this repo - please find and install a fitting IsaacLab version manually (see 'https://isaac-sim.github.io/IsaacLab' and use the toggle for older versions of IsaacLab)" true
+      return 1
+    fi
+    isaaclab_version=$(_find_best_isaaclab "$isaacsim_version")
+  else
+    if _contains REMAINING_ARGS "latest"; then
+      # (2nd Priority) Use latest available version
+      isaaclab_version=$(_get_latest_isaaclab_version)
+    else
+      # (Last Priority) Use specified version
+      for version in "${REMAINING_ARGS[@]}"; do
+        if [[ "$version" == v2.* ]]; then
+          isaaclab_version="$version"
+          break
+        fi
+      done
+    fi
+    # TODO: Test if the version works with installed isaacsim version
+  fi
+  if [ -z "$isaaclab_version" ]; then
+    log_step "No (valid) IsaacLab version found/specified (latest, v2.*)" true
+    return 1
+  fi
+
+  # (STEP) Downloading IsaacLab version $isaaclab_version (this may take a while)...
+  local download_url="https://github.com/isaac-sim/IsaacLab/archive/refs/tags/${isaaclab_version}.zip"
+  local download_path=$(mktemp --suffix=".zip")
+  if ! wget "$download_url" -O "$download_path"; then
+    log_step "Failed to download IsaacLab version ${isaaclab_version} from ${download_url}" true
+    return 1
+  fi
+
+  # (STEP) Unzipping IsaacLab to $HOME/isaac/isaaclab
+  local install_path="$HOME/isaac/isaaclab"
+  local unzipped=$(mktemp -d)
+  if ! unzip "$download_path" -d "$unzipped"; then
+    log_step "Failed to unzip IsaacLab version ${isaaclab_version} to ${install_path}" true
+    return 1
+  fi
+  mv "$unzipped"/* "$install_path"
+
+  # Cleanup
+  rm -rf "$unzipped"
+  rm "$download_path"
+
+  # Create symlink to isaacsim
+  ln -s "${isaacsim_path}" "${install_path}/_isaac_sim"
+
+  # (STEP) Creating conda environment
+  bash -i ${install_path}/isaaclab.sh --conda
+
+  # (STEP) Installing IsaacLab into conda environment
+  bash -ic "conda run -n env_isaaclab ${install_path}/isaaclab.sh --install"
+
+  # Verify installation
+  check_install_isaaclab
 }

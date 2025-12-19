@@ -24,10 +24,11 @@ def install_pip_environments(*args: List[str]) -> None:
     :type args: List[str]
     """
     # Parse config args
-    _, config_file, _ = get_config_args(args)
+    _, config_file, _, _ = get_config_args(args)
     if config_file is None:
         Logger.step(
-            "Skipping installation of pip packages, as no task config file is provided"
+            "Skipping installation of pip packages, as no task config file is provided",
+            warning=True,
         )
         return
 
@@ -43,7 +44,8 @@ def install_pip_environments(*args: List[str]) -> None:
     )
     if not pip_envs:
         Logger.step(
-            "Skipping installation of pip packages, as no environments are specified"
+            "Skipping installation of pip packages, as no environments are specified",
+            warning=True,
         )
         return
 
@@ -52,12 +54,15 @@ def install_pip_environments(*args: List[str]) -> None:
     for env_name, packages in pip_envs.items():
         if not packages:
             Logger.step(
-                f"Skipping installation of pip packages for environment '{env_name}', as no packages are specified"
+                f"Skipping installation of pip packages for environment '{env_name}', as no packages are specified",
+                warning=True,
             )
             continue
 
         # Create virtual environment
-        venv.create(env_dir / env_name, with_pip=True)
+        venv.create(
+            env_dir / env_name, with_pip=True
+        )  # TODO: Is any handling of existing envs needed?
         pip_executable = env_dir / env_name / "bin" / "pip"
 
         # Install packages
@@ -66,7 +71,8 @@ def install_pip_environments(*args: List[str]) -> None:
         )
         if result.returncode != 0:
             Logger.step(
-                f"Failed to install packages for environment '{env_name}'"
+                f"Failed to install packages for environment '{env_name}'",
+                warning=True,
             )
             pass
         else:
@@ -85,10 +91,11 @@ def install_conda_environments(*args: List[str]) -> None:
     :type args: List[str]
     """
     # Parse config args
-    _, config_file, remaining_args = get_config_args(args)
+    _, config_file, force, remaining_args = get_config_args(args)
     if config_file is None:
         Logger.step(
-            "Skipping installation of conda environments, as no task config file is provided"
+            "Skipping installation of conda environments, as no task config file is provided",
+            warning=True,
         )
         return
 
@@ -109,7 +116,8 @@ def install_conda_environments(*args: List[str]) -> None:
     )
     if not conda_envs:
         Logger.step(
-            "Skipping installation of conda environments, as no environments are specified"
+            "Skipping installation of conda environments, as no environments are specified",
+            warning=True,
         )
         return
 
@@ -124,19 +132,22 @@ def install_conda_environments(*args: List[str]) -> None:
         """Check if conda environment type field is valid."""
         if env_type is None:
             Logger.step(
-                f"No environment type specified for '{env_name}' - Skipping"
+                f"No environment type specified for '{env_name}' - Skipping",
+                warning=True,
             )
             return False
         elif env_type not in conda_exe.keys():
             Logger.step(
-                f"Unsupported environment type '{env_type}' for '{env_name}' - Skipping"
+                f"Unsupported environment type '{env_type}' for '{env_name}' - Skipping",
+                warning=True,
             )
             return False
 
         for conda_type, exe in conda_exe.items():
             if env_type == conda_type and exe is None:
                 Logger.step(
-                    f"'{env_type}' is not installed, cannot create environment '{env_name}' - Skipping"
+                    f"'{env_type}' is not installed, cannot create environment '{env_name}' - Skipping",
+                    warning=True,
                 )
                 return False
 
@@ -155,7 +166,8 @@ def install_conda_environments(*args: List[str]) -> None:
         pip_packages = env_spec.get("pip_packages", [])
         if not conda_packages and not pip_packages:
             Logger.step(
-                f"Skipping installation of conda environment '{env_name}', as no packages are specified"
+                f"Skipping installation of conda environment '{env_name}', as no packages are specified",
+                warning=True,
             )
             continue
 
@@ -200,9 +212,14 @@ def install_conda_environments(*args: List[str]) -> None:
             capture_output=True,
             text=True,
         )
-        if result.returncode == 0:
+        if (
+            result.returncode == 0
+            and "--update" not in remaining_args
+            and not force
+        ):
             Logger.step(
-                f"Environment '{env_name}' already exists - Skipping creation"
+                f"Environment '{env_name}' already exists - Skipping creation",
+                warning=True,
             )
             continue
 
@@ -210,16 +227,35 @@ def install_conda_environments(*args: List[str]) -> None:
         if "--update" in remaining_args:
             conda_cmd = ["update" if x == "create" else x for x in conda_cmd]
         else:
-            # TODO: Allow --force as well (in which case the existing env is deleted (via mm env remove -n <env_name>) and recreated)
-            Logger.step(
-                f"Environment '{env_name}' already exists - Skipping creation"
-            )
-            continue
+            if force:
+                result = subprocess.run(
+                    [conda_exe[env_type], "env", "remove", "-n", env_name],
+                    capture_output=True,
+                    text=True,
+                )
+                if not result.returncode == 0:
+                    Logger.step(
+                        f"Failed to remove existing environment '{env_name}' - Skipping creation",
+                        warning=True,
+                    )
+                    continue
+            else:
+                Logger.step(
+                    f"Environment '{env_name}' already exists - Skipping creation",
+                    warning=True,
+                )
+                continue
 
-        # (STEP_NO_PROGRESS) Creating environment '{env_name}' with {env_type}
+        # Create environment
+        Logger.step(
+            f"Creating environment '{env_name}' with {env_type}...",
+            warning=True,
+        )
         result = subprocess.run(conda_cmd)
         if result.returncode != 0:
-            Logger.step(f"Failed to create environment '{env_name}'")
+            Logger.step(
+                f"Failed to create environment '{env_name}'", warning=True
+            )
             success = False
             continue
         else:

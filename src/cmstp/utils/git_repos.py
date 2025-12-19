@@ -62,7 +62,7 @@ def parse_git_ref(repo: GitRef) -> GitRefInfo:
 
     Supported query parameters:
         - branch: branch name
-        - commit: commit hash
+        - commit: commit hash (overrides branch if both provided)
         - path: subdirectory path within the repo
         - depth: clone depth (integer)
 

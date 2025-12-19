@@ -1,16 +1,19 @@
 import json
 import os
+import pty
 import subprocess
+import termios
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Queue
-from tempfile import NamedTemporaryFile
-from threading import Lock, Thread
+from tempfile import NamedTemporaryFile, TemporaryDirectory
+from threading import Event, Lock, Thread
 from typing import Dict, List, Optional, Set, TextIO, Tuple
 
 from cmstp.core.logger import Logger
 from cmstp.utils.command import Command, CommandKind
 from cmstp.utils.interface import run_script_function
+from cmstp.utils.logger import TaskTerminationType
 from cmstp.utils.patterns import PatternCollection
 from cmstp.utils.system_info import get_system_info
 from cmstp.utils.tasks import ResolvedTask
@@ -21,11 +24,12 @@ class Scheduler:
     """Schedules and runs tasks with dependencies, handling logging and progress tracking."""
 
     # fmt: off
-    logger:      Logger             = field(repr=False)
-    tasks:       List[ResolvedTask] = field(repr=False)
+    logger:    Logger             = field(repr=False)
+    tasks:     List[ResolvedTask] = field(repr=False)
+    askpass_file: str         = field(repr=False)
 
-    results:   Dict[ResolvedTask, bool] = field(init=False, repr=False, default_factory=dict)
-    scheduled: Set[ResolvedTask]        = field(init=False, repr=False, default_factory=set)
+    results:   Dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
+    scheduled: Set[ResolvedTask]                             = field(init=False, repr=False, default_factory=set)
 
     lock:      Lock  = field(init=False, repr=False, default_factory=Lock)
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
@@ -36,7 +40,7 @@ class Scheduler:
         """
         Prepare a copy of the desired script that
         - Uses STEP statements only if in the desired function (or entrypoint)
-        - Converts all STEP and STEP_NO_PROGRESS comments into equivalent print statements.
+        - Converts all STEP comments into equivalent print statements.
 
         :param command: Command to prepare
         :type command: Command
@@ -125,37 +129,23 @@ class Scheduler:
 
             :param line: The line to check
             :type line: str
-            :return: Tuple of (step message, step type). Step type is "comment_progress" for STEP comments, "comment_no_progress" for STEP_NO_PROGRESS comments, "any_progress" for STEP print statements, "any_no_progress" for STEP_NO_PROGRESS print statements or None if not a STEP line.
+            :return: Tuple of (step message, step type). Step type is
+                     "comment" for STEP comments or
+                     "any" for (assumed) STEP print statements or
+                     None if not a STEP line.
             :rtype: Tuple[str | None, str | None]
             """
             step_patterns = PatternCollection.STEP.patterns
 
             # See if it's a STEP comment
-            m_comment_progress = step_patterns["comment"](progress=True).match(
-                line
-            )
-            if m_comment_progress:
-                return m_comment_progress.group(1).strip(), "comment_progress"
+            m_comment = step_patterns["comment"](progress=True).match(line)
+            if m_comment:
+                return m_comment.group(1).strip(), "comment"
 
-            m_comment_no_progress = step_patterns["comment"](
-                progress=False
-            ).match(line)
-            if m_comment_no_progress:
-                return (
-                    m_comment_no_progress.group(1).strip(),
-                    "comment_no_progress",
-                )
-
-            # See if it's a STEP print statement - ASSUME any line containing __STEP__ resp. __STEP_NO_PROGRESS__ is a STEP print statement
-            m_any_progress = step_patterns["any"](progress=True).match(line)
-            if m_any_progress:
-                return m_any_progress.group(1).strip(), "any_progress"
-
-            m_any_no_progress = step_patterns["any"](progress=False).match(
-                line
-            )
-            if m_any_no_progress:
-                return m_any_no_progress.group(1).strip(), "any_no_progress"
+            # See if it's a STEP print statement - ASSUME any line containing __STEP__ is a print statement
+            m_any = step_patterns["any"](progress=True).match(line)
+            if m_any:
+                return m_any.group(1).strip(), "any"
 
             return None, None
 
@@ -176,35 +166,29 @@ class Scheduler:
             :rtype: str
             """
             step, step_type = get_step(line)
-            if step is not None:
-                if step_type == "comment_no_progress" or (
-                    in_desired and step_type == "comment_progress"
-                ):
-                    # TODO: make safe, i.e. replace any " with ' (or similar)
-                    # Replace STEP/STEP_NO_PROGRESS comments with print statements
-                    if step_type == "comment_no_progress":
-                        step_msg = f"\\n__STEP_NO_PROGRESS__: {step}"
-                    else:
-                        step_msg = f"\\n__STEP__: {step}"
+            if step is None:
+                # Not a STEP line, return as is
+                return line
 
+            if in_desired:
+                if step_type == "comment":
+                    # TODO: make safe, i.e. replace any " with ' (or similar)
+                    # Replace STEP comments with print statements
+                    step_msg = f"\\n__STEP__: {step}"
                     if command.kind == CommandKind.PYTHON:
                         msg = f'print(f"{step_msg}")'
                     else:
                         msg = f'printf "{step_msg}\\n"'
 
                     return f"{indent}{msg}\n"
+                else:
+                    # Leave (assumed) STEP print statements as is
+                    return line
+            else:
+                # Remove STEP print statements
+                return f"{indent}{'pass' if command.kind == CommandKind.PYTHON else ':'}\n"
 
-                elif not in_desired and step_type in (
-                    "comment_progress",
-                    "any_progress",
-                ):
-                    # Remove STEP print statements
-                    return f"{indent}{'pass' if command.kind == CommandKind.PYTHON else ':'}\n"
-
-                # else: Leave STEP_NO_PROGRESS print statements
-
-            return line
-
+        # Main processing loop
         with original_path.open(
             "r", encoding="utf-8", errors="replace"
         ) as src, tmp_path.open("w", encoding="utf-8") as dst:
@@ -251,14 +235,14 @@ class Scheduler:
         with tmp_path.open("r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 step, step_type = get_step(line)
-                if step and step_type == "any_progress":
+                if step and step_type == "any":
                     n_steps += 1
 
         return tmp_path, n_steps
 
     def _spawn_and_stream(
         self, proc_cmd: List[str], flog: TextIO, task_id: int
-    ) -> bool:
+    ) -> TaskTerminationType:
         """
         Spawn a subprocess and stream its output to the logfile and progress tracker.
 
@@ -268,71 +252,147 @@ class Scheduler:
         :type flog: TextIO
         :param task_id: ID of the task for progress tracking
         :type task_id: int
-        :return: True if the process exited successfully, False otherwise
-        :rtype: bool
+        :return: Task termination type (SUCCESS, FAILURE, PARTIAL)
+        :rtype: TaskTerminationType
         """
+        # 1. Initialize Event for PARTIAL status tracking
+        warning_event = Event()
 
-        def reader(pipe: TextIO):
-            try:
-                for raw in iter(pipe.readline, ""):
-                    if raw == "":
-                        break
-                    line = raw.rstrip("\n")
-                    flog.write(line + "\n")
-                    flog.flush()
+        # 2. Create the PTY master and slave file descriptors
+        master_fd, slave_fd = pty.openpty()
 
-                    # Extract STEP statements with progress
-                    m_progress = PatternCollection.STEP.patterns["output"](
-                        progress=True
-                    ).match(line)
-                    if m_progress:
-                        self.logger.update_task(
-                            task_id, m_progress.group(1).strip()
-                        )
+        # 3. Define the single reader function for the PTY master
+        def pty_reader(master_fd: int) -> None:
+            """Reads lines from the single PTY master stream."""
 
-                    # Extract STEP statements without progress
-                    m_no_progress = PatternCollection.STEP.patterns["output"](
-                        progress=False
-                    ).match(line)
-                    if m_no_progress:
-                        self.logger.update_task(
-                            task_id,
-                            m_no_progress.group(1).strip(),
-                            advance=False,
-                        )
-            finally:
+            # Use os.fdopen in a 'with' block to guarantee closing the master_fd upon exit.
+            with os.fdopen(master_fd, "rb", 0) as master_file:
                 try:
-                    pipe.close()
-                except Exception:
-                    pass
+                    while True:
+                        raw_data = os.read(master_file.fileno(), 4096)
+                        if not raw_data:
+                            break
 
+                        data = raw_data.decode("utf-8", errors="replace")
+
+                        for line_raw in data.splitlines(keepends=True):
+                            line = line_raw.rstrip("\n")
+
+                            # Write to logfile
+                            flog.write(line + "\n")
+                            flog.flush()
+
+                            # Extract STEP statements with progress
+                            m_progress = PatternCollection.STEP.patterns[
+                                "output"
+                            ](progress=True).match(line)
+                            if m_progress:
+                                self.logger.update_task(
+                                    task_id, m_progress.group(1).strip()
+                                )
+
+                            # Extract STEP statements without progress
+                            m_no_progress = PatternCollection.STEP.patterns[
+                                "output"
+                            ](progress=False).match(line)
+                            m_no_progress_warning = (
+                                PatternCollection.STEP.patterns["output"](
+                                    progress=False, warning=True
+                                ).match(line)
+                            )
+                            if m_no_progress or m_no_progress_warning:
+                                if m_no_progress_warning:
+                                    match = m_no_progress_warning
+                                    warning_event.set()
+                                else:
+                                    match = m_no_progress
+
+                                self.logger.update_task(
+                                    task_id,
+                                    match.group(1).strip(),
+                                    advance=False,
+                                )
+
+                except Exception as e:
+                    self.logger.debug(f"PTY reader encountered an error: {e}")
+
+        # 4. Define preexec function for session isolation and FD cleanup in child process
+        def preexec_setup():
+            """Creates a new session and closes the PTY master FD in child."""
+            # Use os.setsid to become session leader and claim TTY control
+            os.setsid()
+            # Child closes the PTY master FD
+            os.close(master_fd)
+
+            # Set terminal parameters for unbuffered output
+            try:
+                attrs = termios.tcgetattr(slave_fd)
+                attrs[1] = attrs[1] & ~termios.ECHO
+                termios.tcsetattr(slave_fd, termios.TCSANOW, attrs)
+            except termios.error:
+                pass
+
+        # 5. Define environment for usage with SUDO_ASKPASS
+        def create_sudo_wrapper() -> str:
+            """Create a temporary sudo wrapper script, to avoid having to use 'sudo -A' everywhere."""
+            # Temporary directory
+            wrapper_dir = Path(TemporaryDirectory().name)
+            if not wrapper_dir.exists():
+                wrapper_dir.mkdir(parents=True, exist_ok=True)
+
+            # Temporary sudo wrapper script
+            sudo_wrapper = wrapper_dir / "sudo"
+            with open(sudo_wrapper, "w") as f:
+                f.write(
+                    """
+                    #!/bin/sh
+                    exec /usr/bin/sudo -A "$@"
+                """
+                )
+            os.chmod(sudo_wrapper, 0o700)
+
+            return wrapper_dir.as_posix()
+
+        env = os.environ.copy()
+        env["SUDO_ASKPASS"] = self.askpass_file
+        env["PATH"] = f"{create_sudo_wrapper()}:{env.get('PATH', '')}"
+
+        # 5. Spawn the process with PTY connections
         process = subprocess.Popen(
             proc_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
+            bufsize=0,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            preexec_fn=preexec_setup,
+            env=env,
+            text=False,
         )
 
-        # Start reader threads
-        t_out = Thread(target=reader, args=(process.stdout,), daemon=True)
-        t_err = Thread(target=reader, args=(process.stderr,), daemon=True)
-        t_out.start()
-        t_err.start()
+        # 6. Parent closes its reference to the PTY slave
+        os.close(slave_fd)
 
-        # Return when process ends
+        # 7. Start the single reader thread on the PTY master
+        t_out = Thread(target=pty_reader, args=(master_fd,), daemon=True)
+        t_out.start()
+
+        # 8. Wait for process exit and clean up
         exit_code = process.wait()
         t_out.join()
-        t_err.join()
-        return exit_code == 0
+
+        # 9. Final Termination Logic: Check status and PARTIAL event
+        if exit_code != 0:
+            return TaskTerminationType.FAILURE
+        elif warning_event.is_set():
+            return TaskTerminationType.PARTIAL
+        else:
+            return TaskTerminationType.SUCCESS
 
     def run_task(
         self,
         task: ResolvedTask,
         task_id: int,
-    ) -> bool:
+    ) -> TaskTerminationType:
         """
         Run a single task, logging its output and tracking progress.
 
@@ -340,13 +400,16 @@ class Scheduler:
         :type task: ResolvedTask
         :param task_id: ID of the task for progress tracking
         :type task_id: int
-        :return: True if the task ran successfully, False otherwise
-        :rtype: bool
+        :return: Task termination type indicating success, failure, or partial completion
+        :rtype: TaskTerminationType
         """
         # Prepare script with modified step statements
         modified_script, n_steps = self._prepare_script(task.command)
         self.logger.debug(
             f"Prepared modified script for task '{task.name}' at {modified_script} with {n_steps} steps"
+        )
+        self.logger.log_script(
+            modified_script, task.name, ext=task.command.kind.ext
         )
 
         def safe_unlink(path: Optional[Path]) -> None:
@@ -420,7 +483,7 @@ class Scheduler:
         try:
             success = self._spawn_and_stream(proc_cmd, flog, task_id)
         except Exception:
-            success = False
+            success = TaskTerminationType.FAILURE
         finally:
             safe_unlink(modified_script)
             safe_unlink(tmpwrap_path)
@@ -435,15 +498,14 @@ class Scheduler:
         :type task: ResolvedTask
         """
         task_id = self.logger.add_task(task.name, total=1)
-        success = False
         try:
             success = self.run_task(task, task_id)
         except Exception:
-            success = False
+            success = TaskTerminationType.FAILURE
         finally:
             self.logger.finish_task(task_id, success)
             self.logger.debug(
-                f"Task '{task.name}' completed {'sucessfully' if success else 'with errors'}"
+                f"Task '{task.name}' completed {'sucessfully' if success == TaskTerminationType.SUCCESS else 'with errors'}"
             )
             with self.lock:
                 self.results[task] = success
@@ -455,14 +517,41 @@ class Scheduler:
         while True:
             with self.lock:
                 for task in self.tasks:
+                    # Skip already running or completed tasks
                     if task in self.results or task in self.scheduled:
                         continue
 
                     results_to_name = {
                         t.name: res for t, res in self.results.items()
                     }
+
+                    # Skip tasks whose dependencies have failed
+                    if any(
+                        results_to_name.get(dep, None)
+                        in {
+                            TaskTerminationType.FAILURE,
+                            TaskTerminationType.SKIPPED,
+                        }
+                        for dep in task.depends_on
+                    ):
+                        self.results[task] = TaskTerminationType.SKIPPED
+                        self.logger.warning(
+                            f"Skipping task '{task.name}' because a dependency failed or was skipped"
+                        )
+
+                        task_id = self.logger.add_task(task.name, total=1)
+                        self.logger.finish_task(
+                            task_id, TaskTerminationType.SKIPPED
+                        )
+                        continue
+
+                    # Start tasks whose dependencies are all met
                     if all(
-                        results_to_name.get(dep, False)
+                        results_to_name.get(dep, None)
+                        in {
+                            TaskTerminationType.SUCCESS,
+                            TaskTerminationType.PARTIAL,
+                        }
                         for dep in task.depends_on
                     ):
                         t = Thread(target=self._worker, args=(task,))

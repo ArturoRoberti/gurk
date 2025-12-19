@@ -11,8 +11,19 @@ class InstallCommands(Enum):
     Predefined installation commands for various package managers.
     """
 
+    def _flock_command(cmd: str) -> str:
+        """
+        Wraps a command with flock to prevent concurrent executions.
+
+        :param cmd: The command to wrap
+        :type cmd: str
+        :return: The wrapped command
+        :rtype: str
+        """
+        return f"sudo flock /var/lib/dpkg/lock-frontend {cmd}"
+
     # fmt: off
-    APT     = "sudo flock /var/lib/dpkg/lock-frontend apt-get install -y"
+    APT     = _flock_command("apt-get install -y")  # TODO: Add '--reinstall' here and in other InstallCommands?
     SNAP    = "sudo snap install"
     FLATPAK = "sudo flatpak install"
     NPM     = "sudo npm install -g"
@@ -60,7 +71,7 @@ def install_packages_from_list(
         cmd = f"{install_command.value} {pkg}"
         result = subprocess.run(cmd, shell=True)
         if result.returncode != 0:
-            Logger.step(f"Failed to install package: {pkg}")
+            Logger.step(f"Failed to install package: {pkg}", warning=True)
         else:
             Logger.step(f"Successfully installed package: {pkg}")
 

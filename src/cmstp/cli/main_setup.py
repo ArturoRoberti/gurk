@@ -1,5 +1,5 @@
+import os
 import shutil
-import subprocess
 import sys
 import traceback
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
@@ -8,7 +8,7 @@ from pathlib import Path
 from cmstp.core.logger import Logger, LoggerSeverity
 from cmstp.core.scheduler import Scheduler
 from cmstp.core.task_processor import TaskProcessor
-from cmstp.utils.cli import MainSetupProcessor
+from cmstp.utils.cli import MainSetupProcessor, get_sudo_askpass
 from cmstp.utils.common import PACKAGE_CONFIG_PATH
 
 
@@ -71,15 +71,19 @@ def main(argv, prog):
     args = parser.parse_args(argv)
 
     # Set default values in case of early exception
-    logger, cloned_config_dir = None, None
+    logger, cloned_config_dir, askpass_path = None, None, None
 
     try:
         # Request sudo access at the start
-        subprocess.run(["sudo", "-v"], check=True)
+        askpass_path = get_sudo_askpass()
 
         with Logger(args.verbose) as logger:
-            # Process args
             setup_processor = MainSetupProcessor(logger, args, argv)
+
+            # Prompt pre-setup if this was never run before
+            setup_processor.prompt_pre_setup()
+
+            # Process args
             processed_args, cloned_config_dir = setup_processor.process_args()
 
             # Check system information
@@ -100,7 +104,9 @@ def main(argv, prog):
                 setup_processor.prepare()
 
             # Schedule and run tasks (where possible, in parallel)
-            scheduler = Scheduler(logger, task_processor.resolved_tasks)
+            scheduler = Scheduler(
+                logger, task_processor.resolved_tasks, askpass_path
+            )
             scheduler.run()
 
         # Final message
@@ -126,6 +132,9 @@ def main(argv, prog):
             Logger.logrichprint(LoggerSeverity.FATAL, interrupt_msg)
             sys.exit(1)
     finally:
+        # Remove temporary sudo askpass file
+        if askpass_path is not None and Path(askpass_path).exists():
+            os.remove(askpass_path)
         # Remove cloned config directory if applicable
         if cloned_config_dir is not None and cloned_config_dir.exists():
             shutil.rmtree(cloned_config_dir)

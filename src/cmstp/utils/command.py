@@ -20,6 +20,15 @@ class CommandKind(Enum):
     def exe(self) -> str:
         return self.value
 
+    @property
+    def ext(self) -> str:
+        if self == CommandKind.BASH:
+            return "bash"
+        elif self == CommandKind.PYTHON:
+            return "py"
+        else:
+            raise ValueError(f"Unsupported CommandKind: {self.name}")
+
     @staticmethod
     def from_script(script: FilePath) -> "CommandKind":
         """

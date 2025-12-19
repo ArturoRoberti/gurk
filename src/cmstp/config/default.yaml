@@ -17,7 +17,7 @@
 # - (dict) 'args' specifies arguments for the task                                                              #
 #     - (list|null) 'allowed' specifies a list of allowed args                                                  #
 #       If null, any arg is allowed (equivalent to [*])                                                         #
-#       If empty ([]), then no args are allowed                                                                 #
+#       If empty ([]), then no args are allowed, except for '--force', which is always allowed                  #
 #     - (list) 'default' specifies a list of default args                                                       #
 #    After processing, the final args are then passed to the script/function as:                                #
 #     -  (bash)  Normal input (accessible via "$1", "$2", ..., "$@")                                            #
@@ -31,8 +31,8 @@
 #       would allow the dependency to run first (if it is enabled), but would not disable the task if the dependency
 #       is not enabled. This would be useful for tasks like "install-mamba" (mamba, not micromamba) which requires conda
 #       to be installed, but could be skipped if micromamba is used instead.
-# TODO: This could also be used to configure the filestructure first, then copy repos and symlinks
-#       And this could be used for pinning apps after installing any packages
+#       This could also be used to configure the filestructure first, then copy repos and symlinks. And this could be
+#       used for pinning apps after installing any packages
 
 # Helpers
 _python_scripts: &python_scripts package://cmstp/scripts/python/
@@ -42,9 +42,9 @@ _defaults: &defaults
   config_file: null
   depends_on: []
   privileged: false
-  supercedes: null
+  supercedes: []
   args:
-    allowed: []  # Allow nothing
+    allowed: []
     default: []
 
 #################################################################################################################
@@ -242,7 +242,7 @@ configure-filestructure:
   config_file: configurations/configure_filestructure.yaml
   privileged: true
   args:
-    allowed: [--root, --overwrite]  # TODO: Repace "--overwrite" with general "--force" option
+    allowed: [--root]
     default: []
 configure-pinned-apps:
   <<: *defaults

@@ -4,6 +4,8 @@ from tempfile import NamedTemporaryFile
 from textwrap import dedent
 from typing import List, Optional, Union
 
+from rich import print as richprint
+
 from cmstp.utils.command import CommandKind
 from cmstp.utils.common import (
     PACKAGE_BASH_HELPERS_PATH,
@@ -12,7 +14,6 @@ from cmstp.utils.common import (
 )
 
 
-# TODO: Make sure that "args" does not change over function calls
 def run_script_function(
     script: FilePath,
     function: Optional[str] = None,
@@ -252,3 +253,20 @@ def revert_sudo_permissions(path: FilePath) -> None:
         args=[str(path)],
         run=True,
     )
+
+
+def promt_bool(message: str) -> bool:
+    """
+    Prompt the user for a yes/no response.
+
+    :param message: The prompt message.
+    :type message: str
+    :return: True if the user responds with 'y', False for 'n'.
+    :rtype: bool
+    """
+    while True:
+        response = input(f"{message} (y/n): ").strip().lower()
+        if response in ["y", "n"]:
+            return response == "y"
+        else:
+            richprint("Invalid input. Please enter 'y' or 'n'")

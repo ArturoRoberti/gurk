@@ -14,6 +14,7 @@
 #     enabled: true                                                                                             #
 #     args: [pkg1, pkg2]    # (optional)                                                                        #
 #   """"""""""""""""""""""""""                                                                                  #
+#   The arg '--force' us is always allowed                                                                      #
 #                                                                                                               #
 # - !!! If any arguments are passed that are not in the 'allowed' list, the task will be disabled !!!           #
 #################################################################################################################
@@ -28,8 +29,6 @@ enable_dependencies: true
 # Enable/disable single tasks and pass custom args below
 # In the enabled.yaml file disable all major tasks by default, as users may not want all of them
 install-cuda:
-  enabled: false
-install-docker:
   enabled: false
 install-isaaclab:
   enabled: false

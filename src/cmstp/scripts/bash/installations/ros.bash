@@ -133,7 +133,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   get_config_args "$@"
 
   # Check if ROS is already installed
-  if check_install_ros; then
+  if check_install_ros && [[ "$FORCE" == false ]]; then
     log_step "ROS is already installed - Exiting"
     return 0
   fi
@@ -159,10 +159,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   DISTROS=()
   for distro in "${REMAINING_ARGS[@]}"; do
     if [[ "$distro" == "latest" ]]; then
-      DISTROS+=$(_get_latest_ros_distro)
-      # (STEP_NO_PROGRESS) Detected latest supported ROS distro: ${DISTROS[-1]}
+      DISTROS+=($(_get_latest_ros_distro))
+      log_step "Detected latest supported ROS distro: ${DISTROS[-1]}"
     elif ! _contains supported_ros_distros "$distro"; then
-      # (STEP_NO_PROGRESS) Skipping unsupported ROS distro: $distro
+      log_step "Skipping unsupported ROS distro: $distro"
       continue
     else
       # Include normal distro
@@ -172,7 +172,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
   # (STEP) Installing ROS distro(s)
   for distro in "${DISTROS[@]}"; do
-    # (STEP_NO_PROGRESS) Installing ROS distro: $distro
+    log_step "Installing ROS distro: $distro"
     apt_install "ros-${distro}-desktop-full"
   done
 

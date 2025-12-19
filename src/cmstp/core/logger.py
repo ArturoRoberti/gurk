@@ -1,3 +1,4 @@
+import shutil
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -18,8 +19,8 @@ from rich.progress import (
 from cmstp.utils.logger import (
     LoggerEnum,
     LoggerSeverity,
-    LoggerTaskTerminationType,
     TaskInfos,
+    TaskTerminationType,
 )
 
 
@@ -71,6 +72,28 @@ class Logger:
     def create_log_dir(self) -> None:
         """Create the log directory if it does not exist."""
         self.logdir.mkdir(parents=True, exist_ok=True)
+        if self.verbose:
+            script_logdir = self.logdir / "modified_scripts"
+            script_logdir.mkdir(parents=True, exist_ok=True)
+
+    def log_script(self, script: Path, task_name: str, ext: str) -> None:
+        """
+        Save the given script to the log directory under 'modified_scripts'.
+
+        :param script: Content of the script to log
+        :type script: Path
+        :param task_name: Name of the script file
+        :type task_name: str
+        :param ext: Extension of the script file (e.g., 'sh', 'py')
+        :type ext: str
+        """
+        if not self.verbose:
+            # Don't log scripts if not in verbose mode
+            return
+
+        shutil.copy2(
+            script, self.logdir / "modified_scripts" / f"{task_name}.{ext}"
+        )
 
     def add_task(self, task_name: str, total: int = 1) -> TaskID:
         """
@@ -256,15 +279,15 @@ class Logger:
     def finish_task(
         self,
         task_id: int,
-        success: bool,
+        success: TaskTerminationType,
     ) -> None:
         """
         Mark a task as finished, updating its progress and description.
 
         :param task_id: ID of the task
         :type task_id: int
-        :param success: Whether the task completed successfully
-        :type success: bool
+        :param success: Task termination type indicating how the task completed
+        :type success: TaskTerminationType
         """
         with self._tasks_lock:
             if task_id not in self.task_infos:
@@ -280,14 +303,19 @@ class Logger:
             logfile = task_info["logfile"]
             task_name = task_info["name"]
 
-        if success:  # TODO: Expand to more than boolean
+        if success == TaskTerminationType.SUCCESS:
             symbol = "✔"
-            termination_type = LoggerTaskTerminationType.SUCCESS
-        else:
+        elif success == TaskTerminationType.PARTIAL:
+            symbol = "⚠"
+            # self._failed_tasks[task_name] = logfile  # TODO: Keep?
+        elif success == TaskTerminationType.SKIPPED:
+            symbol = "⊘"
+        elif success == TaskTerminationType.FAILURE:
             symbol = "✖"
-            termination_type = LoggerTaskTerminationType.FAILURE
             self._failed_tasks[task_name] = logfile
-        desc = f"[{termination_type.color}]{symbol} {termination_type.label}: {task_name}[/{termination_type.color}]"
+        else:
+            raise ValueError("Unknown task termination type")
+        desc = f"[{success.color}]{symbol} {success.label}: {task_name}[/{success.color}]"
         if logfile:
             desc += f" [blue](log: {logfile})[/blue]"
         self._progress.update(task_id, completed=total, description=desc)
@@ -326,14 +354,18 @@ class Logger:
         richprint(f"{prefix}{logstart} {message}")
 
     @staticmethod
-    def step(message: str, progress: bool = False) -> None:
-        # TODO: Allow (via input) to send to stderr instead of stdout
+    def step(message: str, warning: bool = False) -> None:
         """
         Log a step message indicating progress. Only to be used from within tasks.
 
-        :param message: The message
+        :param message: Message to log
         :type message: str
+        :param warning: Whether or not this is a warning (default: false)
+        :type warning: bool
         :param progress: Whether to progress the task
         :type progress: bool
         """
-        print(f"\n__STEP{'_NO_PROGRESS' if not progress else ''}__: {message}")
+        step_type = "STEP_NO_PROGRESS"
+        if warning:
+            step_type += "_WARNING"
+        print(f"\n__{step_type}__: {message}")

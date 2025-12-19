@@ -47,16 +47,16 @@ class LoggerEnumBase(Enum):
         return self.value.bright
 
 
-class LoggerTaskTerminationType(LoggerEnumBase):
+class TaskTerminationType(LoggerEnumBase):
     """
     Types of task termination statuses.
     """
 
     # fmt: off
-    SUCCESS = LoggerTextSpec("Success", "green" , False, False)
-    FAILURE = LoggerTextSpec("Failure", "red"   , False, False)
-    SKIPPED = LoggerTextSpec("Skipped", "yellow", False, False)
-    PARTIAL = LoggerTextSpec("Partial", "orange", False, False)
+    SUCCESS = LoggerTextSpec("Success", "green"  , False, False)
+    FAILURE = LoggerTextSpec("Failure", "red"    , False, False)
+    SKIPPED = LoggerTextSpec("Skipped", "yellow" , False, False)
+    PARTIAL = LoggerTextSpec("Partial", "orange1", False, False)
     # fmt: on
 
 
@@ -75,7 +75,7 @@ class LoggerSeverity(LoggerEnumBase):
     # fmt: on
 
 
-LoggerEnum = Union[LoggerSeverity, LoggerTaskTerminationType]
+LoggerEnum = Union[LoggerSeverity, TaskTerminationType]
 
 
 # TODO: Maybe organize better / replace?

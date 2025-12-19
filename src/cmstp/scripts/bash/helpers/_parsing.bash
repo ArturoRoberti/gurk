@@ -16,6 +16,7 @@ get_config_args() {
   declare -gA SYSTEM_INFO=() # TODO: Use "simulate_hardware" entry
   declare -g CONFIG_FILE=""
   declare -g -a REMAINING_ARGS=()
+  declare -g FORCE=false
 
   local system_info_raw=""
 
@@ -41,6 +42,9 @@ get_config_args() {
           echo "Error: Config file not found: $CONFIG_FILE" >&2
           return 1
         fi
+        ;;
+      --force)
+        FORCE=true
         ;;
       *)
         REMAINING_ARGS+=("$1")

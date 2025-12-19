@@ -29,10 +29,11 @@ def install_js_repositories(*args: List[str]) -> None:
     :type args: List[str]
     """
     # Parse config args
-    _, config_file, remaining_args = get_config_args(args)
+    _, config_file, force, remaining_args = get_config_args(args)
     if config_file is None:
         Logger.step(
-            "Skipping pulling of docker images, as no task config file is provided"
+            "Skipping pulling of docker images, as no task config file is provided",
+            warning=True,
         )
         return
 
@@ -49,7 +50,8 @@ def install_js_repositories(*args: List[str]) -> None:
     repos = get_clean_lines(config_file)
     if not repos:
         Logger.step(
-            "Skipping installation of JS repositories, as no repositories are specified"
+            "Skipping installation of JS repositories, as no repositories are specified",
+            warning=True,
         )
         return
 
@@ -62,13 +64,18 @@ def install_js_repositories(*args: List[str]) -> None:
             parsed["depth"] = 1
             repo_path = clone_git_files(gitref_dict2str(parsed), tmp)
             if not repo_path:
-                Logger.step(f"Failed to clone repository {repo}, skipping.")
+                Logger.step(
+                    f"Failed to clone repository {repo}, skipping.",
+                    warning=True,
+                )
                 continue
 
             # Get package name from package.json if possible
             pkg_json = repo_path / "package.json"
             if not pkg_json.exists():
-                Logger.step(f"No package.json found in {repo}, skipping.")
+                Logger.step(
+                    f"No package.json found in {repo}, skipping.", warning=True
+                )
                 continue
             with pkg_json.open() as f:
                 pkg_json_data = json.load(f)
@@ -99,7 +106,8 @@ def install_js_repositories(*args: List[str]) -> None:
 
                 if not (min_version <= node_version <= max_version):
                     Logger.step(
-                        f"Skipping installation of {pkg_name}, as Node.js version {node_version} does not satisfy required range {node_range}."
+                        f"Skipping installation of {pkg_name}, as Node.js version {node_version} does not satisfy required range {node_range}.",
+                        warning=True,
                     )
                     continue
 
@@ -117,7 +125,6 @@ def install_js_repositories(*args: List[str]) -> None:
                 package_manager = "npm install"
                 if not npm_pkg_dir.exists():
                     subprocess.run(["sudo", "mkdir", "-p", str(npm_pkg_dir)])
-
             # Install package
             try:
                 subprocess.run(
@@ -127,14 +134,23 @@ def install_js_repositories(*args: List[str]) -> None:
                     check=True,
                 )
             except subprocess.CalledProcessError:
-                Logger.step(f"Failed to install package {pkg_name}, skipping.")
+                Logger.step(
+                    f"Failed to install package {pkg_name}, skipping.",
+                    warning=True,
+                )
                 continue
 
             # Move to /opt/npm (overwrite if exists) - TODO: Either generalize or (if only necessary for npm) change to npm only
             target = npm_pkg_dir / pkg_name
             if target.exists():
-                # TODO: Only remove if --force is passed
-                subprocess.run(["sudo", "rm", "-rf", str(target)])
+                if force:
+                    subprocess.run(["sudo", "rm", "-rf", str(target)])
+                else:
+                    Logger.step(
+                        f"Package {pkg_name} already exists at {target}, skipping.",
+                        warning=True,
+                    )
+                    continue
             subprocess.run(
                 ["sudo", "mv", str(repo_path), str(target)], check=True
             )

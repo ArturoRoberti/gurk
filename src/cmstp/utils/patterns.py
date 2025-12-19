@@ -24,7 +24,7 @@ class ScriptBlockPatterns(TypedDict):
 class PatternFactory(Protocol):
     """Callable that produces a regex pattern based on progress flag."""
 
-    def __call__(self, *, progress: bool) -> re.Pattern:
+    def __call__(self, *, progress: bool, warning: bool = False) -> re.Pattern:
         ...
 
 
@@ -38,10 +38,20 @@ def pattern_factory(base_type: str) -> PatternFactory:
     :rtype: PatternFactory
     """
 
-    def factory(*, progress: bool) -> re.Pattern:
+    def factory(*, progress: bool, warning: bool = False) -> re.Pattern:
+        """
+        Generate a regex pattern for step messages.
+
+        :param progress: Whether the step indicates progress
+        :type progress: bool
+        :return: Compiled regex pattern for the step message
+        :rtype: Pattern
+        """
         step_type = "STEP"
         if not progress:
             step_type += "_NO_PROGRESS"
+        if warning:
+            step_type += "_WARNING"
 
         if base_type == "any":
             pattern = rf"^.*__{step_type}__:(.*)$"
@@ -130,8 +140,9 @@ class PatternCollection(Enum):
             "UNTIL":    None,  # Python has no "until"
         },
     }
+    # TODO: Remove "path" - instead, only make it a link if "link://" is prepended. Also, allow concatenation of "link://package://"
     PATH: EnumValue[PathPatterns] = {
-        "path":         re.compile(r"^package://(.*)$"),
+        "path":         re.compile(r"^path://(.*)$"),
         "link":         re.compile(r"^link://(.*)$"),
         "package":      re.compile(r"^package://([^/]+)/(.*)$"),
         "url":          re.compile(r"^https?://[^\s]+$"),
