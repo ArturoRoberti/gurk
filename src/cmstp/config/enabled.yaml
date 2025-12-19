@@ -30,8 +30,6 @@ enable_dependencies: true
 # In the enabled.yaml file disable all major tasks by default, as users may not want all of them
 install-cuda:
   enabled: false
-install-docker:
-  enabled: false
 install-isaaclab:
   enabled: false
 install-isaacsim:

@@ -18,7 +18,7 @@ TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
     "config_file": [None, str],
     "depends_on": [list],
     "privileged": [bool],
-    "supercedes": [None, list],
+    "supercedes": [list],
 }
 
 # Optional in custom config

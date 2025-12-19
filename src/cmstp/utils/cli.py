@@ -185,9 +185,10 @@ class MainSetupProcessor:
                 self.logger.warning(
                     "Config file does not exist or is not valid YAML - skipping it"
                 )
-            if not config:
+                resolved_config_file = None
+            elif not config:
                 self.logger.warning("Config file is empty")
-            if not isinstance(config, dict):
+            elif not isinstance(config, dict):
                 self.logger.fatal(
                     "Config file does not define a dict, "
                     f"but a {type(config).__name__}"

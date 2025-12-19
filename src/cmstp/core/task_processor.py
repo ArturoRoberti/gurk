@@ -20,7 +20,6 @@ from cmstp.utils.tasks import (
 from cmstp.utils.yaml import load_yaml, overlay_dicts
 
 
-# TODO: Extract (into funcs) and order tests, e.g. check structure, check script/function existence, check args, check dependencies, check supercedes, etc.
 @dataclass
 class TaskProcessor:
     """Processes tasks to run by resolving task properties."""
@@ -36,13 +35,16 @@ class TaskProcessor:
     resolved_tasks:      List[ResolvedTask] = field(init=False, repr=False, default=None)
 
     # Internal
-    _default_config:  Path                  = field(init=False, repr=False, default=PACKAGE_CONFIG_PATH / "default.yaml")
-    _allowed_args:    Dict[str, List[str]]  = field(init=False, repr=False, default_factory=dict)
+    _default_cfg_path: Path                 = field(init=False, repr=False, default=PACKAGE_CONFIG_PATH / "default.yaml")
+    _default_config:   TaskDictCollection   = field(init=False, repr=False, default=None)
+    _allowed_args:     Dict[str, List[str]] = field(init=False, repr=False, default_factory=dict)
+    _dependency_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
+    _supercedes_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
     # fmt: on
 
     def __post_init__(self):
         # (Internal) Check default config file
-        default_config = self.check_default_config()
+        self._default_config = self.check_default_config()
 
         # Check custom config file
         if self.config_file is not None:
@@ -59,18 +61,21 @@ class TaskProcessor:
         custom_tasks = self.check_config(self.process_custom_tasks())
 
         # Merge default and custom config
-        tasks = overlay_dicts(
-            [default_config, custom_config, custom_tasks], allow_default=True
+        tasks: TaskDictCollection = overlay_dicts(
+            [self._default_config, custom_config, custom_tasks],
+            allow_default=True,
         )
 
-        # Disable tasks in custom config that are not in default config
-        for task_name in custom_config:
-            if task_name not in default_config:
-                self.logger.warning(
-                    f"Task '{task_name}' in custom config is disabled "
-                    f"because it is not defined in the default config"
-                )
-                tasks[task_name]["enabled"] = False
+        # Enable all tasks (that are not explicitly disabled) if enable_all is set
+        if self.enable_all:
+            for task in tasks.values():
+                if "enabled" not in task:
+                    task["enabled"] = True
+
+        # Disable all "uninstallation" tasks - TODO: Restructure this as soon as more entrypoints are added
+        for task_name, task in tasks.items():
+            if task_name.startswith("uninstall"):
+                task["enabled"] = False
 
         # Fill all missing custom fields in other tasks
         tasks = {
@@ -78,14 +83,11 @@ class TaskProcessor:
             for task_name, task in tasks.items()
         }
 
-        # Resolve dependencies (disable tasks that depend on disabled ones)
-        tasks = self.check_dependencies(tasks)
+        # Resolve and check config file paths for all tasks
+        tasks = self.resolve_config_directory(tasks)
 
-        # Handle conflicting/superceding tasks
-        tasks = self.check_conflicts(tasks)
-
-        # Prepend config directory to config file paths
-        tasks = self.prepend_config_directory(tasks)
+        # Check dependency and supercedes graphs
+        tasks = self.resolve_graphs(tasks)
 
         # Count enabled tasks
         if self.count_tasks(tasks) == 0:
@@ -116,33 +118,60 @@ class TaskProcessor:
             )
             self.resolved_tasks.append(resolved_task)
 
-    def prepend_config_directory(
-        self, tasks: TaskDictCollection
-    ) -> TaskDictCollection:
-        # TODO: Move to better location, e.g. after overlay?
+    @staticmethod
+    def check_allowed(
+        allowed_args: Optional[List[str]],
+        args: Union[str, List[str]],
+        allow_default: bool = False,
+    ) -> Tuple[List[str], bool]:
         """
-        Prepend config directory to config file paths in tasks.
+        Check if an argument is in the allowed list.
+        If allowed_args is None, any argument is allowed.
 
-        :param tasks: Tasks to process
-        :type tasks: TaskDictCollection
-        :return: Processed tasks
-        :rtype: TaskDictCollection
+        :param allowed_args: List of allowed arguments or None if any argument is allowed
+        :type allowed_args: Optional[List[str]]
+        :param args: Argument or list of arguments to check
+        :type args: Union[str, List[str]]
+        :param allow_default: Whether to allow 'default' as a valid argument
+        :type allow_default: bool
+        :return: Tuple of (list of wrong arguments, is valid)
+        :rtype: Tuple[List[str], bool]
         """
-        for task_name, task in tasks.items():
-            if task["config_file"] is not None:
-                config_file = (
-                    self.config_directory / task["config_file"]
-                ).resolve()
 
-                if not config_file.exists():
-                    self.logger.fatal(
-                        f"Config file '{config_file}' for "
-                        f"task '{task_name}' does not exist"
-                    )
-                else:
-                    task["config_file"] = str(config_file)
+        def _check_single_allowed(arg: str) -> bool:
+            """
+            Check if a single argument is allowed, supporting wildcard '*'
 
-        return tasks
+            :param allowed_args: List of allowed arguments
+            :type allowed_args: List[str]
+            :param arg: Argument to check
+            :type arg: str
+            :return: Whether the argument is allowed
+            :rtype: bool
+            """
+            extra_args = ["--force"]
+            if allow_default:
+                extra_args.append("default")
+
+            for allowed in [*allowed_args, *extra_args]:
+                if allowed.endswith("*"):
+                    if arg.startswith(allowed[:-1]):
+                        return True
+                elif arg == allowed:
+                    return True
+            return False
+
+        if allowed_args is None:
+            return [], True
+        if isinstance(args, str):
+            is_allowed = _check_single_allowed(args)
+            wrong_args = [] if is_allowed else [args]
+            return wrong_args, is_allowed
+        else:  # List[str]
+            wrong_args = [
+                arg for arg in args if not _check_single_allowed(arg)
+            ]
+            return wrong_args, not wrong_args
 
     def check_default_config(self) -> TaskDictCollection:
         """
@@ -162,11 +191,11 @@ class TaskProcessor:
             :type task_name: Optional[str]
             """
             self.logger.fatal(
-                f"Error in default config file {self._default_config}: {f'{task_name}:' if task_name else ''} {msg}"
+                f"Error in default config file {self._default_cfg_path}: {f'{task_name}:' if task_name else ''} {msg}"
             )
 
         # Check file exists and is not empty
-        default_config = load_yaml(self._default_config)
+        default_config = load_yaml(self._default_cfg_path)
         if default_config is None:
             fatal("File does not exist or is not valid YAML")
         if not default_config:
@@ -289,7 +318,48 @@ class TaskProcessor:
             self._allowed_args[task_name] = task["args"]["allowed"]
             task["args"] = task["args"]["default"]
 
-        # TODO: Check for cycles in dependencies and supercedes here (instead)
+        # Build and check dependency and supercedes graphs
+        def _build_and_check_task_graph(attribute: str) -> nx.DiGraph:
+            # Create directed graph
+            graph = nx.DiGraph()
+            for task_name, task in default_config.items():
+                graph.add_node(task_name)
+
+            # Check references and add edges
+            missing_refs = []
+            for task_name, task in default_config.items():
+                for ref in task[attribute]:
+                    # Missing reference
+                    if ref not in default_config:
+                        missing_refs.append(
+                            f"'{attribute}' reference '{ref}' "
+                            f"for '{task_name}' not found"
+                        )
+                    # Add edge
+                    else:
+                        if attribute == "depends_on":
+                            graph.add_edge(ref, task_name)
+                        elif attribute == "supercedes":
+                            graph.add_edge(task_name, ref)
+
+            # Check for missing references
+            if missing_refs:
+                self.logger.fatal(
+                    f"Default config: Some task '{attribute}' fields "
+                    f"contain missing references: {missing_refs}"
+                )
+
+            # Check for cycles
+            if not nx.is_directed_acyclic_graph(graph):
+                self.logger.fatal(
+                    f"Default config: {attribute.capitalize()} graph has cycles between: "
+                    f"{list(nx.simple_cycles(graph))[0]}"
+                )
+
+            return graph
+
+        self._dependency_graph = _build_and_check_task_graph("depends_on")
+        self._supercedes_graph = _build_and_check_task_graph("supercedes")
 
         self.logger.debug("Default config file is valid")
         return default_config
@@ -374,7 +444,7 @@ class TaskProcessor:
         for task_name, task in filled_tasks.items():
             # Check custom args are allowed
             wrong_args, is_allowed = self.check_allowed(
-                self._allowed_args[task_name], task["args"], True
+                self._allowed_args.get(task_name), task["args"], True
             )
             if not is_allowed:
                 warning(
@@ -384,8 +454,18 @@ class TaskProcessor:
                 )
                 task["enabled"] = False
 
+        # Disable tasks that are not in default config # TODO: Test this quickly
+        final_tasks = deepcopy(filled_tasks)
+        for task_name, task in filled_tasks.items():
+            if task_name not in self._default_config:
+                self.logger.warning(
+                    f"Task '{task_name}' in custom config is removed "
+                    f"because it is not defined in the default config"
+                )
+                final_tasks.pop(task_name)
+
         self.logger.debug("Config is valid")
-        return filled_tasks
+        return final_tasks
 
     def process_custom_tasks(self) -> TaskDictCollection:
         """
@@ -421,154 +501,95 @@ class TaskProcessor:
 
         return processed_tasks
 
-    @staticmethod
-    def check_allowed(
-        allowed_args: Optional[List[str]],
-        args: Union[str, List[str]],
-        allow_default: bool = False,
-    ) -> Tuple[List[str], bool]:
-        """
-        Check if an argument is in the allowed list.
-        If allowed_args is None, any argument is allowed.
-
-        :param allowed_args: List of allowed arguments or None if any argument is allowed
-        :type allowed_args: Optional[List[str]]
-        :param args: Argument or list of arguments to check
-        :type args: Union[str, List[str]]
-        :param allow_default: Whether to allow 'default' as a valid argument
-        :type allow_default: bool
-        :return: Tuple of (list of wrong arguments, is valid)
-        :rtype: Tuple[List[str], bool]
-        """
-
-        def _check_single_allowed(arg: str) -> bool:
-            """
-            Check if a single argument is allowed, supporting wildcard '*'
-
-            :param allowed_args: List of allowed arguments
-            :type allowed_args: List[str]
-            :param arg: Argument to check
-            :type arg: str
-            :return: Whether the argument is allowed
-            :rtype: bool
-            """
-            extra_args = ["--force"]
-            if allow_default:
-                extra_args.append("default")
-
-            for allowed in [*allowed_args, *extra_args]:
-                if allowed.endswith("*"):
-                    if arg.startswith(allowed[:-1]):
-                        return True
-                elif arg == allowed:
-                    return True
-            return False
-
-        if allowed_args is None:
-            return [], True
-        if isinstance(args, str):
-            is_allowed = _check_single_allowed(args)
-            wrong_args = [] if is_allowed else [args]
-            return wrong_args, is_allowed
-        else:  # List[str]
-            wrong_args = [
-                arg for arg in args if not _check_single_allowed(arg)
-            ]
-            return wrong_args, not wrong_args
-
-    def check_dependencies(
+    def resolve_config_directory(
         self, tasks: TaskDictCollection
     ) -> TaskDictCollection:
         """
-        Check task dependencies and enable/disable tasks accordingly. Specifically:
-        1. Ensures all dependencies exist
-        2. Raises fatal error if dependency graph has cycles
-        3. If `self.enable_dependencies` is True:
-           Enables all dependencies of enabled tasks (recursively)
-        4. Otherwise:
-           Disables any task whose dependencies are disabled
+        Resolve and check config file paths for all tasks.
 
         :param tasks: Tasks to process
         :type tasks: TaskDictCollection
-        :return: Processed tasks with checked dependencies
+        :return: Processed tasks
         :rtype: TaskDictCollection
         """
-        # Build dependency graph
-        G = nx.DiGraph()
         for task_name, task in tasks.items():
-            G.add_node(task_name)
-            for dep in task["depends_on"]:
-                if dep not in tasks:
-                    self.logger.fatal(
-                        f"Dependency '{dep}' for '{task_name}' "
-                        f"not found - needs to be defined in config"
+            if task["config_file"] is not None:
+                config_file = (
+                    self.config_directory / task["config_file"]
+                ).resolve()
+
+                if not config_file.exists():
+                    task["config_file"] = None
+                    task["enabled"] = False
+                    self.logger.warning(
+                        f"Task '{task_name}' was disabled because its "
+                        f"config file does not exist: '{config_file}'"
                     )
-                G.add_edge(dep, task_name)
+                else:
+                    task["config_file"] = str(config_file)
 
-        # Check for cycles
-        if not nx.is_directed_acyclic_graph(G):
-            cycles = list(nx.simple_cycles(G))
-            self.logger.fatal(f"Dependency graph has cycles between: {cycles}")
+        return tasks
 
-        # Topological resolution
-        for node in nx.topological_sort(G):
-            task = tasks[node]
+    def resolve_graphs(self, tasks: TaskDictCollection) -> TaskDictCollection:
+        """
+        Resolve enable/disable rules based on dependency and supercedes graphs.
 
-            if self.enable_dependencies:
-                # Recursively enable dependencies
-                if task["enabled"]:
-                    # Recursively enable all dependencies of this enabled task
-                    for dep in nx.ancestors(G, node):
+        :param tasks: Tasks to process
+        :type tasks: TaskDictCollection
+        :return: Processed tasks with resolved enable/disable states
+        :rtype: TaskDictCollection
+        """
+        # Enable all dependencies of enabled tasks if enable_dependencies is set
+        if self.enable_dependencies:
+            for node in nx.topological_sort(self._dependency_graph):
+                if tasks[node]["enabled"]:
+                    for dep in nx.ancestors(self._dependency_graph, node):
                         if not tasks[dep]["enabled"]:
                             tasks[dep]["enabled"] = True
                             self.logger.info(
                                 f"Enabling dependency '{dep}' "
-                                f"because '{node}' is enabled and enable_dependencies=True"
+                                f"because '{node}' is enabled "
+                                "and enable_dependencies=True"
                             )
 
-            else:
-                if not task["enabled"]:
-                    continue
-                # Disable task if any dependencies are disabled
-                deps = list(G.predecessors(node))
-                disabled_deps = [d for d in deps if not tasks[d]["enabled"]]
-                if disabled_deps:
-                    task["enabled"] = False
-                    self.logger.warning(
-                        f"Task '{node}' was disabled because it depends on "
-                        f"disabled tasks: {disabled_deps}"
-                    )
+        def _graph_pass(graph: nx.DiGraph, is_dependency_graph: bool) -> bool:
+            """
+            Single pass over the given graph to enable/disable tasks.
 
-        self.logger.debug("Checked task dependencies")
-        return tasks
+            :param graph: Graph to process
+            :type graph: nx.DiGraph
+            :param is_dependency_graph: Whether the graph is a dependency graph (True) or a supercedes graph (False)
+            :type is_dependency_graph: bool
+            """
+            _changed = False
+            for node in nx.topological_sort(graph):
+                if tasks[node]["enabled"]:
+                    predecessors = list(graph.predecessors(node))
+                    relevant_predecessors = [
+                        p
+                        for p in predecessors
+                        if tasks[p]["enabled"] != is_dependency_graph
+                    ]
+                    if relevant_predecessors:
+                        _changed = True
+                        tasks[node]["enabled"] = False
+                        self.logger.warning(
+                            f"Task '{node}' was disabled because of "
+                            f"{'disabled dependencies' if is_dependency_graph else 'enabled superceders'}"
+                            f": {relevant_predecessors}"
+                        )
+            return _changed
 
-    def check_conflicts(self, tasks: TaskDictCollection) -> TaskDictCollection:
-        """
-        Disable tasks that are conflicting with superceding tasks.
+        # Repeatedly apply dependency and supercedes rules until no changes occur
+        changed = True
+        while changed:
+            changed = False
+            changed |= _graph_pass(self._dependency_graph, True)
+            changed |= _graph_pass(self._supercedes_graph, False)
 
-        :param tasks: Tasks to process
-        :type tasks: TaskDictCollection
-        :return: Processed tasks with checked conflicts
-        :rtype: TaskDictCollection
-        """
-        # First, collect all tasks that are enabled and have 'supercedes' field
-        superceding_tasks = {
-            task_name: task
-            for task_name, task in tasks.items()
-            if task["enabled"] and task["supercedes"] is not None
-        }
-
-        # Disable conflicting tasks
-        for task_name, task in superceding_tasks.items():
-            for conflicted_task in task["supercedes"]:
-                if tasks[conflicted_task]["enabled"]:
-                    tasks[conflicted_task]["enabled"] = False
-                    self.logger.warning(
-                        f"Disabling task '{conflicted_task}' because it "
-                        f"conflicts with superceding task '{task_name}'"
-                    )
-
-        self.logger.debug("Checked for conflicting/superceding tasks")
+        self.logger.debug(
+            "Resolved dependency and supercedes enabling/disabling"
+        )
         return tasks
 
     @staticmethod

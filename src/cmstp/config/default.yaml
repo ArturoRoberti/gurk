@@ -42,9 +42,9 @@ _defaults: &defaults
   config_file: null
   depends_on: []
   privileged: false
-  supercedes: null
+  supercedes: []
   args:
-    allowed: []  # Allow nothing
+    allowed: []
     default: []
 
 #################################################################################################################

@@ -84,6 +84,8 @@ Further options are
 - `--disable-preparation` to disable updating/upgrading apt beforehand (not recommended)
 - `-v, --verbose` to enable verbose logging
 
+Logs are saved to `~/.cmstp/logs/<timestamp>/`.
+
 ## Note on Git References
 When providing a git reference (for `--config-directory`, `--config-file` or anywhere else), the format is as follows:
 ```bash
