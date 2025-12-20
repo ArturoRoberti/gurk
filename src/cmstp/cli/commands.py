@@ -9,16 +9,13 @@ from cmstp.core.logger import Logger, LoggerSeverity
 from cmstp.core.scheduler import Scheduler
 from cmstp.core.task_processor import TaskProcessor
 from cmstp.utils.cli import MainSetupProcessor, get_sudo_askpass
-from cmstp.utils.common import PACKAGE_CONFIG_PATH
+from cmstp.utils.common import ENABLED_CONFIG_FILE, PACKAGE_CONFIG_PATH
 
 
-def main(argv, prog):
+def main(argv, prog, description, cmd):
     parser = ArgumentParser(
         prog=prog,
-        description=(
-            "Main setup utility - Set up your computer based on a provided "
-            "configuration (or defaults)"
-        ),
+        description=description,
         formatter_class=lambda prog: ArgumentDefaultsHelpFormatter(
             prog=prog,
             max_help_position=60,
@@ -28,7 +25,7 @@ def main(argv, prog):
         "-f",
         "--config-file",
         type=Path,
-        default=PACKAGE_CONFIG_PATH / "enabled.yaml",
+        default=ENABLED_CONFIG_FILE,
         help="Path to the main configuration file",
     )
     parser.add_argument(
@@ -46,7 +43,6 @@ def main(argv, prog):
         default=None,
         help="Specify the tasks to run (default: all enabled tasks in the config file)",
     )
-    # Add '--enable-all' and '--enable-dependencies'
     parser.add_argument(
         "--enable-all",
         action="store_true",
@@ -78,7 +74,7 @@ def main(argv, prog):
         askpass_path = get_sudo_askpass()
 
         with Logger(args.verbose) as logger:
-            setup_processor = MainSetupProcessor(logger, args, argv)
+            setup_processor = MainSetupProcessor(logger, args, argv, cmd)
 
             # Prompt pre-setup if this was never run before
             setup_processor.prompt_pre_setup()
@@ -92,6 +88,7 @@ def main(argv, prog):
             # Load config file and process tasks
             task_processor = TaskProcessor(
                 logger,
+                processed_args.cmstp_cmd,
                 processed_args.config_file,
                 processed_args.config_directory,
                 processed_args.tasks,

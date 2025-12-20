@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from cmstp.core.logger import Logger, LoggerSeverity
-from cmstp.utils.common import PACKAGE_CONFIG_PATH
+from cmstp.utils.common import DEFAULT_CONFIG_FILE, ENABLED_CONFIG_FILE
 from cmstp.utils.system_info import get_system_info
 from cmstp.utils.yaml import load_yaml
 
@@ -101,10 +101,10 @@ def print_dict_aligned(
         print(" " * indent + str(data))
 
 
-def main(argv, prog):
+def main(argv, prog, description):
     parser = ArgumentParser(
         prog=prog,
-        description="Print information about tasks, configuration files and the host system",
+        description=description,
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -155,7 +155,7 @@ def main(argv, prog):
         # Task info
         if args.tasks:
             # Get tasks info from default config
-            default_config = load_yaml(PACKAGE_CONFIG_PATH / "default.yaml")
+            default_config = load_yaml(DEFAULT_CONFIG_FILE)
 
             for task_name in args.tasks:
                 if task_name not in default_config:
@@ -186,7 +186,7 @@ def main(argv, prog):
         # Available tasks
         if args.available_tasks:
             # Get tasks info from default config
-            default_config = load_yaml(PACKAGE_CONFIG_PATH / "default.yaml")
+            default_config = load_yaml(DEFAULT_CONFIG_FILE)
 
             Logger.richprint("=== Available tasks ===", color="cyan")
             for task_name in default_config.keys():
@@ -200,14 +200,14 @@ def main(argv, prog):
             Logger.richprint(
                 "=== Custom configuration file info ===", color="cyan"
             )
-            print_box_contents(PACKAGE_CONFIG_PATH / "enabled.yaml")
+            print_box_contents(ENABLED_CONFIG_FILE)
 
         # Default config info
         if args.default_config:
             Logger.richprint(
                 "=== Default configuration file info ===", color="cyan"
             )
-            print_box_contents(PACKAGE_CONFIG_PATH / "default.yaml")
+            print_box_contents(DEFAULT_CONFIG_FILE)
 
         # System info
         if args.system_info:

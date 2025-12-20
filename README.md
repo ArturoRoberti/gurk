@@ -40,41 +40,58 @@ pipx install cmstp
 ```
 
 # Usage
-## Pre-Setup
+## Setup
 We recommend setting up the following before running the main installation/configuration tasks:
 - Configuring SSH keys for git (GitHub, GitLab, etc.) - some tasks may require cloning private repositories
 - Disabling Secure Boot (e.g. for installing NVIDIA drivers)
 
 You can use the provided helper to guide you through these steps:
 ```bash
-cmstp pre-setup [-s] [-g]
+cmstp setup [-s] [-g]
 ```
 
 The helper also provides further possible manual setup steps for configuring fresh systems.
 
 > **NOTE**: You may also look up the general instructions for creating SSH keys [here](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent#generating-a-new-ssh-key).
 
-## Main Installations/Configurations
-To use default installations/configurations, simply use (without any flags):
-```
-cmstp setup [-h] [-t TASKS [TASKS ...]] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [-p] [-v]
+## Info
+This package provides a variety of tasks, which can install/configure/uninstall a variety of programs. To see all available tasks, use (flag shorthand: `-a`):
+```bash
+cmstp info --available-tasks
 ```
 
-To use custom config installation/configuration config files, use (flag shorthand: `-d`)
+The `info` command also provides further options to see detailed information about tasks, how to use configuration files, and can print out system information. For this, use any of
 ```bash
-cmstp setup --config-directory </path/to/configs/ | git_url>
+cmstp info [-h] [-s] [-t TASKS [TASKS ...]] [-a] [-c] [-d]
+```
+If no flags are provided, every flag is enabled by default.
+
+## Main Commands
+Each task can be run with the resp. command, which is one of:
+- `install` to install packages, programs, ...
+- `configure` to configure programs and settings
+- `uninstall` to uninstall packages, programs, ...
+
+To use default tasks, simply use (without any flags):
+```
+cmstp <command> [-h] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [-t TASKS [TASKS ...]] [--enable-all] [--enable-dependencies] [--disable-preparation] [-v]
+```
+
+To use custom task configuration files, use (flag shorthand: `-d`)
+```bash
+cmstp <command> --config-directory </path/to/configs/ | git_url>
 ```
 where `/path/to/configs/` is a directory containing multiple txt/json(c)/yaml/... configuration files (to be used by tasks as defined in this repo's `config/default.yaml` file) following this package's default `config/` directory. Each file in that directory should have the same name and structure as in the default. We **STRONGLY RECOMMEND** saving a personalized config directory as a git repository and providing the git URL instead of a local path. The repository will be cloned and used for the configurations. For more details and examples of configs, see [this README](https://github.com/ArturoRoberti/cmstp/blob/main/src/cmstp/config/README.md).
 
 To easily specify multiple tasks to be run, use (flag shorthand: `-f`)
 ```bash
-cmstp setup --config-file /path/to/config.yaml
+cmstp <command> --config-file /path/to/config.yaml
 ```
 where the config file should be a yaml file following the structure of the `config/enabled.yaml` file in this package. That config file contains detailed explanations. Should a relative path be provided, the file will first be searched for locally and then in the config directory. Should a git reference be provided, the repository will be cloned and the file searched for there, as specified in the git reference.
 
 To simply enable tasks with their default configurations, use (flag shorthand: `-t`)
 ```bash
-cmstp setup --tasks TASK1 TASK2 ...
+cmstp <command> --tasks TASK1 TASK2 ...
 ```
 where `TASK1`, `TASK2`, ... are the task names as specified in the `config/enabled.yaml` file in this package. Task arguments may optionally be passed via colon separation, e.g. `--tasks task1:arg1:arg2 task2:arg1`, in which case they will override any existing arguments for those tasks. Note that the precedence for any fields passed to tasks is as follows: `CLI tasks` > `config file` > `default config`.
 
@@ -111,14 +128,5 @@ Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/cmstp/blob/main/.g
 # License
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/ArturoRoberti/cmstp/blob/main/LICENSE) file for details.
 
-# Possible Future Features
-- Add uninstallations/deconfigurations and seprate configurations from installations. That could result in multiple entrypoints (instead of the current single `cmstp setup`):
-    - `cmstp install` - for installations only
-    - `cmstp configure` - for configurations only
-    - `cmstp uninstall` - for uninstallations only
-    - Possibly, a `cmstp deconfigure` for deconfigurations only
-- Setup Browser Bookmarks
-- Setup Autocompletions
-
 # TODO
-Please see [TODO.md](https://github.com/ArturoRoberti/cmstp/blob/main/TODO.md) for a list of planned improvements.
+Please see [TODO.md](https://github.com/ArturoRoberti/cmstp/blob/main/TODO.md) for a list of planned improvements and features.

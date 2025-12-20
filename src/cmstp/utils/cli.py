@@ -8,7 +8,11 @@ from tempfile import NamedTemporaryFile
 from typing import List, Optional, Tuple
 
 from cmstp.core.logger import Logger
-from cmstp.utils.common import generate_random_path, resolve_package_path
+from cmstp.utils.common import (
+    ENABLED_CONFIG_FILE,
+    generate_random_path,
+    resolve_package_path,
+)
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
 from cmstp.utils.interface import promt_bool
 from cmstp.utils.logger import TaskTerminationType
@@ -58,6 +62,7 @@ class MainSetupArgs:
     """
 
     # fmt: off
+    cmstp_cmd:           str       = field(init=False, default=None)
     config_file:         Path      = field(init=False, default=None)
     config_directory:    Path      = field(init=False, default=None)
     tasks:               List[str] = field(init=False, default_factory=list)
@@ -74,9 +79,10 @@ class MainSetupProcessor:
     """
 
     # fmt: off
-    logger: Logger        = field(repr=False)
-    args:   MainSetupArgs = field(repr=False)
-    argv:   List[str]     = field(repr=False)
+    logger:  Logger        = field(repr=False)
+    args:    MainSetupArgs = field(repr=False)
+    argv:    List[str]     = field(repr=False)
+    command: str           = field(repr=False)
     # fmt: on
 
     def prompt_pre_setup(self) -> None:
@@ -88,7 +94,7 @@ class MainSetupProcessor:
                 "possible manual steps are taken care of."
             )
             if promt_bool("Would you like to run the pre-setup now?"):
-                from cmstp.cli.pre_setup import main as pre_setup_main
+                from cmstp.cli.setup import main as pre_setup_main
 
                 pre_setup_main([], prog="cmstp pre-setup")
                 self.logger.info("Pre-setup completed")
@@ -108,6 +114,9 @@ class MainSetupProcessor:
         """
         main_setup_args = MainSetupArgs()
         cloned_config_dir = None
+
+        # Cmstp command
+        main_setup_args.cmstp_cmd = self.command
 
         # Tasks
         main_setup_args.tasks = self.args.tasks or []
@@ -193,6 +202,15 @@ class MainSetupProcessor:
                     "Config file does not define a dict, "
                     f"but a {type(config).__name__}"
                 )
+        ## Safety in case of 'uninstall' command
+        if (
+            resolved_config_file == ENABLED_CONFIG_FILE
+            and self.command == "uninstall"
+        ):
+            if not promt_bool(
+                "This will run EVERY uninstallation task available - are you sure?"
+            ):
+                self.logger.done("Exiting...")
         main_setup_args.config_file = resolved_config_file
 
         # Enable all

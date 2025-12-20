@@ -8,7 +8,7 @@ from _pytest.capture import CaptureFixture
 from cmstp.core.logger import Logger
 from cmstp.core.task_processor import TaskProcessor
 from cmstp.utils.common import (
-    PACKAGE_CONFIG_PATH,
+    ENABLED_CONFIG_FILE,
     PACKAGE_TESTS_PATH,
     generate_random_path,
 )
@@ -35,7 +35,7 @@ def test_package_configs():
     dummy_path = Path()
     TaskProcessor(
         logger=dummy_logger,
-        config_file=PACKAGE_CONFIG_PATH / "enabled.yaml",
+        config_file=ENABLED_CONFIG_FILE,
         config_dir=dummy_path,
     )
 

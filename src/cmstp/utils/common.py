@@ -10,6 +10,8 @@ from cmstp.utils.patterns import PatternCollection
 
 PACKAGE_SRC_PATH = Path(resources.files("cmstp")).expanduser().resolve()
 PACKAGE_CONFIG_PATH = PACKAGE_SRC_PATH / "config"
+DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"
+ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PACKAGE_BASH_HELPERS_PATH = (
     PACKAGE_SRC_PATH / "scripts" / "bash" / "helpers" / "helpers.bash"

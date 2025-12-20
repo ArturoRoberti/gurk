@@ -15,8 +15,10 @@ uninstall_fzf() {
     return 0
   fi
 
-  ~/.fzf/uninstall
-  rm -rf ~/.fzf
+  {
+    ~/.fzf/uninstall
+    rm -rf ~/.fzf
+  } || true
 
   # Verify installation
   if check_install_fzf; then
@@ -42,9 +44,11 @@ uninstall_loki_shell() {
     return 0
   fi
 
-  docker rm -f loki-shell
-  rm -rf ~/.loki-shell
-  sed -i "/#* BEGIN LOKI-SHELL #*/,/#* END LOKI-SHELL #*/d" "${HOME}/.bashrc"
+  {
+    docker rm -f loki-shell
+    rm -rf ~/.loki-shell
+    sed -i "/#* BEGIN LOKI-SHELL #*/,/#* END LOKI-SHELL #*/d" "${HOME}/.bashrc"
+  } || true
 
   # Verify installation
   if check_install_loki_shell; then

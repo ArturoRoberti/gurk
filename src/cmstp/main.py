@@ -1,6 +1,6 @@
 import click
 
-from cmstp.cli import info, main_setup, pre_setup
+from cmstp.cli import commands, info, setup
 from cmstp.cli.utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
@@ -16,25 +16,62 @@ def main():
     pass
 
 
-@main.command(name="setup", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@main.command(name="install", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
-def setup_cmd(ctx):
-    """Main setup utility - Set up your computer based on a provided configuration (or defaults)"""
-    main_setup.main(ctx.args, prog=get_prog(ctx.info_name))
+def install_cmd(ctx: click.Context):
+    """Run any of the cmstp installation tasks (see 'cmstp info --available-tasks')"""
+    commands.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+        cmd=ctx.info_name,
+    )
+
+
+@main.command(name="configure", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def configure_cmd(ctx: click.Context):
+    """Run any of the cmstp configuration tasks (see 'cmstp info --available-tasks')"""
+    commands.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+        cmd=ctx.info_name,
+    )
+
+
+@main.command(name="uninstall", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def uninstall_cmd(ctx: click.Context):
+    """Run any of the cmstp uninstallation tasks (see 'cmstp info --available-tasks')"""
+    commands.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+        cmd=ctx.info_name,
+    )
 
 
 @main.command(name="info", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
-def info_cmd(ctx):
+def info_cmd(ctx: click.Context):
     """Print information about tasks, configuration files and the host system"""
-    info.main(ctx.args, prog=get_prog(ctx.info_name))
+    info.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
 
 
-@main.command(name="pre-setup", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@main.command(name="setup", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
-def pre_setup_cmd(ctx):
-    """(Recommended before setup) Run the user through some manual setups"""
-    pre_setup.main(ctx.args, prog=get_prog(ctx.info_name))
+def setup_cmd(ctx: click.Context):
+    """(Recommended before any main commands) Run the user through some manual setups"""
+    setup.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
 
 
 if __name__ == "__main__":

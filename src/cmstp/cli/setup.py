@@ -254,10 +254,10 @@ def print_secure_boot_steps() -> None:
     )
 
 
-def main(argv, prog):
+def main(argv, prog, description):
     parser = ArgumentParser(
         prog=prog,
-        description="Prepare some manual setups",
+        description=description,
         formatter_class=lambda prog: ArgumentDefaultsHelpFormatter(
             prog=prog,
             max_help_position=30,

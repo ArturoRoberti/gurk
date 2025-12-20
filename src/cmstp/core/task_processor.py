@@ -8,7 +8,7 @@ import networkx as nx
 
 from cmstp.core.logger import Logger
 from cmstp.utils.command import Command, CommandKind
-from cmstp.utils.common import PACKAGE_CONFIG_PATH
+from cmstp.utils.common import DEFAULT_CONFIG_FILE
 from cmstp.utils.patterns import PatternCollection
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
@@ -26,6 +26,7 @@ class TaskProcessor:
 
     # fmt: off
     logger:              Logger             = field(repr=False)
+    cmstp_cmd:           str                = field()
     config_file:         Optional[Path]     = field()
     config_directory:    Path               = field()
     custom_tasks:        List[str]          = field()
@@ -35,7 +36,7 @@ class TaskProcessor:
     resolved_tasks:      List[ResolvedTask] = field(init=False, repr=False, default=None)
 
     # Internal
-    _default_cfg_path: Path                 = field(init=False, repr=False, default=PACKAGE_CONFIG_PATH / "default.yaml")
+    _default_cfg_path: Path                 = field(init=False, repr=False, default=DEFAULT_CONFIG_FILE)
     _default_config:   TaskDictCollection   = field(init=False, repr=False, default=None)
     _allowed_args:     Dict[str, List[str]] = field(init=False, repr=False, default_factory=dict)
     _dependency_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
@@ -52,8 +53,7 @@ class TaskProcessor:
             custom_config = self.check_config(custom_config)
         else:
             self.logger.debug(
-                "Tasks have been specified directly and no config "
-                "file is specified, so only those tasks will be run"
+                "No valid config file is specified, thus only cli tasks (if any) will be enabled"
             )
             custom_config = {}
 
@@ -68,13 +68,20 @@ class TaskProcessor:
 
         # Enable all tasks (that are not explicitly disabled) if enable_all is set
         if self.enable_all:
+            self.logger.debug(
+                "Enabling all tasks that are not explicitly disabled"
+            )
             for task in tasks.values():
                 if "enabled" not in task:
                     task["enabled"] = True
 
-        # Disable all "uninstallation" tasks - TODO: Restructure this as soon as more entrypoints are added
+        # Disable all tasks that don't belong to the current cmstp command
         for task_name, task in tasks.items():
-            if task_name.startswith("uninstall"):
+            if not task_name.startswith(self.cmstp_cmd):
+                self.logger.debug(
+                    f"Disabling task '{task_name}', as it does not "
+                    f"belong to the '{self.cmstp_cmd}' command"
+                )
                 task["enabled"] = False
 
         # Fill all missing custom fields in other tasks
@@ -528,6 +535,7 @@ class TaskProcessor:
                 else:
                     task["config_file"] = str(config_file)
 
+        self.logger.debug("Resolved config file paths for all tasks")
         return tasks
 
     def resolve_graphs(self, tasks: TaskDictCollection) -> TaskDictCollection:
