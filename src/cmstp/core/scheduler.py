@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 import pty
@@ -6,6 +7,7 @@ import termios
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Queue
+from re import sub
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import Event, Lock, Thread
 from typing import Dict, List, Optional, Set, TextIO, Tuple
@@ -269,13 +271,26 @@ class Scheduler:
             with os.fdopen(master_fd, "rb", 0) as master_file:
                 try:
                     while True:
-                        raw_data = os.read(master_file.fileno(), 4096)
-                        if not raw_data:
-                            break
+                        # Read data and check end of file (EOF)
+                        try:
+                            raw_data = os.read(master_file.fileno(), 4096)
+                        except OSError as e:
+                            if e.errno == errno.EIO:
+                                # EOF shows up as EIO (Input/Output error)
+                                self.logger.debug(
+                                    "PTY reader encountered an EIO "
+                                    "error - treating as EOF."
+                                )
+                                break
+                            else:
+                                raise e
 
+                        # Read and normalize data
                         data = raw_data.decode("utf-8", errors="replace")
+                        data = sub(r"\r+\n|\r{2,}", "\n", data)
+                        data = data.replace("\r", "")
 
-                        for line_raw in data.splitlines(keepends=True):
+                        for line_raw in data.splitlines():
                             line = line_raw.rstrip("\n")
 
                             # Write to logfile
@@ -467,7 +482,7 @@ class Scheduler:
         # Combine files and args into a runnable command
         proc_cmd = [*exe_cmd, tmpwrap.name]
         self.logger.debug(
-            f"Running task '{task.name}' with command:\n"
+            f"Running task '{task.name}' with command:"
             f"'{' '.join(proc_cmd)}'"
         )
 

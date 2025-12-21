@@ -108,7 +108,8 @@ def main(argv, prog, description, cmd):
 
         # Final message
         logger.done(
-            "All tasks completed - You may need to reboot for some changes to take effect",
+            "All tasks completed - You may need to "
+            "reboot for some changes to take effect"
         )
 
     except (KeyboardInterrupt, Exception) as e:
