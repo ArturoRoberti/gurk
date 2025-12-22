@@ -26,7 +26,7 @@ configure_bashrc() {
   fi
 
   # Append custom bashrc lines to ~/.bashrc
-  log_to_file "$CONFIG_FILE" "$HOME/.bashrc" "BASHRC CONFIGURATION"
+  write_marked "$CONFIG_FILE" "$HOME/.bashrc"
 
   # Verify configuration
   check_configure_bashrc

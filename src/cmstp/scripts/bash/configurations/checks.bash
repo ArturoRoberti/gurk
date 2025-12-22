@@ -9,7 +9,7 @@ check_configure_bashrc() {
     Returns:
       0 if configured, 1 otherwise
     '
-  if marker_in_file "$HOME/.bashrc" "BASHRC CONFIGURATION"; then
+  if markers_exist "$HOME/.bashrc"; then
     log_step "~/.bashrc is already configured"
     return 0
   else

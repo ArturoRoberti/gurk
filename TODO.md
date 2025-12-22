@@ -1,13 +1,14 @@
 Look for TODOs in code. Otherwise, look at:
 
 # !!! Major !!!
-- Update and document pytests, and use them in CI (e.g. fail pytest if there is `✖ Failure` or `⚠ Partial` in output)
+- Update and document pytests (one for each task)
+- Run CI on new or edited tasks only:
+    - See changed files, and which functions they contain (or entrypoints)
+    - See which tasks use those functions/entrypoints
+    - Run only those tasks via corresponding pytests, which check there is no `✖ Failure` or `⚠ Partial` in output
 
 # Minor
-## CI
-- (If possible) Only run CI on new or edited tasks
 ## Core
-- Update logging to file (i.e. `CMSTP START ...`) to only have a single CMSTP section, and fill stuff in there
 - Make dev instructions (e.g. to add a task, edit <...>; to add a field to tasks, edit <...>; to add a test, edit <...>; etc.)
 ## Features
 - Add mujoco stuff (mujoco, dmcontrol, sim applications)

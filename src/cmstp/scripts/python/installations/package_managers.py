@@ -5,7 +5,7 @@ from typing import List, TypedDict
 import commentjson
 
 from cmstp.core.logger import Logger, LoggerSeverity
-from cmstp.scripts.python.helpers._parsing import get_config_args
+from cmstp.scripts.python.helpers._interface import get_config_args
 from cmstp.scripts.python.helpers.processing import (
     InstallCommands,
     get_clean_lines,

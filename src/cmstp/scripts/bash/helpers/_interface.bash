@@ -73,6 +73,28 @@ get_config_args() {
   fi
 }
 
+log_step() {
+  : '
+    Log a step message without advancing progress.
+
+    Args:
+      - message:   Message to log.
+      - warning:   Whether or not this is a warning (default: false).
+    Outputs:
+      Log messages indicating the current progress
+    Returns:
+      0 (unless an unexpected error occurs)
+    '
+  local message="$1"
+  local warning="${2:-false}"
+
+  local step_type="STEP_NO_PROGRESS"
+  if [ "$warning" = true ]; then
+    step_type+="_WARNING"
+  fi
+  echo -e "\n__${step_type}__: $message"
+}
+
 run_script_function() {
   : '
     Runs a script (Bash or Python), optionally invoking a specific function within it.

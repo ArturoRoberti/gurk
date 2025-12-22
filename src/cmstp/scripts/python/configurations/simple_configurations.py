@@ -7,7 +7,7 @@ import commentjson
 import requests
 
 from cmstp.core.logger import Logger, LoggerSeverity
-from cmstp.scripts.python.helpers._parsing import get_config_args
+from cmstp.scripts.python.helpers._interface import get_config_args
 from cmstp.scripts.python.helpers.processing import get_clean_lines
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
 from cmstp.utils.interface import bash_check, revert_sudo_permissions

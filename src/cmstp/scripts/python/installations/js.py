@@ -7,7 +7,7 @@ from typing import List
 from packaging import version
 
 from cmstp.core.logger import Logger
-from cmstp.scripts.python.helpers._parsing import get_config_args
+from cmstp.scripts.python.helpers._interface import get_config_args
 from cmstp.scripts.python.helpers.processing import (
     InstallCommands,
     get_clean_lines,

@@ -84,7 +84,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   check_install_docker
 
   # Enable Docker BuildKit
-  log_to_file "export DOCKER_BUILDKIT=1" "$HOME/.bashrc" "DOCKER BUILDKIT"
+  write_marked "export DOCKER_BUILDKIT=1" "${HOME}/.bashrc"
 
   if _contains REMAINING_ARGS nvidia-container-toolkit; then
     # (STEP) Installing NVIDIA Container Toolkit

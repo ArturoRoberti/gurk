@@ -8,7 +8,7 @@ import commentjson
 from ruamel.yaml import YAML
 
 from cmstp.core.logger import Logger, LoggerSeverity
-from cmstp.scripts.python.helpers._parsing import get_config_args
+from cmstp.scripts.python.helpers._interface import get_config_args
 from cmstp.scripts.python.helpers.processing import (
     InstallCommands,
     install_packages_from_list,
