@@ -1,6 +1,6 @@
 import click
 
-from cmstp.cli import commands, info, setup
+from cmstp.cli import core, info, setup
 from cmstp.cli.utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
@@ -20,7 +20,7 @@ def main():
 @click.pass_context
 def install_cmd(ctx: click.Context):
     """Run any of the cmstp installation tasks (see 'cmstp info --available-tasks')"""
-    commands.main(
+    core.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
         description=ctx.command.help,
@@ -32,7 +32,7 @@ def install_cmd(ctx: click.Context):
 @click.pass_context
 def configure_cmd(ctx: click.Context):
     """Run any of the cmstp configuration tasks (see 'cmstp info --available-tasks')"""
-    commands.main(
+    core.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
         description=ctx.command.help,
@@ -44,7 +44,7 @@ def configure_cmd(ctx: click.Context):
 @click.pass_context
 def uninstall_cmd(ctx: click.Context):
     """Run any of the cmstp uninstallation tasks (see 'cmstp info --available-tasks')"""
-    commands.main(
+    core.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
         description=ctx.command.help,

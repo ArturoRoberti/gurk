@@ -8,7 +8,7 @@ from pathlib import Path
 from cmstp.core.logger import Logger, LoggerSeverity
 from cmstp.core.scheduler import Scheduler
 from cmstp.core.task_processor import TaskProcessor
-from cmstp.utils.cli import MainSetupProcessor, get_sudo_askpass
+from cmstp.utils.cli import CoreCliProcessor, get_sudo_askpass
 from cmstp.utils.common import ENABLED_CONFIG_FILE, PACKAGE_CONFIG_PATH
 
 
@@ -64,6 +64,12 @@ def main(argv, prog, description, cmd):
         action="store_true",
         help="Enable verbose output",
     )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Automatically answer 'yes' to all prompts",
+    )
     args = parser.parse_args(argv)
 
     # Set default values in case of early exception
@@ -74,7 +80,7 @@ def main(argv, prog, description, cmd):
         askpass_path = get_sudo_askpass()
 
         with Logger(args.verbose) as logger:
-            setup_processor = MainSetupProcessor(logger, args, argv, cmd)
+            setup_processor = CoreCliProcessor(logger, args, argv, cmd)
 
             # Prompt pre-setup if this was never run before
             setup_processor.prompt_pre_setup()
@@ -86,15 +92,7 @@ def main(argv, prog, description, cmd):
             setup_processor.check_system_compatibility()
 
             # Load config file and process tasks
-            task_processor = TaskProcessor(
-                logger,
-                processed_args.cmstp_cmd,
-                processed_args.config_file,
-                processed_args.config_directory,
-                processed_args.tasks,
-                processed_args.enable_all,
-                processed_args.enable_dependencies,
-            )
+            task_processor = TaskProcessor(logger, processed_args)
 
             # Pre-setup
             if not processed_args.disable_preparation:

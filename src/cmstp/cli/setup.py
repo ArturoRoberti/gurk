@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from cmstp.core.logger import Logger, LoggerSeverity
-from cmstp.utils.interface import promt_bool
+from cmstp.utils.interface import prompt_bool
 from cmstp.utils.system_info import get_manufacturer
 
 
@@ -132,7 +132,7 @@ class SSHKeysManager:
             self.create()
             self.prompt_upload()
             Logger.richprint("\n=== New SSH Key ===", "cyan")
-            if not promt_bool("Would you like to create another SSH key?"):
+            if not prompt_bool("Would you like to create another SSH key?"):
                 break
             print()  # Newline for better readability
         Logger.richprint("SSH key setup complete!\n", "green")
@@ -284,21 +284,26 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
+    # If none are enabled, enable all
+    if not (args.ssh_keys or args.git_credentials or args.disable_secure_boot):
+        args.ssh_keys = True
+        args.git_credentials = True
+        args.disable_secure_boot = True
+
     try:
         # Set up SSH keys
         ssh_keys_manager = SSHKeysManager()
         ssh_keys_exist = ssh_keys_manager.keys_exist()
-        if (
-            args.ssh_keys
-            or (
+        if args.ssh_keys and (
+            (
                 not ssh_keys_exist
-                and promt_bool(
+                and prompt_bool(
                     "No SSH keys detected. Would you like to create SSH keys?"
                 )
             )
             or (
                 ssh_keys_exist
-                and promt_bool(
+                and prompt_bool(
                     "Existing SSH keys detected. Would you still like to create new ones?"
                 )
             )
@@ -310,17 +315,16 @@ def main(argv, prog, description):
         # Set up Git Credentials
         git_credentials_manager = GitCredentialsManager()
         git_credentials_exist = git_credentials_manager.credentials_exist()
-        if (
-            args.git_credentials
-            or (
+        if args.git_credentials and (
+            (
                 not git_credentials_exist
-                and promt_bool(
+                and prompt_bool(
                     "Git user name/email not set. Would you like to set them up?"
                 )
             )
             or (
                 git_credentials_exist
-                and promt_bool(
+                and prompt_bool(
                     f"Git user name/email already set (to '{git_credentials_manager.user_name}' resp. '{git_credentials_manager.user_email}'). Would you like to update them?"
                 )
             )
@@ -330,7 +334,7 @@ def main(argv, prog, description):
             Logger.richprint("Skipping Git credentials setup\n", "yellow")
 
         # Print Secure Boot disabling steps
-        if args.disable_secure_boot or promt_bool(
+        if args.disable_secure_boot and prompt_bool(
             "Would you like to see the steps to disable Secure Boot in UEFI/BIOS?"
         ):
             print_secure_boot_steps()

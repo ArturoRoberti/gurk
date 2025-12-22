@@ -1,8 +1,7 @@
 Look for TODOs in code. Otherwise, look at:
 
 # !!! Major !!!
-- Update and document pytests, and use them in CI (e.g. make sure there is no `✖ Failure` or `⚠ Partial` in output)
-- Find a safer way than to use askpass file for scripts
+- Update and document pytests, and use them in CI (e.g. fail pytest if there is `✖ Failure` or `⚠ Partial` in output)
 
 # Minor
 ## CI

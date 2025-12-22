@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import networkx as nx
 
 from cmstp.core.logger import Logger
+from cmstp.utils.cli import CoreCliArgs
 from cmstp.utils.command import Command, CommandKind
 from cmstp.utils.common import DEFAULT_CONFIG_FILE
 from cmstp.utils.patterns import PatternCollection
@@ -26,13 +27,10 @@ class TaskProcessor:
 
     # fmt: off
     logger:              Logger             = field(repr=False)
-    cmstp_cmd:           str                = field()
-    config_file:         Optional[Path]     = field()
-    config_directory:    Path               = field()
-    custom_tasks:        List[str]          = field()
-    enable_all:          Optional[bool]     = field()
-    enable_dependencies: Optional[bool]     = field()
+    processed_args:      CoreCliArgs      = field()
 
+    enable_all:          bool               = field(init=False, default=False)
+    enable_dependencies: bool               = field(init=False, default=False)
     resolved_tasks:      List[ResolvedTask] = field(init=False, repr=False, default=None)
 
     # Internal
@@ -47,9 +45,13 @@ class TaskProcessor:
         # (Internal) Check default config file
         self._default_config = self.check_default_config()
 
+        # Add CLI options
+        self.enable_all = self.processed_args.enable_all
+        self.enable_dependencies = self.processed_args.enable_dependencies
+
         # Check custom config file
-        if self.config_file is not None:
-            custom_config = load_yaml(self.config_file)
+        if self.processed_args.config_file is not None:
+            custom_config = load_yaml(self.processed_args.config_file)
             custom_config = self.check_config(custom_config)
         else:
             self.logger.debug(
@@ -77,10 +79,10 @@ class TaskProcessor:
 
         # Disable all tasks that don't belong to the current cmstp command
         for task_name, task in tasks.items():
-            if not task_name.startswith(self.cmstp_cmd):
+            if not task_name.startswith(self.processed_args.cmstp_cmd):
                 self.logger.debug(
                     f"Disabling task '{task_name}', as it does not "
-                    f"belong to the '{self.cmstp_cmd}' command"
+                    f"belong to the '{self.processed_args.cmstp_cmd}' command"
                 )
                 task["enabled"] = False
 
@@ -97,13 +99,17 @@ class TaskProcessor:
         tasks = self.resolve_graphs(tasks)
 
         # Count enabled tasks
-        if self.count_tasks(tasks) == 0:
+        enabled_task_names = [
+            name for name, task in tasks.items() if task["enabled"]
+        ]
+        n_enabled = len(enabled_task_names)
+        if n_enabled == 0:
             self.logger.fatal(
                 "There are no enabled tasks (anymore). Nothing to do"
             )
         else:
             self.logger.debug(
-                f"Final enabled tasks: {[name for name, task in tasks.items() if task['enabled']]}"
+                f"Final enabled tasks ({n_enabled}): {enabled_task_names}"
             )
 
         # Create logging directory
@@ -397,16 +403,14 @@ class TaskProcessor:
             """
             if option in config:
                 value = config.pop(option)
-            else:
-                value = None
-            if getattr(self, option) is None and value:
                 if not isinstance(value, bool):
                     warning(
                         f"Ignoring '{option}' value - must be "
                         f"a boolean, not a {type(value).__name__}"
                     )
-                    value = False
-                setattr(self, option, value)
+                else:
+                    current_value = getattr(self, option)
+                    setattr(self, option, current_value | value)
 
         # Check for "enable_all" parameter
         check_option("enable_all")
@@ -466,8 +470,8 @@ class TaskProcessor:
         for task_name, task in filled_tasks.items():
             if task_name not in self._default_config:
                 self.logger.warning(
-                    f"Task '{task_name}' in custom config is removed "
-                    f"because it is not defined in the default config"
+                    f"Task '{task_name}' in is removed because"
+                    f"it is not defined in the default config"
                 )
                 final_tasks.pop(task_name)
 
@@ -482,7 +486,7 @@ class TaskProcessor:
         :rtype: TaskDictCollection
         """
         processed_tasks = dict()
-        for task_str in self.custom_tasks:
+        for task_str in self.processed_args.tasks:
             parts = task_str.split(":")
             task_name = parts[0]
             task_args = parts[1:] if len(parts) > 1 else []
@@ -522,7 +526,7 @@ class TaskProcessor:
         for task_name, task in tasks.items():
             if task["config_file"] is not None:
                 config_file = (
-                    self.config_directory / task["config_file"]
+                    self.processed_args.config_directory / task["config_file"]
                 ).resolve()
 
                 if not config_file.exists():
@@ -599,19 +603,3 @@ class TaskProcessor:
             "Resolved dependency and supercedes enabling/disabling"
         )
         return tasks
-
-    @staticmethod
-    def count_tasks(tasks: TaskDictCollection) -> int:
-        """
-        Count the number of enabled tasks.
-
-        :param tasks: Tasks to count
-        :type tasks: TaskDictCollection
-        :return: Number of enabled tasks
-        :rtype: int
-        """
-        count = 0
-        for task in tasks.values():
-            if task.get("enabled", False):
-                count += 1
-        return count

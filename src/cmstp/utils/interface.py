@@ -255,17 +255,24 @@ def revert_sudo_permissions(path: FilePath) -> None:
     )
 
 
-def promt_bool(message: str) -> bool:
+def prompt_bool(message: str, answer: Optional[str] = None) -> bool:
     """
     Prompt the user for a yes/no response.
 
     :param message: The prompt message.
     :type message: str
+    :param answer: Optional predefined answer for non-interactive usage.
+    :type answer: Optional[str]
     :return: True if the user responds with 'y', False for 'n'.
     :rtype: bool
     """
+    if answer not in (None, "y", "n"):
+        raise ValueError(
+            "Answer must be 'y', 'n', or None for interactive prompt."
+        )
+
     while True:
-        response = input(f"{message} (y/n): ").strip().lower()
+        response = answer or input(f"{message} (y/n): ").strip().lower()
         if response in ["y", "n"]:
             return response == "y"
         else:

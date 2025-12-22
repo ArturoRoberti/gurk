@@ -64,9 +64,9 @@ The `info` command also provides further options to see detailed information abo
 ```bash
 cmstp info [-h] [-s] [-t TASKS [TASKS ...]] [-a] [-c] [-d]
 ```
-If no flags are provided, every flag is enabled by default.
+If no flags are provided, only the system information is printed by default.
 
-## Main Commands
+## Core Commands
 Each task can be run with the resp. command, which is one of:
 - `install` to install packages, programs, ...
 - `configure` to configure programs and settings
@@ -74,7 +74,7 @@ Each task can be run with the resp. command, which is one of:
 
 To use default tasks, simply use (without any flags):
 ```
-cmstp <command> [-h] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [-t TASKS [TASKS ...]] [--enable-all] [--enable-dependencies] [--disable-preparation] [-v]
+cmstp <command> [-h] [-f CONFIG_FILE] [-d CONFIG_DIRECTORY] [-t TASKS [TASKS ...]] [--enable-all] [--enable-dependencies] [--disable-preparation] [-v] [-y]
 ```
 
 To use custom task configuration files, use (flag shorthand: `-d`)
