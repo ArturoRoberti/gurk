@@ -90,3 +90,4 @@ repos:
     entry: python3 .github/scripts/bump_version.py
     language: python
     additional_dependencies: [packaging, requests, toml]
+    require_serial: true

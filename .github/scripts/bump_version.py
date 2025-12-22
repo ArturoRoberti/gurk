@@ -6,7 +6,7 @@ from packaging.version import InvalidVersion, Version
 try:
     requests.get("https://pypi.org", timeout=5)
 except requests.RequestException:
-    print("No internet connection. Skipping version bump.")
+    # No internet connection, skip version bump
     exit(0)
 
 # Load local version
