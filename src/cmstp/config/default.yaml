@@ -48,18 +48,18 @@ _defaults: &defaults
     default: []
 
 #################################################################################################################
-################################################# Installations #################################################
+#################################################### Install ####################################################
 #################################################################################################################
 install-apt-packages:
   <<: *defaults
   description: Install a list of apt packages
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_apt_packages
-  config_file: installations/install_apt_packages.txt
+  config_file: install/install_apt_packages.txt
 install-conda:
   <<: *defaults
   description: Install Conda (Miniconda/Anaconda)
-  script: !join [*bash_scripts, "installations/conda.bash"]
+  script: !join [*bash_scripts, "install/conda.bash"]
   function: install_conda
   args:
     allowed: [miniconda, anaconda]
@@ -67,9 +67,9 @@ install-conda:
 install-conda-environments:
   <<: *defaults
   description: Install Conda/Mamba environments
-  script: !join [*python_scripts, "installations/environments.py"]
+  script: !join [*python_scripts, "install/environments.py"]
   function: install_conda_environments
-  config_file: installations/install_conda_environments.jsonc
+  config_file: install/install_conda_environments.jsonc
   args:
     allowed: [--update]
     default: []
@@ -77,14 +77,14 @@ install-cuda:  # TODO: Allow version specification, and then adapt driver versio
   <<: *defaults
   description: Install NVIDIA CUDA Toolkit (and compatible driver). WARNING -
     Removes driver prime-selection!
-  script: !join [*bash_scripts, "installations/nvidia.bash"]
+  script: !join [*bash_scripts, "install/nvidia.bash"]
   function: install_cuda
   supercedes: [install-nvidia-driver]
 install-docker:
   <<: *defaults
   description: Install Docker. Optionally installs NVIDIA Container Toolkit and
     DevContainers CLI.
-  script: !join [*bash_scripts, "installations/docker.bash"]
+  script: !join [*bash_scripts, "install/docker.bash"]
   function: null
   args:
     allowed: [nvidia-container-toolkit, devcontainers-cli, distrobox]
@@ -92,30 +92,30 @@ install-docker:
 install-docker-images:
   <<: *defaults
   description: Pull a list of Docker images
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_docker_images
-  config_file: installations/install_docker_images.jsonc
+  config_file: install/install_docker_images.jsonc
   depends_on: [install-docker]
 install-flatpak-packages:
   <<: *defaults
   description: Install a list of flatpak packages. Optionally makes handy
     aliases for running the apps.
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_flatpak_packages
-  config_file: installations/install_flatpak_packages.txt
+  config_file: install/install_flatpak_packages.txt
   args:
     allowed: [--create-aliases]
     default: [--create-aliases]
 install-fzf:
   <<: *defaults
   description: Install fzf (allows fuzzy searching in terminal)
-  script: !join [*bash_scripts, "installations/simple_installations.bash"]
+  script: !join [*bash_scripts, "install/simple_installations.bash"]
   function: install_fzf
   depends_on: [install-docker]
 install-isaaclab:
   <<: *defaults
   description: Install NVIDIA IsaacLab
-  script: !join [*bash_scripts, "installations/isaac.bash"]
+  script: !join [*bash_scripts, "install/isaac.bash"]
   function: install_isaaclab
   depends_on: [install-isaacsim, install-conda]
   args:
@@ -124,7 +124,7 @@ install-isaaclab:
 install-isaacsim:
   <<: *defaults
   description: Install NVIDIA IsaacSim
-  script: !join [*bash_scripts, "installations/isaac.bash"]
+  script: !join [*bash_scripts, "install/isaac.bash"]
   function: install_isaacsim
   args:
     allowed: [latest, 4.*, 5.*]
@@ -133,9 +133,9 @@ install-js-repositories:
   <<: *defaults
   description: Clone and install a list of packages using JavaScript. Optionally
     makes handy aliases for running the apps.
-  script: !join [*python_scripts, "installations/js.py"]
+  script: !join [*python_scripts, "install/js.py"]
   function: install_js_repositories
-  config_file: installations/install_js_repositories.txt
+  config_file: install/install_js_repositories.txt
   args:
     allowed: [--create-aliases]
     default: [--create-aliases]
@@ -143,13 +143,13 @@ install-loki-shell:
   <<: *defaults
   description: Install Loki shell (allows shared fuzzy searching over different
     machines (SSH, Docker, ...))
-  script: !join [*bash_scripts, "installations/simple_installations.bash"]
+  script: !join [*bash_scripts, "install/simple_installations.bash"]
   function: install_loki_shell
   depends_on: [install-fzf]
 install-mamba:  # NOTE: "mamba" requires conda, "micromamba" does not (is standalone)
   <<: *defaults
   description: Install (Micro)Mamba
-  script: !join [*bash_scripts, "installations/conda.bash"]
+  script: !join [*bash_scripts, "install/conda.bash"]
   function: install_mamba
   args:
     allowed: [micromamba, mamba]
@@ -157,14 +157,14 @@ install-mamba:  # NOTE: "mamba" requires conda, "micromamba" does not (is standa
 install-npm-packages:
   <<: *defaults
   description: Install a list of npm packages
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_npm_packages
-  config_file: installations/install_npm_packages.txt
+  config_file: install/install_npm_packages.txt
 install-nvidia-driver:
   <<: *defaults
   description: Install NVIDIA driver (standalone). WARNING - Removes CUDA
     compatibility!
-  script: !join [*bash_scripts, "installations/nvidia.bash"]
+  script: !join [*bash_scripts, "install/nvidia.bash"]
   function: install_nvidia_driver
   args:
     allowed: [recommended, latest, nvidia-driver-*, --include-server,
@@ -173,19 +173,19 @@ install-nvidia-driver:
 install-pip-environments:
   <<: *defaults
   description: Install Python pip virtual environments
-  script: !join [*python_scripts, "installations/environments.py"]
+  script: !join [*python_scripts, "install/environments.py"]
   function: install_pip_environments
-  config_file: installations/install_pip_environments.jsonc
+  config_file: install/install_pip_environments.jsonc
 install-pipx-packages:
   <<: *defaults
   description: Install a list of pipx CLI packages
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_pipx_packages
-  config_file: installations/install_pipx_packages.txt
+  config_file: install/install_pipx_packages.txt
 install-ros:
   <<: *defaults
   description: Install ROS (Robot Operating System)
-  script: !join [*bash_scripts, "installations/ros.bash"]
+  script: !join [*bash_scripts, "install/ros.bash"]
   function: null
   args:
     allowed: [latest, --include-future, ardent, bouncy, crystal, dashing,
@@ -194,52 +194,52 @@ install-ros:
 install-snap-packages:
   <<: *defaults
   description: Install a list of snap packages
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_snap_packages
-  config_file: installations/install_snap_packages.txt
+  config_file: install/install_snap_packages.txt
 install-vscode:
   <<: *defaults
   description: Install Visual Studio Code
-  script: !join [*bash_scripts, "installations/simple_installations.bash"]
+  script: !join [*bash_scripts, "install/simple_installations.bash"]
   function: install_vscode
 install-vscode-extensions:
   <<: *defaults
   description: Install a list of Visual Studio Code extensions
-  script: !join [*python_scripts, "installations/package_managers.py"]
+  script: !join [*python_scripts, "install/package_managers.py"]
   function: install_vscode_extensions
-  config_file: installations/install_vscode_extensions.txt
+  config_file: install/install_vscode_extensions.txt
   depends_on: [install-vscode]
 
 #################################################################################################################
-################################################ Uninstallations ################################################
+################################################### Uninstall ###################################################
 #################################################################################################################
 uninstall-fzf:
   <<: *defaults
   description: Uninstall fzf
-  script: !join [*bash_scripts, "uninstallations/simple_uninstallations.bash"]
+  script: !join [*bash_scripts, "uninstall/simple_uninstallations.bash"]
   function: uninstall_fzf
   depends_on: [uninstall-loki-shell]
 uninstall-loki-shell:
   <<: *defaults
   description: Uninstall loki-shell
-  script: !join [*bash_scripts, "uninstallations/simple_uninstallations.bash"]
+  script: !join [*bash_scripts, "uninstall/simple_uninstallations.bash"]
   function: uninstall_loki_shell
 
 #################################################################################################################
-################################################ Configurations #################################################
+################################################### Configure ###################################################
 #################################################################################################################
 configure-bashrc:
   <<: *defaults
   description: Copy lines from a template bashrc file to the user's .bashrc
-  script: !join [*bash_scripts, "configurations/simple_configurations.bash"]
+  script: !join [*bash_scripts, "configure/simple_configurations.bash"]
   function: configure_bashrc
-  config_file: configurations/configure_bashrc.bash
+  config_file: configure/configure_bashrc.bash
 configure-filestructure:
   <<: *defaults
   description: Create a predefined filestructure in the user's home directory
-  script: !join [*python_scripts, "configurations/simple_configurations.py"]
+  script: !join [*python_scripts, "configure/simple_configurations.py"]
   function: configure_filestructure
-  config_file: configurations/configure_filestructure.yaml
+  config_file: configure/configure_filestructure.yaml
   privileged: true
   args:
     allowed: [--root]
@@ -247,13 +247,13 @@ configure-filestructure:
 configure-pinned-apps:
   <<: *defaults
   description: Determine pinned applications
-  script: !join [*python_scripts, "configurations/simple_configurations.py"]
+  script: !join [*python_scripts, "configure/simple_configurations.py"]
   function: configure_pinned_apps
-  config_file: configurations/configure_pinned_apps.txt
+  config_file: configure/configure_pinned_apps.txt
 configure-vscode-keybindings:
   <<: *defaults
   description: Configure Visual Studio Code keybindings
-  script: !join [*python_scripts, "configurations/simple_configurations.py"]
+  script: !join [*python_scripts, "configure/simple_configurations.py"]
   function: configure_vscode_keybindings
-  config_file: configurations/configure_vscode_keybindings.jsonc
+  config_file: configure/configure_vscode_keybindings.jsonc
   depends_on: [install-vscode]
