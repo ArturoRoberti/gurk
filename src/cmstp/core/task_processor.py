@@ -221,12 +221,13 @@ class TaskProcessor:
         default_config = {
             k: overlay_dicts([defaults, v])
             for k, v in default_config.items()
-            if k.startswith(self.processed_args.cmstp_cmd)
+            if isinstance(k, str)
+            and k.startswith(self.processed_args.cmstp_cmd)
         }
 
         # Check structure (incl. types)
         invalid_tasks = get_invalid_tasks_from_task_dict_collection(
-            default_config
+            default_config, True
         )
         if invalid_tasks:
             fatal_msg = textwrap.dedent(
@@ -386,10 +387,9 @@ class TaskProcessor:
 
         # Add defaults for missing optional fields. Used to check structure of custom config tasks
         default_dict = deepcopy(DEFAULT_CUSTOM_CONFIG)
-        # TODO: Remove explicit adding of "args" as soon as TASK_PROPERTIES_DEFAULT is restructured
         for common_key in (
             TASK_PROPERTIES_DEFAULT.keys() & TASK_PROPERTIES_CUSTOM.keys()
-        ) | {"args"}:
+        ):
             # Keep default value if not provided in config
             default_dict[common_key] = "default"
         filled_tasks = deepcopy(config)
@@ -406,7 +406,7 @@ class TaskProcessor:
 
         # Check structure (incl. types)
         invalid_tasks = get_invalid_tasks_from_task_dict_collection(
-            filled_tasks, include_default=False, include_custom=True
+            filled_tasks, False
         )
         if invalid_tasks:
             warning_msg = textwrap.dedent(
