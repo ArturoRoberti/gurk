@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, TypedDict, Union
+from typing import Dict, Optional, TypedDict, TypeVar
 
 from rich.progress import TaskID
 
@@ -31,19 +31,19 @@ class LoggerEnumBase(Enum):
     value: LoggerTextSpec
 
     @property
-    def label(self):
+    def label(self) -> str:
         return self.value.label
 
     @property
-    def color(self):
+    def color(self) -> str:
         return self.value.color
 
     @property
-    def bold(self):
+    def bold(self) -> bool:
         return self.value.bold
 
     @property
-    def bright(self):
+    def bright(self) -> bool:
         return self.value.bright
 
 
@@ -75,10 +75,9 @@ class LoggerSeverity(LoggerEnumBase):
     # fmt: on
 
 
-LoggerEnum = Union[LoggerSeverity, TaskTerminationType]
+LoggerEnum = TypeVar("LoggerEnum", bound=LoggerEnumBase)
 
 
-# TODO: Maybe organize better / replace?
 class TaskInfo(TypedDict):
     """
     Information about a logged task.

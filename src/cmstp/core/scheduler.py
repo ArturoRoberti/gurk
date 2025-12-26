@@ -2,6 +2,7 @@ import errno
 import json
 import os
 import pty
+import shlex
 import subprocess
 import termios
 from dataclasses import dataclass, field
@@ -26,12 +27,12 @@ class Scheduler:
     """Schedules and runs tasks with dependencies, handling logging and progress tracking."""
 
     # fmt: off
-    logger:    Logger             = field(repr=False)
-    tasks:     List[ResolvedTask] = field(repr=False)
-    askpass_file: str         = field(repr=False)
+    logger:       Logger             = field(repr=False)
+    tasks:        List[ResolvedTask] = field(repr=False)
+    askpass_file: str                = field(repr=False)
 
     results:   Dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
-    scheduled: Set[ResolvedTask]                             = field(init=False, repr=False, default_factory=set)
+    scheduled: Set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
 
     lock:      Lock  = field(init=False, repr=False, default_factory=Lock)
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
@@ -83,7 +84,7 @@ class Scheduler:
 
             # Entrypoint
             r_entry = PatternCollection[command.kind.name].patterns[
-                "entrypoints"
+                "entrypoint"
             ]
             m_entry = r_entry.match(stripped)
 
@@ -174,13 +175,13 @@ class Scheduler:
 
             if in_desired:
                 if step_type == "comment":
-                    # TODO: make safe, i.e. replace any " with ' (or similar)
                     # Replace STEP comments with print statements
-                    step_msg = f"\\n__STEP__: {step}"
+                    step_msg = f"\n__STEP__: {step}"
                     if command.kind == CommandKind.PYTHON:
-                        msg = f'print(f"{step_msg}")'
+                        msg = f"print({step_msg!r})"
                     else:
-                        msg = f'printf "{step_msg}\\n"'
+                        step_msg += "\n"
+                        msg = f"printf %s {shlex.quote(step_msg)}"
 
                     return f"{indent}{msg}\n"
                 else:

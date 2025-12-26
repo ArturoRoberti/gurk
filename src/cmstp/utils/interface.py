@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 
 from rich import print as richprint
 
-from cmstp.utils.command import CommandKind
+from cmstp.utils.command import Command, CommandKind
 from cmstp.utils.common import (
     PACKAGE_BASH_HELPERS_PATH,
     PIPX_PYTHON_PATH,
@@ -40,22 +40,17 @@ def run_script_function(
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
     """
-    if not Path(script).exists():
-        raise FileNotFoundError(f"Script file not found: {script}")
-    # TODO: Add check for function existence. Make util for this somewhere and use both here and in scheduler
+    # Check existence of script & function fields
+    command = Command(script, function)
 
-    kind = CommandKind.from_script(script)
-    if kind == CommandKind.BASH:
-        return _run_bash_script_function(
-            script, function, args, run, capture_output
-        )
-    elif kind == CommandKind.PYTHON:
+    # Run respective command
+    if command.kind == CommandKind.PYTHON:
         return _run_python_script_function(
             script, function, args, run, capture_output, sudo
         )
     else:
-        raise ValueError(
-            f"Unsupported script type: {kind} (supported: {CommandKind.BASH.name}, {CommandKind.PYTHON.name})"
+        return _run_bash_script_function(
+            script, function, args, run, capture_output
         )
 
 

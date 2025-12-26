@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from cmstp.utils.common import PIPX_PYTHON_PATH, FilePath
+from cmstp.utils.patterns import PatternCollection
 
 
 class ScriptExtension(Enum):
@@ -58,6 +59,72 @@ class Command:
     script:   str           = field()
     function: Optional[str] = field(default=None)
     # fmt: on
+
+    def __post_init__(self) -> None:
+        # Check 'script'
+        if not Path(self.script).exists():
+            raise FileNotFoundError(f"Script file not found: {self.script}")
+        try:
+            self.kind  # Trigger kind property to validate script type
+        except ValueError:
+            raise ValueError(
+                f"Unsupported script type for file {self.script} - supported "
+                f"types: {[ext.name.lower() for ext in ScriptExtension]}"
+            )
+
+        # Read script
+        with open(self.script) as f:
+            lines = f.readlines()
+
+        # Check 'function'
+        if self.function is not None:
+            # Find function in script
+            function_pattern = PatternCollection[self.kind.name].patterns[
+                "blocks"
+            ]["FUNCTION"]
+            function_matches = [
+                match.groups()
+                for line in lines
+                if (match := function_pattern.search(line.strip()))
+            ]
+            if self.kind == CommandKind.PYTHON:  # Also capture args
+                function_names = [name for name, _ in function_matches]
+            else:  # No args are captured in bash
+                function_names = [name for name, in function_matches]
+            if self.function not in function_names:
+                raise ValueError(
+                    f"'{self.function}' function not found in script "
+                    f"{self.script}\nAvailable functions: {function_names}",
+                )
+
+            # If Python, check function definition only captures '*args'
+            if self.kind == CommandKind.PYTHON:
+                # Test if the function has only *args
+                function_args = [args for _, args in function_matches]
+                args = function_args[function_names.index(self.function)]
+                arg_list = [a.strip() for a in args.split(",") if a.strip()]
+                if not (
+                    len(arg_list) == 1 and arg_list[0].split(":")[0] == "*args"
+                ):
+                    raise ValueError(
+                        f"'{self.function}' function in script "
+                        f"{self.script} must ONLY capture '*args' as "
+                        f"an argument, if it is to be used as a task",
+                    )
+        else:
+            # Find entrypoint in script
+            entrypoint_pattern = PatternCollection[self.kind.name].patterns[
+                "entrypoint"
+            ]
+            entrypoint_matches = [
+                line
+                for line in lines
+                if entrypoint_pattern.search(line.strip())
+            ]
+            if len(entrypoint_matches) != 1:
+                raise ValueError(
+                    f"Expected exactly one entrypoint, found {len(entrypoint_matches)}"
+                )
 
     @cached_property
     def kind(self) -> CommandKind:

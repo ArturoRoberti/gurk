@@ -11,7 +11,6 @@ from cmstp.core.logger import Logger
 from cmstp.utils.cli import CoreCliArgs
 from cmstp.utils.command import Command, CommandKind
 from cmstp.utils.common import DEFAULT_CONFIG_FILE, PACKAGE_SRC_PATH
-from cmstp.utils.patterns import PatternCollection
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
     TASK_PROPERTIES_CUSTOM,
@@ -245,7 +244,7 @@ class TaskProcessor:
             if not task["description"]:
                 fatal("Description is empty", task_name)
 
-            # Check & resolve 'script' field
+            # Resolve 'script' field
             if not task["script"]:
                 fatal(
                     "Script is either null, empty or invalid",
@@ -265,13 +264,14 @@ class TaskProcessor:
                     / self.processed_args.cmstp_cmd
                     / task["script"]
                 )
-                if not Path(task["script"]).exists():
-                    fatal(
-                        f"'{task['script']}' script does not exist", task_name
-                    )
+
+            # Check existence of script & function fields
+            try:
+                script_command = Command(task["script"], task["function"])
+            except Exception as e:
+                fatal(str(e), task_name)
 
             # Check for duplicate (script, function) pairs
-            script_command = Command(task["script"], task["function"])
             if script_command in existing_scripts:
                 fatal(
                     f"Duplicate (script, function) pair: {script_command}",
@@ -279,54 +279,6 @@ class TaskProcessor:
                 )
             else:
                 existing_scripts.add(script_command)
-
-            # Check 'function' field
-            if task["function"] is not None:
-                # Get script info
-                script_kind = script_command.kind
-                with open(task["script"]) as f:
-                    lines = f.readlines()
-
-                # Find function in script
-                function_pattern = PatternCollection[
-                    script_kind.name
-                ].patterns["blocks"]["FUNCTION"]
-                function_matches = [
-                    match.groups()
-                    for line in lines
-                    if (match := function_pattern.search(line.strip()))
-                ]
-                if script_kind == CommandKind.PYTHON:  # Also capture args
-                    function_names = [name for name, _ in function_matches]
-                else:  # No args are captured in bash
-                    function_names = [name for name, in function_matches]
-                if task["function"] not in function_names:
-                    fatal(
-                        f"'{task['function']}' function not found in script "
-                        f"{task['script']}\nAvailable functions: {function_names}",
-                        task_name,
-                    )
-
-                # If Python, check function definition only captures '*args'
-                elif script_kind == CommandKind.PYTHON:
-                    # Test if the function has only *args
-                    function_args = [args for _, args in function_matches]
-                    args = function_args[
-                        function_names.index(task["function"])
-                    ]
-                    arg_list = [
-                        a.strip() for a in args.split(",") if a.strip()
-                    ]
-                    if not (
-                        len(arg_list) == 1
-                        and arg_list[0].split(":")[0] == "*args"
-                    ):
-                        fatal(
-                            f"'{task['function']}' function in script "
-                            f"{task['script']} must ONLY capture '*args' as "
-                            f"an argument, if it is to be used as a task",
-                            task_name,
-                        )
 
             # Check 'depends_on' field (must refer to existing tasks)
             for dep in task["depends_on"]:
@@ -481,7 +433,7 @@ class TaskProcessor:
                 )
                 task["enabled"] = False
 
-        # Disable tasks that are not in default config # TODO: Test this quickly
+        # Disable tasks that are not in default config
         final_tasks = deepcopy(filled_tasks)
         for task_name, task in filled_tasks.items():
             if task_name not in self._default_config:

@@ -32,7 +32,6 @@ DEFAULT_CUSTOM_CONFIG = {
     for key, val in TASK_PROPERTIES_CUSTOM.items()
 }
 
-# TODO: Auto-detect via flag in default config?
 HARDWARE_SPECIFIC_TASKS = ["install-nvidia-driver", "install-cuda"]
 
 
