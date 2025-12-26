@@ -33,8 +33,9 @@ for file in ${PACKAGE_HELP_PATH}/*.bash; do
 done
 
 # Source check scripts
-source "${PACKAGE_SRC_PATH}/scripts/bash/configurations/checks.bash"
-source "${PACKAGE_SRC_PATH}/scripts/bash/installations/checks.bash"
+for file in ${PACKAGE_SRC_PATH}/scripts/bash/*/checks.bash; do
+  source "$file"
+done
 
 # Ensure this script is not run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

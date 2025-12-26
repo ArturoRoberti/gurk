@@ -84,7 +84,7 @@ class Logger:
         :type script: Path
         :param task_name: Name of the script file
         :type task_name: str
-        :param ext: Extension of the script file (e.g., 'sh', 'py')
+        :param ext: Extension of the script file (e.g., 'bash', 'py')
         :type ext: str
         """
         if not self.verbose:

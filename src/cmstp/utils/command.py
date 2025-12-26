@@ -8,6 +8,15 @@ from typing import Optional
 from cmstp.utils.common import PIPX_PYTHON_PATH, FilePath
 
 
+class ScriptExtension(Enum):
+    """Enumeration of supported script file extensions."""
+
+    # fmt: off
+    BASH   = "bash"
+    PYTHON = "py"
+    # fmt: on
+
+
 class CommandKind(Enum):
     """Enumeration of supported command kinds with their executables."""
 
@@ -22,11 +31,9 @@ class CommandKind(Enum):
 
     @property
     def ext(self) -> str:
-        if self == CommandKind.BASH:
-            return "bash"
-        elif self == CommandKind.PYTHON:
-            return "py"
-        else:
+        try:
+            return ScriptExtension[self.name].value
+        except KeyError:
             raise ValueError(f"Unsupported CommandKind: {self.name}")
 
     @staticmethod
@@ -39,18 +46,8 @@ class CommandKind(Enum):
         :return: CommandKind corresponding to the script type
         :rtype: CommandKind
         """
-        bash_suffixes = (".sh", ".bash")
-        python_suffixes = (".py",)
-
-        suffix = Path(script).suffix
-        if suffix in bash_suffixes:
-            return CommandKind.BASH
-        elif suffix in python_suffixes:
-            return CommandKind.PYTHON
-        else:
-            raise ValueError(
-                f"Unsupported script type: {suffix} (supported: {bash_suffixes + python_suffixes})"
-            )
+        suffix = Path(script).suffix.replace(".", "")
+        return CommandKind[ScriptExtension(suffix).name]
 
 
 @dataclass(frozen=True)

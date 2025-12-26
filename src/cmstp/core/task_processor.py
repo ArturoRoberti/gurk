@@ -1,6 +1,7 @@
 import textwrap
 from copy import deepcopy
 from dataclasses import dataclass, field
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -9,10 +10,12 @@ import networkx as nx
 from cmstp.core.logger import Logger
 from cmstp.utils.cli import CoreCliArgs
 from cmstp.utils.command import Command, CommandKind
-from cmstp.utils.common import DEFAULT_CONFIG_FILE
+from cmstp.utils.common import DEFAULT_CONFIG_FILE, PACKAGE_SRC_PATH
 from cmstp.utils.patterns import PatternCollection
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
+    TASK_PROPERTIES_CUSTOM,
+    TASK_PROPERTIES_DEFAULT,
     ResolvedTask,
     TaskDictCollection,
     get_invalid_tasks_from_task_dict_collection,
@@ -27,7 +30,7 @@ class TaskProcessor:
 
     # fmt: off
     logger:              Logger             = field(repr=False)
-    processed_args:      CoreCliArgs      = field()
+    processed_args:      CoreCliArgs        = field(repr=False)
 
     enable_all:          bool               = field(init=False, default=False)
     enable_dependencies: bool               = field(init=False, default=False)
@@ -133,7 +136,7 @@ class TaskProcessor:
 
     @staticmethod
     def check_allowed(
-        allowed_args: Optional[List[str]],
+        allowed_args: List[str],
         args: Union[str, List[str]],
         allow_default: bool = False,
     ) -> Tuple[List[str], bool]:
@@ -141,8 +144,8 @@ class TaskProcessor:
         Check if an argument is in the allowed list.
         If allowed_args is None, any argument is allowed.
 
-        :param allowed_args: List of allowed arguments or None if any argument is allowed
-        :type allowed_args: Optional[List[str]]
+        :param allowed_args: List of allowed arguments
+        :type allowed_args: List[str]
         :param args: Argument or list of arguments to check
         :type args: Union[str, List[str]]
         :param allow_default: Whether to allow 'default' as a valid argument
@@ -162,20 +165,15 @@ class TaskProcessor:
             :return: Whether the argument is allowed
             :rtype: bool
             """
-            extra_args = ["--force"]
-            if allow_default:
-                extra_args.append("default")
+            allowed = [
+                *allowed_args,
+                "--force",
+                *(["default"] if allow_default else []),
+            ]
+            return any(
+                fnmatchcase(arg, allowed_arg) for allowed_arg in allowed
+            )
 
-            for allowed in [*allowed_args, *extra_args]:
-                if allowed.endswith("*"):
-                    if arg.startswith(allowed[:-1]):
-                        return True
-                elif arg == allowed:
-                    return True
-            return False
-
-        if allowed_args is None:
-            return [], True
         if isinstance(args, str):
             is_allowed = _check_single_allowed(args)
             wrong_args = [] if is_allowed else [args]
@@ -219,12 +217,12 @@ class TaskProcessor:
                 + type(default_config).__name__
             )
 
-        # Remove helpers (start with '_') that may otherwise be picked up as tasks
+        # Remove helpers and any tasks not belonging to the current cmstp command
         defaults = default_config["_defaults"]
         default_config = {
             k: overlay_dicts([defaults, v])
             for k, v in default_config.items()
-            if not k.startswith("_")
+            if k.startswith(self.processed_args.cmstp_cmd)
         }
 
         # Check structure (incl. types)
@@ -247,14 +245,30 @@ class TaskProcessor:
             if not task["description"]:
                 fatal("Description is empty", task_name)
 
-            # Check 'script' field
+            # Check & resolve 'script' field
             if not task["script"]:
                 fatal(
-                    "Script is either null, empty or uses a package that can't be found",
+                    "Script is either null, empty or invalid",
                     task_name,
                 )
-            if not Path(task["script"]).exists():
-                fatal(f"'{task['script']}' script does not exist", task_name)
+            else:
+                try:
+                    language = CommandKind.from_script(
+                        task["script"]
+                    ).name.lower()
+                except ValueError as e:
+                    fatal(str(e), task_name)
+                task["script"] = (
+                    PACKAGE_SRC_PATH
+                    / "scripts"
+                    / language
+                    / self.processed_args.cmstp_cmd
+                    / task["script"]
+                )
+                if not Path(task["script"]).exists():
+                    fatal(
+                        f"'{task['script']}' script does not exist", task_name
+                    )
 
             # Check for duplicate (script, function) pairs
             script_command = Command(task["script"], task["function"])
@@ -420,10 +434,12 @@ class TaskProcessor:
 
         # Add defaults for missing optional fields. Used to check structure of custom config tasks
         default_dict = deepcopy(DEFAULT_CUSTOM_CONFIG)
-        default_dict[
-            "config_file"
-        ] = "default"  # Allow default config file to be kept
-        default_dict["args"] = "default"  # Allow default args to be kept
+        # TODO: Remove explicit adding of "args" as soon as TASK_PROPERTIES_DEFAULT is restructured
+        for common_key in (
+            TASK_PROPERTIES_DEFAULT.keys() & TASK_PROPERTIES_CUSTOM.keys()
+        ) | {"args"}:
+            # Keep default value if not provided in config
+            default_dict[common_key] = "default"
         filled_tasks = deepcopy(config)
         for task_name, task in config.items():
             # Quick check
@@ -487,25 +503,13 @@ class TaskProcessor:
         """
         processed_tasks = dict()
         for task_str in self.processed_args.tasks:
-            parts = task_str.split(":")
+            parts = [p for p in task_str.split(":") if p]
             task_name = parts[0]
-            task_args = parts[1:] if len(parts) > 1 else []
+            task_args = parts[1:]
 
             processed_tasks[task_name] = {"enabled": True}
             if task_args:
                 processed_tasks[task_name]["args"] = task_args
-
-                # Check custom args
-                wrong_args, is_allowed = self.check_allowed(
-                    self._allowed_args.get(task_name, []), task_args, True
-                )
-                if not is_allowed:
-                    self.logger.warning(
-                        f"Task '{task_name}' was disabled because some custom "
-                        f"args ({wrong_args}) are not in allowed args "
-                        f"{self._allowed_args.get(task_name, [])}"
-                    )
-                    processed_tasks[task_name]["enabled"] = False
 
         if not processed_tasks:
             self.logger.debug("No custom tasks were specified")
@@ -526,7 +530,9 @@ class TaskProcessor:
         for task_name, task in tasks.items():
             if task["config_file"] is not None:
                 config_file = (
-                    self.processed_args.config_directory / task["config_file"]
+                    self.processed_args.config_directory
+                    / self.processed_args.cmstp_cmd
+                    / task["config_file"]
                 ).resolve()
 
                 if not config_file.exists():

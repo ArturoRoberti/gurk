@@ -5,10 +5,10 @@ from cmstp.utils.command import Command
 
 FieldTypeDict = Dict[str, List[Optional[type]]]
 
-# Required in default config. NOTE:
-# - "'script': None" is actually not allowed, but defaults to None if nonexistent package is used
+# TODO: Restructure/merge for simplicity, i.e. add "args" to default properties as a dict
+# Required in default config
 TASK_ARGS_DEFAULT: FieldTypeDict = {
-    "allowed": [list, None],
+    "allowed": [list],
     "default": [list],
 }
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {

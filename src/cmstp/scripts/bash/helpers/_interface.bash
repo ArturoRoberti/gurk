@@ -112,7 +112,7 @@ run_script_function() {
   local function="${2:-}"
   local ext="${script##*.}"
   case "${ext,,}" in
-    sh | bash)
+    bash)
       run_bash_script_function "$script" "$function" "${@:3}"
       ;;
     py)

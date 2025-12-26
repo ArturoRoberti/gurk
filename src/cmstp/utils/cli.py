@@ -80,7 +80,7 @@ class CoreCliProcessor:
 
     # fmt: off
     logger:  Logger        = field(repr=False)
-    args:    CoreCliArgs = field(repr=False)
+    args:    CoreCliArgs   = field(repr=False)
     argv:    List[str]     = field(repr=False)
     command: str           = field(repr=False)
     # fmt: on
@@ -259,7 +259,7 @@ class CoreCliProcessor:
         Prepare the system for setup.
         """
         error_msg = None
-        requirements_id = self.logger.add_task("install-requirements", total=2)
+        requirements_id = self.logger.add_task("cmstp-requirements", total=2)
 
         result_update = subprocess.run(
             ["sudo", "apt-get", "update"],
