@@ -55,140 +55,122 @@ class Scheduler:
         tmp_path = Path(tmp.name)
         tmp.close()
 
-        start = None
-        in_desired = False
+        # Keep track of number of steps
+        n_steps = 0
+
+        # Initialize block tracking variables
         in_function = False
         in_entrypoint = False
-        loc_indent = None
+        loc_indent = 0
         function_name = None
 
-        def detect_block_start(
-            stripped: str, indent_len: int
-        ) -> Optional[Tuple[str, Optional[str], int]]:
+        def detect_block_start() -> Optional[Tuple[str, Optional[str], int]]:
             """
             Detect the start of a function, class, or entrypoint block.
 
-            :param stripped: The stripped line
-            :type stripped: str
-            :param indent_len: The indentation length of the line
-            :type indent_len: int
             :return: Tuple of (kind, name, location_indent) or None
             :rtype: Tuple[str, str | None, int] | None
             """
-            # TODO: Can this handle nested functions/classes?
+            if not line.lstrip() == line:
+                # Only consider top-level blocks in this function
+                return None
+
             # Function
             r_func = PatternCollection[command.kind.name].patterns["blocks"][
                 "FUNCTION"
             ]
-            m_func = r_func.match(stripped)
+            m_func = r_func.match(line)
 
             # Entrypoint
             r_entry = PatternCollection[command.kind.name].patterns[
                 "entrypoint"
             ]
-            m_entry = r_entry.match(stripped)
+            m_entry = r_entry.match(line)
 
             # Class (for python)
             r_class = PatternCollection[command.kind.name].patterns["blocks"][
                 "CLASS"
             ]
-            m_class = r_class.match(stripped) if r_class else None
+            m_class = r_class.match(line) if r_class else None
 
             if m_func or m_class:
                 name = m_func.group(1) if m_func else None
-                return "function", name, indent_len
+                return "function", name
             if m_entry:
-                return "entrypoint", None, indent_len
+                return "entrypoint", None
             return None
 
-        def block_end_reached(stripped: str, indent_len: int) -> bool:
+        def block_end_reached() -> bool:
             """
             Determine if the current line ends the current block.
+                NOTE: Highest-level block ends are usually already
+                      detected by 'detect_block_start' detecting a new block
 
-            :param stripped: The stripped line
-            :type stripped: str
-            :param indent_len: The indentation length of the line
-            :type indent_len: int
             :return: True if the current line ends the current block, False otherwise
             :rtype: bool
             """
-            if command.kind == CommandKind.PYTHON:
-                # For python: non-empty line with indent <= loc_indent and not a comment
-                if (
-                    stripped.strip()
-                    and indent_len <= (loc_indent or 0)
-                    and not stripped.startswith("#")
-                ):
-                    return True
+            # Ignore empty or comment-only lines entirely (they don't end blocks).
+            #   Also, assume block-ending lines are at the same or less indentation
+            #   than the block start - both in python (necessary) and bash (convention).
+            stripped = line.strip()
+            if (
+                not stripped
+                or stripped.startswith("#")
+                or len(indent) > loc_indent
+            ):
                 return False
-            else:
-                # For bash: closing brace ends the block
-                # TODO: This only works for entrypoints if they are at the end of the script - Fix
-                return stripped.strip() == "}"
 
-        def get_step(line: str) -> Tuple[Optional[str], Optional[str]]:
-            """
-            Determine if a line marks a STEP output
+            if command.kind == CommandKind.PYTHON:
+                # Less/equally indented code already ends the block
+                return True
+            else:  # Bash
+                # Check for '}' (function) or 'fi' (entrypoint) endings
+                rstripped = line.rstrip("\n")
+                return (in_function and rstripped == "}") or (
+                    in_entrypoint and rstripped == "fi"
+                )
 
-            :param line: The line to check
-            :type line: str
-            :return: Tuple of (step message, step type). Step type is
-                     "comment" for STEP comments or
-                     "any" for (assumed) STEP print statements or
-                     None if not a STEP line.
-            :rtype: Tuple[str | None, str | None]
-            """
-            step_patterns = PatternCollection.STEP.patterns
-
-            # See if it's a STEP comment
-            m_comment = step_patterns["comment"](progress=True).match(line)
-            if m_comment:
-                return m_comment.group(1).strip(), "comment"
-
-            # See if it's a STEP print statement - ASSUME any line containing __STEP__ is a print statement
-            m_any = step_patterns["any"](progress=True).match(line)
-            if m_any:
-                return m_any.group(1).strip(), "any"
-
-            return None, None
-
-        def replace_potential_step(
-            line: str, indent: str, in_desired: bool
-        ) -> str:
+        def replace_potential_step() -> str:
             """
             Replace a STEP comment with print statements, preserving indentation.
             If not in_desired, remove the STEP comment.
 
-            :param line: The line to process
-            :type line: str
-            :param indent: The indentation of the line
-            :type indent: str
-            :param in_desired: Whether the line is in the desired block
-            :type in_desired: bool
             :return: The processed line
             :rtype: str
             """
-            step, step_type = get_step(line)
-            if step is None:
-                # Not a STEP line, return as is
+            # Look for STEP instances
+            step_comment_found = False
+            step_patterns = PatternCollection.STEP.patterns
+            m_comment = step_patterns["comment"](progress=True).match(line)
+            m_any = step_patterns["any"](progress=True).match(line)
+            if m_comment:
+                # STEP comment is found
+                step_comment_found = True
+                step = m_comment.group(1).strip()
+            elif m_any:
+                # Assumed (unwanted, manual) STEP print statement is found
+                step = m_any.group(1).strip()
+            else:
+                # Not a STEP instance, return as is
                 return line
 
-            if in_desired:
-                if step_type == "comment":
-                    # Replace STEP comments with print statements
-                    step_msg = f"\n__STEP__: {step}"
-                    if command.kind == CommandKind.PYTHON:
-                        msg = f"print({step_msg!r})"
-                    else:
-                        step_msg += "\n"
-                        msg = f"printf %s {shlex.quote(step_msg)}"
-
-                    return f"{indent}{msg}\n"
+            # Handle STEP replacement/removal
+            if in_desired and step_comment_found:
+                # Replace STEP comments with print statements
+                step_msg = f"\n__STEP__: {step}"
+                if command.kind == CommandKind.PYTHON:
+                    msg = f"print({step_msg!r})"
                 else:
-                    # Leave (assumed) STEP print statements as is
-                    return line
+                    step_msg += "\n"
+                    msg = f"printf %s {shlex.quote(step_msg)}"
+
+                # Add to step count
+                nonlocal n_steps
+                n_steps += 1
+
+                return f"{indent}{msg}\n"
             else:
-                # Remove STEP print statements
+                # Remove (assumed) STEP print statements
                 return f"{indent}{'pass' if command.kind == CommandKind.PYTHON else ':'}\n"
 
         # Main processing loop
@@ -201,9 +183,10 @@ class Scheduler:
                 indent_len = len(indent)
 
                 # Detect block starts (function/class/entrypoint)
-                start = detect_block_start(line, indent_len)
+                start = detect_block_start()
                 if start:
-                    kind, name, loc_indent = start
+                    kind, name = start
+                    loc_indent = indent_len
                     dst.write(line)
                     if kind == "function":
                         in_function = True
@@ -223,23 +206,13 @@ class Scheduler:
                     in_desired = True
                 else:
                     in_desired = False
-                dst.write(replace_potential_step(line, indent, in_desired))
+                dst.write(replace_potential_step())
 
-                if (in_function or in_entrypoint) and block_end_reached(
-                    line, indent_len
-                ):
+                if (in_function or in_entrypoint) and block_end_reached():
                     in_function = False
                     in_entrypoint = False
-                    loc_indent = None
+                    loc_indent = 0
                     function_name = None
-
-        # Count steps
-        n_steps = 0
-        with tmp_path.open("r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                step, step_type = get_step(line)
-                if step and step_type == "any":
-                    n_steps += 1
 
         return tmp_path, n_steps
 

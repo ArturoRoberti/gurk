@@ -419,11 +419,21 @@ class TaskProcessor:
             for task_name in invalid_tasks:
                 filled_tasks[task_name] = default_dict
 
-        # Check args
+        # Remove tasks that are not in default config
+        final_tasks = deepcopy(filled_tasks)
         for task_name, task in filled_tasks.items():
+            if task_name not in self._default_config:
+                self.logger.warning(
+                    f"Task '{task_name}' in is removed because "
+                    f"it is not defined in the default config"
+                )
+                final_tasks.pop(task_name)
+
+        # Check args
+        for task_name, task in final_tasks.items():
             # Check custom args are allowed
             wrong_args, is_allowed = self.check_allowed(
-                self._allowed_args.get(task_name), task["args"], True
+                self._allowed_args[task_name], task["args"], True
             )
             if not is_allowed:
                 warning(
@@ -432,16 +442,6 @@ class TaskProcessor:
                     f"{self._allowed_args[task_name]}"
                 )
                 task["enabled"] = False
-
-        # Disable tasks that are not in default config
-        final_tasks = deepcopy(filled_tasks)
-        for task_name, task in filled_tasks.items():
-            if task_name not in self._default_config:
-                self.logger.warning(
-                    f"Task '{task_name}' in is removed because"
-                    f"it is not defined in the default config"
-                )
-                final_tasks.pop(task_name)
 
         self.logger.debug("Config is valid")
         return final_tasks
