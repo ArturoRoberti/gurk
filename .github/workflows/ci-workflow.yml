@@ -35,3 +35,17 @@ jobs:
           "feature/": "enhancement",
           "fix/": "bug"
         }
+
+  # Final job to report overall CI status
+  ci-wf-status:
+    needs:
+      - ci-wf-assignee
+      - ci-wf-branch-name
+      - ci-wf-labels
+    if: always()
+    uses: ./.github/workflows/reusable-check-results.yml
+    with:
+      results: |
+        ${{ needs.ci-wf-assignee.result }}
+        ${{ needs.ci-wf-branch-name.result }}
+        ${{ needs.ci-wf-labels.result }}

@@ -1,11 +1,11 @@
 import subprocess
-from pathlib import Path
 from typing import List, TypedDict
 
 import commentjson
 
 from cmstp.core.logger import Logger, LoggerSeverity
 from cmstp.scripts.python.helpers._interface import get_config_args
+from cmstp.scripts.python.helpers.common import add_alias
 from cmstp.scripts.python.helpers.processing import (
     InstallCommands,
     get_clean_lines,
@@ -13,22 +13,6 @@ from cmstp.scripts.python.helpers.processing import (
     install_packages_from_txt_file,
 )
 from cmstp.utils.interface import bash_check
-
-
-def add_alias(command: str) -> None:
-    """
-    Add an alias to ~/.bashrc if it doesn't already exist.
-
-    :param command: Description
-    :type command: str
-    """
-    bashrc_path = Path.home() / ".bashrc"
-    alias_cmd = f"alias {command}"
-    with open(bashrc_path, "r", encoding="utf-8") as bashrc:
-        if alias_cmd in bashrc.read():
-            return  # Alias already exists
-    with open(bashrc_path, "a", encoding="utf-8") as bashrc:
-        bashrc.write(f"\n{alias_cmd}\n")
 
 
 def install_apt_packages(*args: List[str]) -> None:
@@ -69,6 +53,7 @@ def install_snap_packages(*args: List[str]) -> None:
 
     # (STEP) Installing Requirement(s)
     install_packages_from_list(InstallCommands.APT, ["snapd"])
+    # TODO: Ensure snapd service is running
 
     # (STEP) Installing snap packages
     install_packages_from_txt_file(InstallCommands.SNAP, config_file)
@@ -115,10 +100,9 @@ def install_flatpak_packages(*args: List[str]) -> None:
     if "--create-aliases" in remaining_args:
         Logger.step("Adding aliases for flatpak packages...")
         for pkg in get_clean_lines(config_file):
-            pkg_name = pkg.split(".")[
-                -1
-            ]  # Use probable package name for alias
-            add_alias(f"{pkg_name}='(flatpak run {pkg_name} > /dev/null &)'")
+            # Use probable package name for alias
+            pkg_name = pkg.split(".")[-1]
+            add_alias(f"{pkg_name}='(flatpak run {pkg} > /dev/null &)'")
 
 
 def install_npm_packages(*args: List[str]) -> None:
@@ -159,10 +143,6 @@ def install_pipx_packages(*args: List[str]) -> None:
             warning=True,
         )
         return
-
-    # (STEP) Installing Requirement(s)
-    install_packages_from_list(InstallCommands.APT, ["python3-pip"])
-    install_packages_from_list(InstallCommands.PIP, ["pipx"])
 
     # (STEP) Installing pipx packages
     install_packages_from_txt_file(InstallCommands.PIPX, config_file)
@@ -241,7 +221,6 @@ def install_docker_images(*args: List[str]) -> None:
     if not docker_images:
         Logger.step(
             "No docker images found in the provided config file. Skipping pulling of docker images.",
-            warning=True,
         )
         return
 

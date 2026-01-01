@@ -77,6 +77,7 @@ class StepPatterns(TypedDict):
     # fmt: on
 
 
+# TODO: Merge "entrypoint" pattern into "blocks" and then actually remove necessity of "blocks" subcategory
 class ScriptPatterns(TypedDict):
     """Patterns for different script types."""
 

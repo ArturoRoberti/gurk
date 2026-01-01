@@ -1,8 +1,0 @@
-# Test task with missing property (e.g. 'script')
-some-task:
-# script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
-  function: null
-  depends_on: []
-  args:
-    allowed: null
-    default: []

@@ -1,8 +1,0 @@
-# Test task with a missing script file
-some-task:
-  script: somescript.bash
-  function: null
-  depends_on: []
-  args:
-    allowed: null
-    default: []

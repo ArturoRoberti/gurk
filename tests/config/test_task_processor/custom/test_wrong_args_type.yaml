@@ -1,6 +1,0 @@
-# Test task with the 'args' property of wrong type (e.g. being a str instead of a dict)
-some-task:       # Placeholder task to avoid eventual empty config
-  enabled: true
-some-other-task: # Invalid task
-  enabled: true
-  args: some_string_instead_of_dict

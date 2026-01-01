@@ -21,6 +21,12 @@ from cmstp.utils.yaml import load_yaml
 
 
 def get_sudo_askpass() -> Path:
+    """
+    Create a temporary sudo askpass script that provides the user's sudo password.
+
+    :return: Path to the temporary askpass script
+    :rtype: Path
+    """
     # Reset sudo permissions
     subprocess.run(["sudo", "-k"])
 
@@ -99,7 +105,7 @@ class CoreCliProcessor:
             ):
                 from cmstp.cli.setup import main as setup_main
 
-                setup_main([], prog="cmstp setup")
+                setup_main([], "", "")
                 self.logger.info("Setup completed")
             else:
                 self.logger.warning("Skipping setup")
@@ -254,6 +260,7 @@ class CoreCliProcessor:
 
         self.logger.debug(f"System information: {system_info}")
 
+    # TODO: Use logfile instead of manual capture
     def prepare(self) -> None:
         """
         Prepare the system for setup.

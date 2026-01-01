@@ -1,5 +1,6 @@
 import os
 import subprocess
+import venv
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict, List, Optional, TypedDict
@@ -7,12 +8,8 @@ from typing import Dict, List, Optional, TypedDict
 import commentjson
 from ruamel.yaml import YAML
 
-from cmstp.core.logger import Logger, LoggerSeverity
+from cmstp.core.logger import Logger
 from cmstp.scripts.python.helpers._interface import get_config_args
-from cmstp.scripts.python.helpers.processing import (
-    InstallCommands,
-    install_packages_from_list,
-)
 from cmstp.utils.interface import bash_check
 
 
@@ -32,12 +29,6 @@ def install_pip_environments(*args: List[str]) -> None:
         )
         return
 
-    # (STEP) Installing Requirement(s)
-    install_packages_from_list(
-        InstallCommands.APT, ["python3-venv", "python3-pip"]
-    )
-    import venv
-
     # Get pip environments info
     pip_envs: Dict[str, List[str]] = commentjson.load(
         config_file.open("r", encoding="utf-8")
@@ -45,7 +36,6 @@ def install_pip_environments(*args: List[str]) -> None:
     if not pip_envs:
         Logger.step(
             "Skipping installation of pip packages, as no environments are specified",
-            warning=True,
         )
         return
 
@@ -74,12 +64,10 @@ def install_pip_environments(*args: List[str]) -> None:
                 f"Failed to install packages for environment '{env_name}'",
                 warning=True,
             )
-            pass
         else:
             Logger.step(
                 f"Successfully installed packages for environment '{env_name}'"
             )
-            pass
 
 
 # TODO: Test, especially the sourcing of bashrc stuff
@@ -99,9 +87,6 @@ def install_conda_environments(*args: List[str]) -> None:
         )
         return
 
-    # (STEP) Installing Requirement(s)
-    install_packages_from_list(InstallCommands.APT, ["python3-pip"])
-
     # Typing helper classes
     class CondaEnv(TypedDict):
         # fmt: off
@@ -117,7 +102,6 @@ def install_conda_environments(*args: List[str]) -> None:
     if not conda_envs:
         Logger.step(
             "Skipping installation of conda environments, as no environments are specified",
-            warning=True,
         )
         return
 
@@ -154,7 +138,6 @@ def install_conda_environments(*args: List[str]) -> None:
         return True
 
     # (STEP) Creating conda environments
-    success = True
     for env_name, env_spec in conda_envs.items():
         # Get and check conda environment type
         env_type = env_spec.get("type", None)
@@ -249,24 +232,14 @@ def install_conda_environments(*args: List[str]) -> None:
         # Create environment
         Logger.step(
             f"Creating environment '{env_name}' with {env_type}...",
-            warning=True,
         )
         result = subprocess.run(conda_cmd)
         if result.returncode != 0:
             Logger.step(
                 f"Failed to create environment '{env_name}'", warning=True
             )
-            success = False
-            continue
         else:
             Logger.step(f"Successfully created environment '{env_name}'")
 
         # Cleanup
         os.remove(env_yaml_path)
-
-    if not success:
-        Logger.logrichprint(
-            LoggerSeverity.FATAL,
-            "Some conda environments failed to install properly - See previous output",
-        )
-        raise RuntimeError

@@ -4,13 +4,13 @@ from tempfile import NamedTemporaryFile
 from textwrap import dedent
 from typing import List, Optional, Union
 
-from rich import print as richprint
+from rich.prompt import Confirm
 
 from cmstp.utils.command import Command, CommandKind
-from cmstp.utils.common import (
-    PACKAGE_BASH_HELPERS_PATH,
-    PIPX_PYTHON_PATH,
-    FilePath,
+from cmstp.utils.common import PACKAGE_SRC_PATH, PIPX_PYTHON_PATH, FilePath
+
+PACKAGE_BASH_HELPERS_PATH = (
+    PACKAGE_SRC_PATH / "scripts" / "bash" / "helpers" / "helpers.bash"
 )
 
 
@@ -21,6 +21,7 @@ def run_script_function(
     run: bool = True,
     capture_output: bool = False,
     sudo: bool = False,
+    check: bool = True,
 ) -> Union[str, subprocess.CompletedProcess]:
     """
     Build a wrapper script string for the specified command kind and optionally execute it.
@@ -37,11 +38,13 @@ def run_script_function(
     :type capture_output: bool
     :param sudo: If True, runs python scripts with sudo privileges.
     :type sudo: bool
+    :param check: If True, checks if the script and function exist before running. Usually set to False if e.g. the function is sourced from another script (e.g. with a bash helper).
+    :type check: bool
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
     """
     # Check existence of script & function fields
-    command = Command(script, function)
+    command = Command(script, function, check)
 
     # Run respective command
     if command.kind == CommandKind.PYTHON:
@@ -77,10 +80,13 @@ def _run_bash_script_function(
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
     """
+    # TODO: See if this (needing to activate venv) is not maybe wrong? Does 'activate' even exist?
     # Source pipx venv and helpers
+    #   NOTE: Not existing/necessary in github runner, thus "-f" check
+    activate_exe = PIPX_PYTHON_PATH.parent / "activate"
     sourcing = dedent(
         f"""\
-        source {PIPX_PYTHON_PATH.parent / 'activate'}
+        [ -f {activate_exe} ] && source {activate_exe}
         source {PACKAGE_BASH_HELPERS_PATH}
     """
     )
@@ -221,6 +227,7 @@ def bash_check(check_name: str) -> subprocess.CompletedProcess:
             function=check_name,
             run=True,
             capture_output=True,
+            check=False,
         )
     except Exception as e:
         # Return a failed CompletedProcess instead of None
@@ -247,6 +254,7 @@ def revert_sudo_permissions(path: FilePath) -> None:
         function="revert_sudo_permissions",
         args=[str(path)],
         run=True,
+        check=False,
     )
 
 
@@ -261,14 +269,13 @@ def prompt_bool(message: str, answer: Optional[str] = None) -> bool:
     :return: True if the user responds with 'y', False for 'n'.
     :rtype: bool
     """
+    # Automatic answer handling
     if answer not in (None, "y", "n"):
         raise ValueError(
-            "Answer must be 'y', 'n', or None for interactive prompt."
+            "Automatic answer must be 'y', 'n', or None for interactive prompt."
         )
+    elif answer is not None:
+        return answer == "y"
 
-    while True:
-        response = answer or input(f"{message} (y/n): ").strip().lower()
-        if response in ["y", "n"]:
-            return response == "y"
-        else:
-            richprint("Invalid input. Please enter 'y' or 'n'")
+    # Interactive prompt
+    return Confirm.ask(message)

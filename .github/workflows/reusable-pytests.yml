@@ -1,0 +1,44 @@
+name: Task pytests
+
+on:
+  workflow_call: null
+
+jobs:
+  pytest-affected-tasks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install package
+        run: pip install -e .[test]
+
+      - name: Compute affected tasks, based on changed files
+        run: |
+          git diff -U0 -b origin/${{ github.base_ref }}...HEAD \
+            | python .github/scripts/cmstp_find_affected_tasks.py
+
+      - name: Run pytest for package configs
+        run: pytest -v tests/configs.py
+
+      - name: Run pytest for package scripts
+        run: pytest -v tests/scripts.py
+
+      - name: Run pytest for affected tasks
+        run: |
+          if [ -z "${AFFECTED_TASKS}" ]; then
+            echo "No affected tasks. Skipping pytest."
+            exit 0
+          fi
+
+          echo "Running pytest for affected tasks: ${AFFECTED_TASKS}"
+
+          pytest -v tests/tasks.py --tasks="${AFFECTED_TASKS}"

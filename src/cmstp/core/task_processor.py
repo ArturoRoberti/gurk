@@ -9,8 +9,8 @@ import networkx as nx
 
 from cmstp.core.logger import Logger
 from cmstp.utils.cli import CoreCliArgs
-from cmstp.utils.command import Command, CommandKind
-from cmstp.utils.common import DEFAULT_CONFIG_FILE, PACKAGE_SRC_PATH
+from cmstp.utils.command import Command
+from cmstp.utils.common import DEFAULT_CONFIG_FILE, get_script_path
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
     TASK_PROPERTIES_CUSTOM,
@@ -96,6 +96,17 @@ class TaskProcessor:
 
         # Resolve and check config file paths for all tasks
         tasks = self.resolve_config_directory(tasks)
+
+        # Disable all tasks not belonging to the current cmstp command
+        # NOTE: '--enable-dependencies' may thus be required even if '--enable-all'
+        #       is passed, to enable dependencies belonging to other cmstp commands
+        for task_name, task in tasks.items():
+            if not task_name.startswith(self.processed_args.cmstp_cmd):
+                self.logger.debug(
+                    f"Disabling task '{task_name}', as it does not "
+                    f"belong to the '{self.processed_args.cmstp_cmd}' command"
+                )
+                task["enabled"] = False
 
         # Check dependency and supercedes graphs
         tasks = self.resolve_graphs(tasks)
@@ -183,6 +194,7 @@ class TaskProcessor:
             ]
             return wrong_args, not wrong_args
 
+    # TODO: Check that all tasks belong to some command (use CORE_COMMANDS)
     def check_default_config(self) -> TaskDictCollection:
         """
         Check that the default config file is valid.
@@ -216,13 +228,12 @@ class TaskProcessor:
                 + type(default_config).__name__
             )
 
-        # Remove helpers and any tasks not belonging to the current cmstp command
+        # Remove helpers
         defaults = default_config["_defaults"]
         default_config = {
             k: overlay_dicts([defaults, v])
             for k, v in default_config.items()
-            if isinstance(k, str)
-            and k.startswith(self.processed_args.cmstp_cmd)
+            if isinstance(k, str) and not k.startswith("_")
         }
 
         # Check structure (incl. types)
@@ -253,18 +264,11 @@ class TaskProcessor:
                 )
             else:
                 try:
-                    language = CommandKind.from_script(
-                        task["script"]
-                    ).name.lower()
+                    task["script"] = get_script_path(
+                        task["script"], task_name.split("-", 1)[0]
+                    )
                 except ValueError as e:
                     fatal(str(e), task_name)
-                task["script"] = (
-                    PACKAGE_SRC_PATH
-                    / "scripts"
-                    / language
-                    / self.processed_args.cmstp_cmd
-                    / task["script"]
-                )
 
             # Check existence of script & function fields
             try:
@@ -483,7 +487,7 @@ class TaskProcessor:
             if task["config_file"] is not None:
                 config_file = (
                     self.processed_args.config_directory
-                    / self.processed_args.cmstp_cmd
+                    / task_name.split("-", 1)[0]
                     / task["config_file"]
                 ).resolve()
 

@@ -1,6 +1,0 @@
-# Test task with an unallowed arg
-some-task:       # Placeholder valid task to avoid eventual empty config
-  enabled: true
-some-other-task: # Invalid task
-  enabled: true
-  args: [unallowed_arg]

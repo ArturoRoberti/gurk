@@ -1,3 +1,5 @@
+# TODO: Merge with utils/command.py
+
 import os
 import shutil
 import sys
@@ -6,6 +8,7 @@ from pathlib import Path
 from tempfile import mkdtemp, mkstemp
 from typing import Optional, Union
 
+from cmstp.cli.utils import CORE_COMMANDS
 from cmstp.utils.patterns import PatternCollection
 
 PACKAGE_SRC_PATH = Path(resources.files("cmstp")).expanduser().resolve()
@@ -13,12 +16,52 @@ PACKAGE_CONFIG_PATH = PACKAGE_SRC_PATH / "config"
 DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"
 ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
-PACKAGE_BASH_HELPERS_PATH = (
-    PACKAGE_SRC_PATH / "scripts" / "bash" / "helpers" / "helpers.bash"
-)
 PIPX_PYTHON_PATH = Path(sys.executable)
 
+
 FilePath = Union[Path, str]
+
+
+def get_script_path(script: FilePath, command: str) -> Path:
+    """
+    Create a full path to a script inside the package's scripts directory.
+
+    :param script: Name of the script file
+    :type script: FilePath
+    :param command: Name of the command that uses the script
+    :type command: str
+    :return: Full path to the script file
+    :rtype: Path
+    """
+    if not isinstance(script, (str, Path)):
+        raise TypeError("script must be a str or Path")
+
+    if command not in CORE_COMMANDS:
+        raise ValueError(f"Unknown command: {command}")
+
+    # TODO: Use commandkind here, after merging with command.py
+    language = "bash" if str(script).endswith(".bash") else "python"
+    return PACKAGE_SRC_PATH / "scripts" / language / command / script
+
+
+def get_config_path(config_file: FilePath, command: str) -> Path:
+    """
+    Create a full path to a config file inside the package's config directory.
+
+    :param config_file: Name of the config file
+    :type config_file: FilePath
+    :param command: Name of the command that uses the config file
+    :type command: str
+    :return: Full path to the config file
+    :rtype: Path
+    """
+    if not isinstance(config_file, (str, Path)):
+        raise TypeError("config_file must be a str or Path")
+
+    if command not in CORE_COMMANDS:
+        raise ValueError(f"Unknown command: {command}")
+
+    return PACKAGE_CONFIG_PATH / command / config_file
 
 
 def generate_random_path(
@@ -84,3 +127,18 @@ def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
         return Path(resolved_path)
     else:  # str
         return str(resolved_path)
+
+
+def stream_print(text: str, stderr: bool = False) -> None:
+    """
+    Print text to stdout or stderr.
+
+    :param text: Text to be printed
+    :type text: str
+    :param stderr: Whether to print to stderr instead of stdout
+    :type stderr: bool
+    """
+    if stderr:
+        print(text, file=sys.stderr)
+    else:
+        print(text)

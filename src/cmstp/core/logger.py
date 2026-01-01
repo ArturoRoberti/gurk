@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Dict, Optional
+from typing import Optional
 
 from rich import print as richprint
 from rich.console import Console
@@ -38,9 +38,6 @@ class Logger:
     _console_out: Console   = field(init=False, repr=False)
     _console_err: Console   = field(init=False, repr=False)
     _progress:    Progress  = field(init=False, repr=False)
-
-    # Used only in testing  # TODO: Use
-    _failed_tasks: Dict[str, Optional[Path]] = field(init=False, repr=False, default_factory=dict)
     # fmt: on
 
     def __post_init__(self):
@@ -307,12 +304,10 @@ class Logger:
             symbol = "✔"
         elif success == TaskTerminationType.PARTIAL:
             symbol = "⚠"
-            # self._failed_tasks[task_name] = logfile  # TODO: Keep?
         elif success == TaskTerminationType.SKIPPED:
             symbol = "⊘"
         elif success == TaskTerminationType.FAILURE:
             symbol = "✖"
-            self._failed_tasks[task_name] = logfile
         else:
             raise ValueError("Unknown task termination type")
         desc = f"[{success.color}]{symbol} {success.label}: {task_name}[/{success.color}]"

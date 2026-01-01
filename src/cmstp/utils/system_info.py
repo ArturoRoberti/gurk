@@ -1,6 +1,6 @@
-import inspect
 import platform
 import subprocess
+import sys
 from typing import Optional, TypedDict
 
 import distro
@@ -14,8 +14,7 @@ class SystemInfo(TypedDict):
     kernel:            str
     name:              Optional[str]
     codename:          Optional[str]
-    version_dot:       Optional[str]
-    version_nodot:     Optional[str]
+    version:           Optional[str]
     arch:              str
     simulate_hardware: bool
     manufacturer:      str
@@ -70,41 +69,20 @@ def get_system_info() -> SystemInfo:
     :return: System information dictionary
     :rtype: SystemInfo
     """
-
-    def is_current_test(test_name: str) -> bool:
-        """
-        Checks if the current execution context is within a specific pytest test function.
-
-        :param test_name: Name of the pytest test function
-        :type test_name: str
-        :return: True if running inside the specified test function, False otherwise
-        :rtype: bool
-        """
-        for frame_info in inspect.stack():
-            func = frame_info.function
-            # Typical pytest test functions start with "test_"
-            if func.startswith("test_"):
-                return func == test_name
-        return False
-
     system_info = SystemInfo()
     # linux, darwin, etc.
     system_info["type"] = platform.system().lower()
     # x86_64, aarch64, etc.
     system_info["kernel"] = platform.machine()
-    # Simulate Hardware (e.g. GPU)
-    system_info["simulate_hardware"] = is_current_test(
-        "test_hardware_specific"
-    )
+    # Simulate Hardware (e.g. GPU) - TODO: Update this to check if host system is a github runner
+    system_info["simulate_hardware"] = "pytest" in sys.modules
     if system_info["type"] == "linux":
         # ubuntu, debian, etc.
         system_info["name"] = distro.id().lower()
         # focal, jammy, buster, bullseye, etc.
         system_info["codename"] = distro.codename().lower()
         # 20.04, 22.04, etc.
-        system_info["version_dot"] = distro.version()
-        # 2004, 2204, etc.
-        system_info["version_nodot"] = distro.version().replace(".", "")
+        system_info["version"] = distro.version()
         # amd64, arm64, etc.
         system_info["arch"] = get_architecture()
         # manufacturer
@@ -113,8 +91,7 @@ def get_system_info() -> SystemInfo:
         # Unsupported OS
         system_info["name"] = None
         system_info["codename"] = None
-        system_info["version_dot"] = None
-        system_info["version_nodot"] = None
+        system_info["version"] = None
         system_info["arch"] = None
         system_info["manufacturer"] = None
 

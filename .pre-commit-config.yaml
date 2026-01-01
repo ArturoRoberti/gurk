@@ -14,7 +14,7 @@ repos:
   rev: v3.9.0-1
   hooks:
   - id: shfmt
-    args: ["-i", "2", "-ci", "-w"]
+    args: ["-i", "0", "-ci", "-w"]  # IMPORTANT: Use tabs for indentation; allows indented 'EOF' in scripts
 # Shell script linting
 - repo: https://github.com/shellcheck-py/shellcheck-py
   rev: v0.10.0.1

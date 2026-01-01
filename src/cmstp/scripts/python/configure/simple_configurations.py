@@ -243,7 +243,7 @@ def configure_vscode_keybindings(*args: List[str]) -> None:
     vscode_keys = Path.home() / ".config/Code/User/keybindings.json"
     vscode_keys.parent.mkdir(parents=True, exist_ok=True)
     if not vscode_keys.exists():
-        Logger.richprint(
+        Logger.logrichprint(
             LoggerSeverity.WARNING,
             "VSCode keybindings file does not exist, creating an empty one.",
         )
@@ -260,3 +260,4 @@ def configure_vscode_keybindings(*args: List[str]) -> None:
     vscode_keys.write_text(
         commentjson.dumps(merged, indent=2), encoding="utf-8"
     )
+    Logger.step("VSCode keybindings configured successfully.")

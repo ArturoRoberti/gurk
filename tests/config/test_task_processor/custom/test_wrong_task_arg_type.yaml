@@ -1,6 +1,0 @@
-# Test task with an arg of wrong type (e.g. a str instead of a list)
-some-task:       # Placeholder valid task to avoid eventual empty config
-  enabled: true
-some-other-task: # Invalid task
-  enabled: true
-  args: some_string_instead_of_list

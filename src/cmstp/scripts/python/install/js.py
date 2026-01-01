@@ -8,12 +8,12 @@ from packaging import version
 
 from cmstp.core.logger import Logger
 from cmstp.scripts.python.helpers._interface import get_config_args
+from cmstp.scripts.python.helpers.common import add_alias
 from cmstp.scripts.python.helpers.processing import (
     InstallCommands,
     get_clean_lines,
     install_packages_from_list,
 )
-from cmstp.scripts.python.installations.package_managers import add_alias
 from cmstp.utils.git_repos import (
     clone_git_files,
     gitref_dict2str,
@@ -37,6 +37,14 @@ def install_js_repositories(*args: List[str]) -> None:
         )
         return
 
+    # Get JS repositories info
+    repos = get_clean_lines(config_file)
+    if not repos:
+        Logger.step(
+            "Skipping installation of JS repositories, as no repositories are specified",
+        )
+        return
+
     # (STEP) Installing Requirement(s)
     install_packages_from_list(InstallCommands.APT, ["npm", "nodejs", "git"])
     install_packages_from_list(InstallCommands.NPM, ["yarn", "pnpm"])
@@ -45,15 +53,6 @@ def install_js_repositories(*args: List[str]) -> None:
     yarn_pkg_dir = Path("/opt/yarn")
     pnpm_pkg_dir = Path("/opt/pnpm")
     npm_pkg_dir = Path("/opt/npm")
-
-    # Get JS repositories info
-    repos = get_clean_lines(config_file)
-    if not repos:
-        Logger.step(
-            "Skipping installation of JS repositories, as no repositories are specified",
-            warning=True,
-        )
-        return
 
     # (STEP) Installing npm repositories
     for repo in repos:
@@ -115,16 +114,15 @@ def install_js_repositories(*args: List[str]) -> None:
             package_manager_entry = pkg_json_data.get("packageManager", "npm")
             if package_manager_entry.startswith("yarn"):
                 package_manager = "yarn install"
-                if not yarn_pkg_dir.exists():
-                    subprocess.run(["sudo", "mkdir", "-p", str(yarn_pkg_dir)])
+                pkg_dir = yarn_pkg_dir
             elif package_manager_entry.startswith("pnpm"):
                 package_manager = "pnpm install"
-                if not pnpm_pkg_dir.exists():
-                    subprocess.run(["sudo", "mkdir", "-p", str(pnpm_pkg_dir)])
+                pkg_dir = pnpm_pkg_dir
             else:
                 package_manager = "npm install"
-                if not npm_pkg_dir.exists():
-                    subprocess.run(["sudo", "mkdir", "-p", str(npm_pkg_dir)])
+                pkg_dir = npm_pkg_dir
+            if not pkg_dir.exists():
+                subprocess.run(["sudo", "mkdir", "-p", str(pkg_dir)])
             # Install package
             try:
                 subprocess.run(

@@ -1,0 +1,75 @@
+from pathlib import Path
+
+from cmstp.utils.common import stream_print
+from cmstp.utils.scripts import ScriptBlockTypes, get_block_spans, iter_scripts
+
+
+def _check_script_blocks(path: Path) -> bool:
+    """
+    Check that a script only contains allowed top-level code:
+    - Only functions and an entrypoint (and imports for Python)
+    - At most one entrypoint, which must be at the end of the script
+
+    NOTE: Any block start with an added comment after will be considered invalid/OTHER.
+
+    :param path: Path to the script file
+    :type path: Path
+    :return: True if the script meets the criteria, False otherwise
+    :rtype: bool
+    """
+    # Use get_block_spans to find all blocks
+    blocks = get_block_spans(path)
+
+    # Error variables
+    errors = []
+    errors_prefix = "ERROR: "
+
+    # Check there are no CLASS or OTHER blocks
+    disallowed_blocks = [
+        b
+        for b in blocks
+        if b["type"] in {ScriptBlockTypes.CLASS, ScriptBlockTypes.OTHER}
+    ]
+    if disallowed_blocks:
+        disallowed_lines = ", ".join(
+            str(b["lines"]) for b in disallowed_blocks
+        )
+        errors.append(
+            f"'{path}:{disallowed_blocks[0]['lines'][0]}' contains disallowed "
+            f"top-level blocks (not FUNCTION, ENTRYPOINT, or IMPORT).\n"
+            f"{' ' * len(errors_prefix)}Disallowed lines: {disallowed_lines}"
+        )
+
+    # Check that there is at most one ENTRYPOINT block and it is at the end
+    entrypoints = [
+        b for b in blocks if b["type"] == ScriptBlockTypes.ENTRYPOINT
+    ]
+    if len(entrypoints) > 1:
+        entrypoint_lines = ", ".join(str(b["lines"]) for b in entrypoints)
+        errors.append(
+            f"'{path}:{entrypoints[0]['lines'][0]}' contains more than one ENTRYPOINT block.\n"
+            f"{' ' * len(errors_prefix)}ENTRYPOINT blocks at lines: {entrypoint_lines}"
+        )
+
+    # Check that ENTRYPOINT is at the end
+    if entrypoints and blocks[-1]["type"] != ScriptBlockTypes.ENTRYPOINT:
+        entrypoint_lines = ", ".join(str(b["lines"]) for b in entrypoints)
+        errors.append(
+            f"'{path}:{entrypoints[0]['lines'][0]}' ENTRYPOINT block in {path} is not at the end of the script.\n"
+            f"{' ' * len(errors_prefix)}ENTRYPOINT block(s) at lines: {entrypoint_lines}"
+        )
+
+    # Report errors if any
+    if errors:
+        for error in errors:
+            stream_print(errors_prefix + error, stderr=True)
+        return False
+    else:
+        return True
+
+
+def test_package_scripts() -> None:
+    """Test that the package scripts are valid."""
+    assert all(
+        _check_script_blocks(path) for path in iter_scripts()
+    ), "One or more scripts contain disallowed top-level blocks"

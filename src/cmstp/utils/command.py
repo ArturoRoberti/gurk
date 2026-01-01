@@ -1,3 +1,5 @@
+# TODO: Merge with utils/common.py
+
 import shutil
 from dataclasses import dataclass, field
 from enum import Enum
@@ -51,15 +53,21 @@ class CommandKind(Enum):
         return CommandKind[ScriptExtension(suffix).name]
 
 
+SCRIPT_LANGUAGES = [kind.name for kind in CommandKind]
+
+
 @dataclass(frozen=True)
 class Command:
     """Represents a command to be executed, including its script and optional function."""
 
     # fmt: off
-    script:   str           = field()
-    function: Optional[str] = field(default=None)
+    script:     str           = field()
+    function:   Optional[str] = field(default=None)
+    check_func: bool          = field(default=True)
     # fmt: on
 
+    # TODO: Remove checks completely, as checked in pytest?
+    #       Or does that rely on this resp. is a second check good to have?
     def __post_init__(self) -> None:
         # Check 'script'
         if not Path(self.script).exists():
@@ -77,54 +85,60 @@ class Command:
             lines = f.readlines()
 
         # Check 'function'
-        if self.function is not None:
-            # Find function in script
-            function_pattern = PatternCollection[self.kind.name].patterns[
-                "blocks"
-            ]["FUNCTION"]
-            function_matches = [
-                match.groups()
-                for line in lines
-                if (match := function_pattern.search(line.strip()))
-            ]
-            if self.kind == CommandKind.PYTHON:  # Also capture args
-                function_names = [name for name, _ in function_matches]
-            else:  # No args are captured in bash
-                function_names = [name for name, in function_matches]
-            if self.function not in function_names:
-                raise ValueError(
-                    f"'{self.function}' function not found in script "
-                    f"{self.script}\nAvailable functions: {function_names}",
-                )
-
-            # If Python, check function definition only captures '*args'
-            if self.kind == CommandKind.PYTHON:
-                # Test if the function has only *args
-                function_args = [args for _, args in function_matches]
-                args = function_args[function_names.index(self.function)]
-                arg_list = [a.strip() for a in args.split(",") if a.strip()]
-                if not (
-                    len(arg_list) == 1 and arg_list[0].split(":")[0] == "*args"
-                ):
+        if self.check_func:
+            if self.function is not None:
+                # Find function in script
+                # TODO: Does this also detect sub-functions? It should not
+                # TODO: Use 'get_block_spans'?
+                function_pattern = PatternCollection[self.kind.name].patterns[
+                    "blocks"
+                ]["FUNCTION"]
+                function_matches = [
+                    match.groups()
+                    for line in lines
+                    if (match := function_pattern.search(line.strip()))
+                ]
+                if self.kind == CommandKind.PYTHON:  # Also capture args
+                    function_names = [name for name, _ in function_matches]
+                else:  # No args are captured in bash
+                    function_names = [name for name, in function_matches]
+                if self.function not in function_names:
                     raise ValueError(
-                        f"'{self.function}' function in script "
-                        f"{self.script} must ONLY capture '*args' as "
-                        f"an argument, if it is to be used as a task",
+                        f"'{self.function}' function not found in script "
+                        f"{self.script}\nAvailable functions: {function_names}",
                     )
-        else:
-            # Find entrypoint in script
-            entrypoint_pattern = PatternCollection[self.kind.name].patterns[
-                "entrypoint"
-            ]
-            entrypoint_matches = [
-                line
-                for line in lines
-                if entrypoint_pattern.search(line.strip())
-            ]
-            if len(entrypoint_matches) != 1:
-                raise ValueError(
-                    f"Expected exactly one entrypoint, found {len(entrypoint_matches)}"
-                )
+
+                # If Python, check function definition only captures '*args'
+                if self.kind == CommandKind.PYTHON:
+                    # Test if the function has only *args
+                    function_args = [args for _, args in function_matches]
+                    args = function_args[function_names.index(self.function)]
+                    arg_list = [
+                        a.strip() for a in args.split(",") if a.strip()
+                    ]
+                    if not (
+                        len(arg_list) == 1
+                        and arg_list[0].split(":")[0] == "*args"
+                    ):
+                        raise ValueError(
+                            f"'{self.function}' function in script "
+                            f"{self.script} must ONLY capture '*args' as "
+                            f"an argument, if it is to be used as a task",
+                        )
+            else:
+                # Find entrypoint in script
+                entrypoint_pattern = PatternCollection[
+                    self.kind.name
+                ].patterns["entrypoint"]
+                entrypoint_matches = [
+                    line
+                    for line in lines
+                    if entrypoint_pattern.search(line.strip())
+                ]
+                if len(entrypoint_matches) != 1:
+                    raise ValueError(
+                        f"Expected exactly one entrypoint, found {len(entrypoint_matches)}"
+                    )
 
     @cached_property
     def kind(self) -> CommandKind:

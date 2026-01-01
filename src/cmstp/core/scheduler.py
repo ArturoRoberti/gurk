@@ -38,6 +38,7 @@ class Scheduler:
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
     # fmt: on
 
+    # TODO: Update to use utils/scripts.py
     @staticmethod
     def _prepare_script(command: Command) -> Tuple[Path, int]:
         """
@@ -71,7 +72,7 @@ class Scheduler:
             :return: Tuple of (kind, name, location_indent) or None
             :rtype: Tuple[str, str | None, int] | None
             """
-            if not line.lstrip() == line:
+            if not (line.strip() and line.lstrip() == line):
                 # Only consider top-level blocks in this function
                 return None
 
@@ -252,15 +253,17 @@ class Scheduler:
                             if e.errno == errno.EIO:
                                 # EOF shows up as EIO (Input/Output error)
                                 self.logger.debug(
-                                    "PTY reader encountered an EIO "
-                                    "error - treating as EOF."
+                                    "(This is normal) PTY reader encountered "
+                                    "an EIO error - treating as EOF."
                                 )
                                 break
                             else:
                                 raise e
 
                         # Read and normalize data
-                        data = raw_data.decode("utf-8", errors="replace")
+                        data = raw_data.decode(
+                            encoding="utf-8", errors="replace"
+                        )
                         data = sub(r"\r+\n|\r{2,}", "\n", data)
                         data = data.replace("\r", "")
 
@@ -371,6 +374,7 @@ class Scheduler:
 
         # 9. Final Termination Logic: Check status and PARTIAL event
         if exit_code != 0:
+            self.logger.debug("Task failed with non-zero exit code.")
             return TaskTerminationType.FAILURE
         elif warning_event.is_set():
             return TaskTerminationType.PARTIAL
@@ -472,6 +476,9 @@ class Scheduler:
         try:
             success = self._spawn_and_stream(proc_cmd, flog, task_id)
         except Exception:
+            self.logger.debug(
+                f"Task '{task.name}' failed, as an exception occurred during '_spawn_and_stream'."
+            )
             success = TaskTerminationType.FAILURE
         finally:
             safe_unlink(modified_script)
@@ -490,6 +497,9 @@ class Scheduler:
         try:
             success = self.run_task(task, task_id)
         except Exception:
+            self.logger.debug(
+                f"Task '{task.name}' failed, as an exception occurred during 'run_task'."
+            )
             success = TaskTerminationType.FAILURE
         finally:
             self.logger.finish_task(task_id, success)
@@ -554,3 +564,23 @@ class Scheduler:
             finished = self.queue.get()
             running[finished].join()
             del running[finished]
+
+    def get_results(self) -> List[Tuple[str, str, bool]]:
+        """
+        Get a list of all tasks with their results.
+
+        :return: List of tasks in the format [task_name, task_logfile, successful]
+        :rtype: List[Tuple[str, str, bool]]
+        """
+        all_tasks = []
+        for task, result in self.results.items():
+            for _, task_info in self.logger.task_infos.items():
+                if task_info["name"] == task.name:
+                    all_tasks.append(
+                        (
+                            task.name,
+                            str(task_info["logfile"]),
+                            result == TaskTerminationType.SUCCESS,
+                        )
+                    )
+        return all_tasks

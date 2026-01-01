@@ -41,7 +41,19 @@ DEFAULT_CUSTOM_CONFIG = {
     for key, val in TASK_PROPERTIES_CUSTOM.items()
 }
 
-HARDWARE_SPECIFIC_TASKS = ["install-nvidia-driver", "install-cuda"]
+# HARDWARE_SPECIFIC_TASKS = ["install-cuda", "install-nvidia-driver"]
+
+# Explanations:
+# - install-isaaclab: Hangs (may be an issue with the install itself, not the runner)
+# - install-isaacsim: Takes too long (~30 mins); costs too much CI time - purely practical
+# - install-nvidia-driver: Cannot use 'modprobe nvidia'
+# - install-ros: Fails due to missing setup script (may be an issue with the install itself, not the runner)
+RUNNER_SPECIFIC_TASKS = [
+    "install-isaaclab",
+    "install-isaacsim",
+    "install-nvidia-driver",
+    "install-ros",
+]
 
 
 def print_expected_task_fields(

@@ -215,11 +215,6 @@ def main(argv, prog, description):
             system_info = get_system_info()
             system_info.pop("simulate_hardware")
 
-            # Adjust version field
-            system_info.pop("version_nodot")
-            version = system_info.pop("version_dot")
-            system_info["version"] = version
-
             Logger.richprint("=== System information ===", color="cyan")
             print_dict_aligned(system_info)
 

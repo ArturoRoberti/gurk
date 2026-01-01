@@ -12,7 +12,7 @@ from cmstp.utils.cli import CoreCliProcessor, get_sudo_askpass
 from cmstp.utils.common import ENABLED_CONFIG_FILE, PACKAGE_CONFIG_PATH
 
 
-def main(argv, prog, description, cmd):
+def main(argv, prog, description, cmd, _captured=None):
     parser = ArgumentParser(
         prog=prog,
         description=description,
@@ -103,6 +103,10 @@ def main(argv, prog, description, cmd):
                 logger, task_processor.resolved_tasks, askpass_path
             )
             scheduler.run()
+
+            # Save failed tasks (pytest usage)
+            if _captured is not None:
+                _captured.extend(scheduler.get_results())
 
         # Final message
         logger.done(
