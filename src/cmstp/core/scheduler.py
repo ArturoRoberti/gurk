@@ -240,7 +240,7 @@ class Scheduler:
             """Create a temporary sudo wrapper script, to avoid having to use 'sudo -A' everywhere."""
             # Temporary directory
             wrapper_dir = Path(TemporaryDirectory().name)
-            if not wrapper_dir.exists():
+            if not wrapper_dir.is_dir():
                 wrapper_dir.mkdir(parents=True, exist_ok=True)
 
             # Temporary sudo wrapper script

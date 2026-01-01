@@ -83,7 +83,7 @@ def main(argv, prog, description, cmd, _captured=None):
             setup_processor = CoreCliProcessor(logger, args, argv, cmd)
 
             # Prompt pre-setup if this was never run before
-            setup_processor.prompt_pre_setup()
+            setup_processor.prompt_setup()
 
             # Process args
             processed_args, cloned_config_dir = setup_processor.process_args()
@@ -133,8 +133,8 @@ def main(argv, prog, description, cmd, _captured=None):
             sys.exit(1)
     finally:
         # Remove temporary sudo askpass file
-        if askpass_path is not None and Path(askpass_path).exists():
+        if askpass_path is not None and Path(askpass_path).is_file():
             os.remove(askpass_path)
         # Remove cloned config directory if applicable
-        if cloned_config_dir is not None and cloned_config_dir.exists():
+        if cloned_config_dir is not None and cloned_config_dir.is_dir():
             shutil.rmtree(cloned_config_dir)

@@ -78,6 +78,9 @@ class CoreCliArgs:
     # fmt: on
 
 
+SETUP_DONE_FILE = Path.home() / ".cmstp" / "setup.done"
+
+
 @dataclass
 class CoreCliProcessor:
     """
@@ -91,9 +94,11 @@ class CoreCliProcessor:
     command: str           = field(repr=False)
     # fmt: on
 
-    def prompt_pre_setup(self) -> None:
-        pre_setup_done_file = Path.home() / ".cmstp" / "setup.done"
-        if not pre_setup_done_file.exists():
+    def prompt_setup(self) -> None:
+        """
+        Prompt the user to run setup if it has never been run before.
+        """
+        if not SETUP_DONE_FILE.is_file():
             print(
                 "It seems that this is the first time you are running cmstp. "
                 "It is recommended to run the setup first to ensure all "
@@ -111,8 +116,8 @@ class CoreCliProcessor:
                 self.logger.warning("Skipping setup")
 
             # Mark setup as done
-            pre_setup_done_file.parent.mkdir(parents=True, exist_ok=True)
-            pre_setup_done_file.touch()
+            SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            SETUP_DONE_FILE.touch()
 
     def process_args(self) -> Tuple[CoreCliArgs, Optional[Path]]:
         """
@@ -170,12 +175,12 @@ class CoreCliProcessor:
         if self.args.tasks and self.args.config_file == ENABLED_CONFIG_FILE:
             # If tasks are specified without a config file, ignore the config file
             self.args.config_file = None
-        elif not self.args.config_file.exists():
+        elif not self.args.config_file.is_file():
             # If a config directory is specified, look for a config file there
             possible_config_file = (
                 self.args.config_directory / self.args.config_file
             )
-            if possible_config_file.exists():
+            if possible_config_file.is_file():
                 self.args.config_file = possible_config_file
             elif is_git_repo(str(self.args.config_file)):
                 # Git repo

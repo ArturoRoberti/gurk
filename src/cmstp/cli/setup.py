@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from cmstp.core.logger import Logger, LoggerSeverity
+from cmstp.utils.cli import SETUP_DONE_FILE
 from cmstp.utils.interface import prompt_bool
 from cmstp.utils.system_info import get_manufacturer
 
@@ -64,7 +65,7 @@ class SSHKeysManager:
             ).strip()
             if key_name:
                 self.curr_ssh_key = self.ssh_directory / key_name
-                if self.curr_ssh_key.exists():
+                if self.curr_ssh_key.is_file():
                     print(
                         f"Key '{key_name}' already exists. Please choose a different name.\n"
                     )
@@ -340,6 +341,11 @@ def main(argv, prog, description):
             print_secure_boot_steps()
         else:
             Logger.richprint("Skipping Secure Boot disabling steps", "yellow")
+
+        # Mark setup as done
+        if not SETUP_DONE_FILE.is_file():
+            SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            SETUP_DONE_FILE.touch()
 
     except (KeyboardInterrupt, Exception) as e:
         traceback_str = traceback.format_exc()

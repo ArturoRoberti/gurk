@@ -205,7 +205,7 @@ class Command:
     #       Or does that rely on this resp. is a second check good to have?
     def __post_init__(self) -> None:
         # Check 'script'
-        if not Path(self.script).exists():
+        if not Path(self.script).is_file():
             raise FileNotFoundError(f"Script file not found: {self.script}")
         try:
             self.kind  # Trigger kind property to validate script type

@@ -490,7 +490,7 @@ class TaskProcessor:
                     / task["config_file"]
                 ).resolve()
 
-                if not config_file.exists():
+                if not config_file.is_file():
                     task["config_file"] = None
                     task["enabled"] = False
                     self.logger.warning(

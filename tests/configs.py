@@ -19,7 +19,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
     # Disable/Replace prompts
     monkeypatch.setattr(core, "get_sudo_askpass", _get_sudo_askpass)
     monkeypatch.setattr(
-        core.CoreCliProcessor, "prompt_pre_setup", lambda self: None
+        core.CoreCliProcessor, "prompt_setup", lambda self: None
     )
     monkeypatch.setattr(core.Scheduler, "run", lambda self: None)
 
@@ -45,7 +45,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
             full_path = get_config_path(
                 config_file, task_name.split("-", 1)[0]
             )
-            if not full_path.exists():
+            if not full_path.is_file():
                 pytest.fail(
                     f"Config file '{config_file}' for task '{task_name}' does not exist"
                 )

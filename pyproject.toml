@@ -9,7 +9,7 @@ description = "Contains anything related to setting up a new computer (desktop) 
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [ "click", "rich", "distro", "ruamel.yaml", "commentjson", "networkx", "GitPython", "requests", "packaging", "toml",]
-classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: OS Independent", "Environment :: Console", "Topic :: System :: Installation/Setup", "Intended Audience :: End Users/Desktop",]
+classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: POSIX :: Linux", "Environment :: Console", "Topic :: System :: Installation/Setup", "Intended Audience :: End Users/Desktop",]
 [[project.authors]]
 name = "Arturo Roberti"
 email = "arturo.roberti@outlook.com"
