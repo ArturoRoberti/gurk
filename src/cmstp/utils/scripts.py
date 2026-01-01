@@ -10,6 +10,7 @@ from cmstp.utils.common import (
     PACKAGE_SRC_PATH,
     SCRIPT_LANGUAGES,
     CommandKind,
+    FilePath,
 )
 from cmstp.utils.patterns import PatternCollection
 
@@ -39,17 +40,17 @@ class ScriptBlock(TypedDict):
     # fmt: on
 
 
-def get_block_spans(path: Path) -> List[ScriptBlock]:
+def get_block_spans(path: FilePath) -> List[ScriptBlock]:
     """
     Returns list of (block_type, start_line, end_line) for top-level script blocks in the given file.
 
     :param path: Path to the script file
-    :type path: Path
+    :type path: FilePath
     :return: List of ScriptBlock dictionaries with block type and line spans
     :rtype: List[ScriptBlock]
     """
     kind = CommandKind.from_script(path)
-    source = path.read_text(encoding="utf-8", errors="replace")
+    source = Path(path).read_text(encoding="utf-8", errors="replace")
 
     # Find imports (python only)
     imports = []
