@@ -1,17 +1,20 @@
 import textwrap
 from copy import deepcopy
 from dataclasses import dataclass, field
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 
 from cmstp.core.logger import Logger
-from cmstp.utils.command import Command, CommandKind
-from cmstp.utils.common import PACKAGE_CONFIG_PATH
-from cmstp.utils.patterns import PatternCollection
+from cmstp.utils.cli import CoreCliArgs
+from cmstp.utils.command import Command
+from cmstp.utils.common import DEFAULT_CONFIG_FILE, get_script_path
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
+    TASK_PROPERTIES_CUSTOM,
+    TASK_PROPERTIES_DEFAULT,
     ResolvedTask,
     TaskDictCollection,
     get_invalid_tasks_from_task_dict_collection,
@@ -26,16 +29,14 @@ class TaskProcessor:
 
     # fmt: off
     logger:              Logger             = field(repr=False)
-    config_file:         Optional[Path]     = field()
-    config_directory:    Path               = field()
-    custom_tasks:        List[str]          = field()
-    enable_all:          Optional[bool]     = field()
-    enable_dependencies: Optional[bool]     = field()
+    processed_args:      CoreCliArgs        = field(repr=False)
 
+    enable_all:          bool               = field(init=False, default=False)
+    enable_dependencies: bool               = field(init=False, default=False)
     resolved_tasks:      List[ResolvedTask] = field(init=False, repr=False, default=None)
 
     # Internal
-    _default_cfg_path: Path                 = field(init=False, repr=False, default=PACKAGE_CONFIG_PATH / "default.yaml")
+    _default_cfg_path: Path                 = field(init=False, repr=False, default=DEFAULT_CONFIG_FILE)
     _default_config:   TaskDictCollection   = field(init=False, repr=False, default=None)
     _allowed_args:     Dict[str, List[str]] = field(init=False, repr=False, default_factory=dict)
     _dependency_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
@@ -46,14 +47,17 @@ class TaskProcessor:
         # (Internal) Check default config file
         self._default_config = self.check_default_config()
 
+        # Add CLI options
+        self.enable_all = self.processed_args.enable_all
+        self.enable_dependencies = self.processed_args.enable_dependencies
+
         # Check custom config file
-        if self.config_file is not None:
-            custom_config = load_yaml(self.config_file)
+        if self.processed_args.config_file is not None:
+            custom_config = load_yaml(self.processed_args.config_file)
             custom_config = self.check_config(custom_config)
         else:
             self.logger.debug(
-                "Tasks have been specified directly and no config "
-                "file is specified, so only those tasks will be run"
+                "No valid config file is specified, thus only cli tasks (if any) will be enabled"
             )
             custom_config = {}
 
@@ -68,13 +72,20 @@ class TaskProcessor:
 
         # Enable all tasks (that are not explicitly disabled) if enable_all is set
         if self.enable_all:
+            self.logger.debug(
+                "Enabling all tasks that are not explicitly disabled"
+            )
             for task in tasks.values():
                 if "enabled" not in task:
                     task["enabled"] = True
 
-        # Disable all "uninstallation" tasks - TODO: Restructure this as soon as more entrypoints are added
+        # Disable all tasks that don't belong to the current cmstp command
         for task_name, task in tasks.items():
-            if task_name.startswith("uninstall"):
+            if not task_name.startswith(self.processed_args.cmstp_cmd):
+                self.logger.debug(
+                    f"Disabling task '{task_name}', as it does not "
+                    f"belong to the '{self.processed_args.cmstp_cmd}' command"
+                )
                 task["enabled"] = False
 
         # Fill all missing custom fields in other tasks
@@ -86,17 +97,32 @@ class TaskProcessor:
         # Resolve and check config file paths for all tasks
         tasks = self.resolve_config_directory(tasks)
 
+        # Disable all tasks not belonging to the current cmstp command
+        # NOTE: '--enable-dependencies' may thus be required even if '--enable-all'
+        #       is passed, to enable dependencies belonging to other cmstp commands
+        for task_name, task in tasks.items():
+            if not task_name.startswith(self.processed_args.cmstp_cmd):
+                self.logger.debug(
+                    f"Disabling task '{task_name}', as it does not "
+                    f"belong to the '{self.processed_args.cmstp_cmd}' command"
+                )
+                task["enabled"] = False
+
         # Check dependency and supercedes graphs
         tasks = self.resolve_graphs(tasks)
 
         # Count enabled tasks
-        if self.count_tasks(tasks) == 0:
+        enabled_task_names = [
+            name for name, task in tasks.items() if task["enabled"]
+        ]
+        n_enabled = len(enabled_task_names)
+        if n_enabled == 0:
             self.logger.fatal(
                 "There are no enabled tasks (anymore). Nothing to do"
             )
         else:
             self.logger.debug(
-                f"Final enabled tasks: {[name for name, task in tasks.items() if task['enabled']]}"
+                f"Final enabled tasks ({n_enabled}): {enabled_task_names}"
             )
 
         # Create logging directory
@@ -120,7 +146,7 @@ class TaskProcessor:
 
     @staticmethod
     def check_allowed(
-        allowed_args: Optional[List[str]],
+        allowed_args: List[str],
         args: Union[str, List[str]],
         allow_default: bool = False,
     ) -> Tuple[List[str], bool]:
@@ -128,8 +154,8 @@ class TaskProcessor:
         Check if an argument is in the allowed list.
         If allowed_args is None, any argument is allowed.
 
-        :param allowed_args: List of allowed arguments or None if any argument is allowed
-        :type allowed_args: Optional[List[str]]
+        :param allowed_args: List of allowed arguments
+        :type allowed_args: List[str]
         :param args: Argument or list of arguments to check
         :type args: Union[str, List[str]]
         :param allow_default: Whether to allow 'default' as a valid argument
@@ -149,20 +175,15 @@ class TaskProcessor:
             :return: Whether the argument is allowed
             :rtype: bool
             """
-            extra_args = ["--force"]
-            if allow_default:
-                extra_args.append("default")
+            allowed = [
+                *allowed_args,
+                "--force",
+                *(["default"] if allow_default else []),
+            ]
+            return any(
+                fnmatchcase(arg, allowed_arg) for allowed_arg in allowed
+            )
 
-            for allowed in [*allowed_args, *extra_args]:
-                if allowed.endswith("*"):
-                    if arg.startswith(allowed[:-1]):
-                        return True
-                elif arg == allowed:
-                    return True
-            return False
-
-        if allowed_args is None:
-            return [], True
         if isinstance(args, str):
             is_allowed = _check_single_allowed(args)
             wrong_args = [] if is_allowed else [args]
@@ -173,6 +194,7 @@ class TaskProcessor:
             ]
             return wrong_args, not wrong_args
 
+    # TODO: Check that all tasks belong to some command (use CORE_COMMANDS)
     def check_default_config(self) -> TaskDictCollection:
         """
         Check that the default config file is valid.
@@ -206,17 +228,17 @@ class TaskProcessor:
                 + type(default_config).__name__
             )
 
-        # Remove helpers (start with '_') that may otherwise be picked up as tasks
+        # Remove helpers
         defaults = default_config["_defaults"]
         default_config = {
             k: overlay_dicts([defaults, v])
             for k, v in default_config.items()
-            if not k.startswith("_")
+            if isinstance(k, str) and not k.startswith("_")
         }
 
         # Check structure (incl. types)
         invalid_tasks = get_invalid_tasks_from_task_dict_collection(
-            default_config
+            default_config, True
         )
         if invalid_tasks:
             fatal_msg = textwrap.dedent(
@@ -234,17 +256,27 @@ class TaskProcessor:
             if not task["description"]:
                 fatal("Description is empty", task_name)
 
-            # Check 'script' field
+            # Resolve 'script' field
             if not task["script"]:
                 fatal(
-                    "Script is either null, empty or uses a package that can't be found",
+                    "Script is either null, empty or invalid",
                     task_name,
                 )
-            if not Path(task["script"]).exists():
-                fatal(f"'{task['script']}' script does not exist", task_name)
+            else:
+                try:
+                    task["script"] = get_script_path(
+                        task["script"], task_name.split("-", 1)[0]
+                    )
+                except ValueError as e:
+                    fatal(str(e), task_name)
+
+            # Check existence of script & function fields
+            try:
+                script_command = Command(task["script"], task["function"])
+            except Exception as e:
+                fatal(str(e), task_name)
 
             # Check for duplicate (script, function) pairs
-            script_command = Command(task["script"], task["function"])
             if script_command in existing_scripts:
                 fatal(
                     f"Duplicate (script, function) pair: {script_command}",
@@ -252,54 +284,6 @@ class TaskProcessor:
                 )
             else:
                 existing_scripts.add(script_command)
-
-            # Check 'function' field
-            if task["function"] is not None:
-                # Get script info
-                script_kind = script_command.kind
-                with open(task["script"]) as f:
-                    lines = f.readlines()
-
-                # Find function in script
-                function_pattern = PatternCollection[
-                    script_kind.name
-                ].patterns["blocks"]["FUNCTION"]
-                function_matches = [
-                    match.groups()
-                    for line in lines
-                    if (match := function_pattern.search(line.strip()))
-                ]
-                if script_kind == CommandKind.PYTHON:  # Also capture args
-                    function_names = [name for name, _ in function_matches]
-                else:  # No args are captured in bash
-                    function_names = [name for name, in function_matches]
-                if task["function"] not in function_names:
-                    fatal(
-                        f"'{task['function']}' function not found in script "
-                        f"{task['script']}\nAvailable functions: {function_names}",
-                        task_name,
-                    )
-
-                # If Python, check function definition only captures '*args'
-                elif script_kind == CommandKind.PYTHON:
-                    # Test if the function has only *args
-                    function_args = [args for _, args in function_matches]
-                    args = function_args[
-                        function_names.index(task["function"])
-                    ]
-                    arg_list = [
-                        a.strip() for a in args.split(",") if a.strip()
-                    ]
-                    if not (
-                        len(arg_list) == 1
-                        and arg_list[0].split(":")[0] == "*args"
-                    ):
-                        fatal(
-                            f"'{task['function']}' function in script "
-                            f"{task['script']} must ONLY capture '*args' as "
-                            f"an argument, if it is to be used as a task",
-                            task_name,
-                        )
 
             # Check 'depends_on' field (must refer to existing tasks)
             for dep in task["depends_on"]:
@@ -390,16 +374,14 @@ class TaskProcessor:
             """
             if option in config:
                 value = config.pop(option)
-            else:
-                value = None
-            if getattr(self, option) is None and value:
                 if not isinstance(value, bool):
                     warning(
                         f"Ignoring '{option}' value - must be "
                         f"a boolean, not a {type(value).__name__}"
                     )
-                    value = False
-                setattr(self, option, value)
+                else:
+                    current_value = getattr(self, option)
+                    setattr(self, option, current_value | value)
 
         # Check for "enable_all" parameter
         check_option("enable_all")
@@ -409,10 +391,11 @@ class TaskProcessor:
 
         # Add defaults for missing optional fields. Used to check structure of custom config tasks
         default_dict = deepcopy(DEFAULT_CUSTOM_CONFIG)
-        default_dict[
-            "config_file"
-        ] = "default"  # Allow default config file to be kept
-        default_dict["args"] = "default"  # Allow default args to be kept
+        for common_key in (
+            TASK_PROPERTIES_DEFAULT.keys() & TASK_PROPERTIES_CUSTOM.keys()
+        ):
+            # Keep default value if not provided in config
+            default_dict[common_key] = "default"
         filled_tasks = deepcopy(config)
         for task_name, task in config.items():
             # Quick check
@@ -427,7 +410,7 @@ class TaskProcessor:
 
         # Check structure (incl. types)
         invalid_tasks = get_invalid_tasks_from_task_dict_collection(
-            filled_tasks, include_default=False, include_custom=True
+            filled_tasks, False
         )
         if invalid_tasks:
             warning_msg = textwrap.dedent(
@@ -440,11 +423,21 @@ class TaskProcessor:
             for task_name in invalid_tasks:
                 filled_tasks[task_name] = default_dict
 
-        # Check args
+        # Remove tasks that are not in default config
+        final_tasks = deepcopy(filled_tasks)
         for task_name, task in filled_tasks.items():
+            if task_name not in self._default_config:
+                self.logger.warning(
+                    f"Task '{task_name}' in is removed because "
+                    f"it is not defined in the default config"
+                )
+                final_tasks.pop(task_name)
+
+        # Check args
+        for task_name, task in final_tasks.items():
             # Check custom args are allowed
             wrong_args, is_allowed = self.check_allowed(
-                self._allowed_args.get(task_name), task["args"], True
+                self._allowed_args[task_name], task["args"], True
             )
             if not is_allowed:
                 warning(
@@ -453,16 +446,6 @@ class TaskProcessor:
                     f"{self._allowed_args[task_name]}"
                 )
                 task["enabled"] = False
-
-        # Disable tasks that are not in default config # TODO: Test this quickly
-        final_tasks = deepcopy(filled_tasks)
-        for task_name, task in filled_tasks.items():
-            if task_name not in self._default_config:
-                self.logger.warning(
-                    f"Task '{task_name}' in custom config is removed "
-                    f"because it is not defined in the default config"
-                )
-                final_tasks.pop(task_name)
 
         self.logger.debug("Config is valid")
         return final_tasks
@@ -475,26 +458,14 @@ class TaskProcessor:
         :rtype: TaskDictCollection
         """
         processed_tasks = dict()
-        for task_str in self.custom_tasks:
-            parts = task_str.split(":")
+        for task_str in self.processed_args.tasks:
+            parts = [p for p in task_str.split(":") if p]
             task_name = parts[0]
-            task_args = parts[1:] if len(parts) > 1 else []
+            task_args = parts[1:]
 
             processed_tasks[task_name] = {"enabled": True}
             if task_args:
                 processed_tasks[task_name]["args"] = task_args
-
-                # Check custom args
-                wrong_args, is_allowed = self.check_allowed(
-                    self._allowed_args.get(task_name, []), task_args, True
-                )
-                if not is_allowed:
-                    self.logger.warning(
-                        f"Task '{task_name}' was disabled because some custom "
-                        f"args ({wrong_args}) are not in allowed args "
-                        f"{self._allowed_args.get(task_name, [])}"
-                    )
-                    processed_tasks[task_name]["enabled"] = False
 
         if not processed_tasks:
             self.logger.debug("No custom tasks were specified")
@@ -515,7 +486,9 @@ class TaskProcessor:
         for task_name, task in tasks.items():
             if task["config_file"] is not None:
                 config_file = (
-                    self.config_directory / task["config_file"]
+                    self.processed_args.config_directory
+                    / task_name.split("-", 1)[0]
+                    / task["config_file"]
                 ).resolve()
 
                 if not config_file.exists():
@@ -528,6 +501,7 @@ class TaskProcessor:
                 else:
                     task["config_file"] = str(config_file)
 
+        self.logger.debug("Resolved config file paths for all tasks")
         return tasks
 
     def resolve_graphs(self, tasks: TaskDictCollection) -> TaskDictCollection:
@@ -591,19 +565,3 @@ class TaskProcessor:
             "Resolved dependency and supercedes enabling/disabling"
         )
         return tasks
-
-    @staticmethod
-    def count_tasks(tasks: TaskDictCollection) -> int:
-        """
-        Count the number of enabled tasks.
-
-        :param tasks: Tasks to count
-        :type tasks: TaskDictCollection
-        :return: Number of enabled tasks
-        :rtype: int
-        """
-        count = 0
-        for task in tasks.values():
-            if task.get("enabled", False):
-                count += 1
-        return count

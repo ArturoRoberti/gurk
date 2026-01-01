@@ -1,0 +1,28 @@
+name: Check Results
+
+on:
+  workflow_call:
+    inputs:
+      results:
+        description: "Newline-separated list of job results"
+        required: true
+        type: string
+
+jobs:
+  check-results:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate results
+        run: |
+          echo "Evaluating results:"
+          echo "${{ inputs.results }}"
+
+          while IFS= read -r result; do
+            [ -z "$result" ] && continue
+            if [ "$result" != "success" ]; then
+              echo "A required job failed"
+              exit 1
+            fi
+          done <<< "${{ inputs.results }}"
+
+          echo "All required jobs succeeded"

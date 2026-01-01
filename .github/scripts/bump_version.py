@@ -2,6 +2,13 @@ import requests
 import toml
 from packaging.version import InvalidVersion, Version
 
+# Check internet connection
+try:
+    requests.get("https://pypi.org", timeout=5)
+except requests.RequestException:
+    # No internet connection, skip version bump
+    exit(0)
+
 # Load local version
 data = toml.load("pyproject.toml")
 local_ver = Version(data["project"]["version"])

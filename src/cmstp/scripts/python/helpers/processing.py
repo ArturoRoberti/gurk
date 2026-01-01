@@ -25,7 +25,7 @@ class InstallCommands(Enum):
     # fmt: off
     APT     = _flock_command("apt-get install -y")  # TODO: Add '--reinstall' here and in other InstallCommands?
     SNAP    = "sudo snap install"
-    FLATPAK = "sudo flatpak install"
+    FLATPAK = "sudo flatpak install -y"
     NPM     = "sudo npm install -g"
     PIP     = "python3 -m pip install --user"
     PIPX    = "python3 -m pipx install"

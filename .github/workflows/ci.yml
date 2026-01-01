@@ -8,12 +8,27 @@ on:
   workflow_dispatch: null
 
 jobs:
+  # Run pre-commit checks
   ci-pre-commit:
     uses: ./.github/workflows/reusable-pre-commit.yml
     secrets:
       PAT: ${{ secrets.COMMIT_TOKEN }}
-  ci-main-script:
+
+  # Run pytest on affected tasks
+  ci-pytests:
     needs: ci-pre-commit
     # Avoid double runs if pre-commit pushed changes
     if: ${{ needs.ci-pre-commit.outputs.HAS_PUSHED != 'true' }}
-    uses: ./.github/workflows/reusable-main-script.yml
+    uses: ./.github/workflows/reusable-pytests.yml
+
+  # Final job to report overall CI status
+  ci-status:
+    needs:
+      - ci-pre-commit
+      - ci-pytests
+    if: always()
+    uses: ./.github/workflows/reusable-check-results.yml
+    with:
+      results: |
+        ${{ needs.ci-pre-commit.result }}
+        ${{ needs.ci-pytests.result }}

@@ -1,7 +1,0 @@
-# Test task with an extra arg (i.e. 'extra')
-some-task:       # Placeholder valid task to avoid eventual empty config
-  enabled: true
-some-other-task: # Invalid task
-  enabled: true
-  args:
-    extra: some_extra_value

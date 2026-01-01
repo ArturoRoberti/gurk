@@ -1,9 +1,0 @@
-# Test task with an extra property (i.e. 'extra')
-some-task:
-  script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
-  function: null
-  depends_on: []
-  extra: some_extra_value
-  args:
-    allowed: null
-    default: []

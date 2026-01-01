@@ -1,6 +1,0 @@
-# Test task with an extra property (i.e. 'extra')
-some-task:       # Placeholder valid task to avoid eventual empty config
-  enabled: true
-some-other-task: # Invalid task
-  enabled: true
-  extra: some_extra_value

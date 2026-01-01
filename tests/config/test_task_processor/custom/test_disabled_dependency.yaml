@@ -1,7 +1,0 @@
-# Test task that depends on a disabled task
-some-task:              # Placeholder valid task to avoid eventual empty config
-  enabled: true
-some-other-task:
-  enabled: false
-some-third-task:
-  enabled: true

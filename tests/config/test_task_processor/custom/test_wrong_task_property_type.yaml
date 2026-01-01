@@ -1,5 +1,0 @@
-# Test task with a property of wrong type (e.g. 'enabled' being a str instead of a bool)
-some-task:       # Placeholder task to avoid eventual empty config
-  enabled: true
-some-other-task: # Invalid task
-  enabled: some_string_instead_of_bool

@@ -1,4 +1,0 @@
-# Test invalid task that leaves the config eventually empty
-some-other-task:
-  enabled: true
-  extra: some_extra_value # Example invalid property

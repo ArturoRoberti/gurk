@@ -77,12 +77,13 @@ class StepPatterns(TypedDict):
     # fmt: on
 
 
+# TODO: Merge "entrypoint" pattern into "blocks" and then actually remove necessity of "blocks" subcategory
 class ScriptPatterns(TypedDict):
     """Patterns for different script types."""
 
     # fmt: off
-    entrypoints: Optional[re.Pattern]
-    blocks:      ScriptBlockPatterns
+    entrypoint: Optional[re.Pattern]
+    blocks:     ScriptBlockPatterns
     # fmt: on
 
 
@@ -113,7 +114,7 @@ class PatternCollection(Enum):
         "comment":      pattern_factory("comment"),
     }
     BASH: EnumValue[ScriptPatterns] = {
-        "entrypoints":  re.compile(r"if\s+\[\[.*BASH_SOURCE.*\]\];?\s*"),
+        "entrypoint":   re.compile(r"if\s+\[\[.*BASH_SOURCE.*\]\];?\s*"),
         "blocks": {
             "FUNCTION": re.compile(r"\s*(?:function\s+|)(\w+)\s*\(\)\s*{\s*$"),
             "CLASS":    None,  # Bash has no classes
@@ -127,7 +128,7 @@ class PatternCollection(Enum):
         },
     }
     PYTHON: EnumValue[ScriptPatterns] = {
-        "entrypoints":  re.compile(r'if __name__\s*==\s*[\'"]__main__[\'"]\s*:'),
+        "entrypoint":   re.compile(r'if __name__\s*==\s*[\'"]__main__[\'"]\s*:'),
         "blocks": {
             "FUNCTION": re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*[^:]+)?\s*:\s*$"),
             "CLASS":    re.compile(r"^\s*class\s+(\w+)\s*(\(.*\))?:\s*$"),

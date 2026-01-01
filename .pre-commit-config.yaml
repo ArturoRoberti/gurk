@@ -6,23 +6,15 @@ repos:
   - id: trailing-whitespace
   - id: end-of-file-fixer
   - id: check-json
+  - id: check-yaml
   - id: check-merge-conflict
   - id: detect-private-key
-# YAML checking with ruamel.yaml (supports custom !join tag)
-- repo: local
-  hooks:
-  - id: check-yaml
-    name: Check YAML with ruamel support
-    entry: python3 .github/scripts/check_yaml.py
-    language: python
-    additional_dependencies: [ruamel.yaml]
-    files: \.ya?ml$
 # Formatting for shell scripts
 - repo: https://github.com/scop/pre-commit-shfmt
   rev: v3.9.0-1
   hooks:
   - id: shfmt
-    args: ["-i", "2", "-ci", "-w"]
+    args: ["-i", "0", "-ci", "-w"]  # IMPORTANT: Use tabs for indentation; allows indented 'EOF' in scripts
 # Shell script linting
 - repo: https://github.com/shellcheck-py/shellcheck-py
   rev: v0.10.0.1
@@ -90,3 +82,4 @@ repos:
     entry: python3 .github/scripts/bump_version.py
     language: python
     additional_dependencies: [packaging, requests, toml]
+    require_serial: true

@@ -1,16 +1,21 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    TypeAlias,
+    TypedDict,
+    Union,
+)
 
 from cmstp.utils.command import Command
 
-FieldTypeDict = Dict[str, List[Optional[type]]]
+FieldTypeDict: TypeAlias = Mapping[str, List[Optional[type]] | "FieldTypeDict"]
 
-# Required in default config. NOTE:
-# - "'script': None" is actually not allowed, but defaults to None if nonexistent package is used
-TASK_ARGS_DEFAULT: FieldTypeDict = {
-    "allowed": [list, None],
-    "default": [list],
-}
+# Required in default config
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
     "description": [str],
     "script": [str],
@@ -19,6 +24,10 @@ TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
     "depends_on": [list],
     "privileged": [bool],
     "supercedes": [list],
+    "args": {
+        "allowed": [list],
+        "default": [list],
+    },
 }
 
 # Optional in custom config
@@ -32,8 +41,19 @@ DEFAULT_CUSTOM_CONFIG = {
     for key, val in TASK_PROPERTIES_CUSTOM.items()
 }
 
-# TODO: Auto-detect via flag in default config?
-HARDWARE_SPECIFIC_TASKS = ["install-nvidia-driver", "install-cuda"]
+# HARDWARE_SPECIFIC_TASKS = ["install-cuda", "install-nvidia-driver"]
+
+# Explanations:
+# - install-isaaclab: Hangs (may be an issue with the install itself, not the runner)
+# - install-isaacsim: Takes too long (~30 mins); costs too much CI time - purely practical
+# - install-nvidia-driver: Cannot use 'modprobe nvidia'
+# - install-ros: Fails due to missing setup script (may be an issue with the install itself, not the runner)
+RUNNER_SPECIFIC_TASKS = [
+    "install-isaaclab",
+    "install-isaacsim",
+    "install-nvidia-driver",
+    "install-ros",
+]
 
 
 def print_expected_task_fields(
@@ -43,60 +63,63 @@ def print_expected_task_fields(
     Returns a YAML-like string with a top-level task name, first-level
     properties and and second-level args, along with their expected types.
 
-    :param default: Whether to use default task fields or custom task fields
+    :param default: Whether to use default task fields (True) or custom task fields (False)
     :type default: bool
     :return: Formatted string representing expected task fields
     :rtype: str
     """
-
-    def format_value(value):
-        formatted_items = []
-        for v in value:
-            if isinstance(v, type):
-                formatted = v.__name__
-            elif v is None:
-                formatted = "null"
-            else:
-                formatted = str(v)
-            formatted_items.append(formatted)
-
-        return ", ".join(formatted_items)
-
     if default:
         keys_types = TASK_PROPERTIES_DEFAULT
-        args_types = TASK_ARGS_DEFAULT
     else:
         keys_types = TASK_PROPERTIES_CUSTOM
-        args_types = None
 
-    # Prepare key width for alignment (including indented args keys)
-    all_keys = list(keys_types.keys())
-    if args_types:
-        all_keys += [f"  {k}" for k in args_types.keys()]
-    max_key_len = max(len(k) for k in all_keys) + 2
+    def format_value(value):
+        """Format a (non-dict) value into a single string."""
+        if isinstance(value, (list, tuple, set)):
+            formatted_items = []
+            for v in value:
+                if isinstance(v, type):
+                    formatted_items.append(v.__name__)
+                elif v is None:
+                    formatted_items.append("null")
+                else:
+                    formatted_items.append(str(v))
+            return ", ".join(formatted_items)
+        elif isinstance(value, type):
+            return value.__name__
+        elif value is None:
+            return "null"
+        else:
+            return str(value)
 
+    entries = []  # list of (display_key, value)
+    base_indent = " " * 2
+
+    def walk(dct: dict, depth: int):
+        """Depth-first traversal that appends (display_key, formatted_value|None)."""
+        for key, val in dct.items():
+            display_key = f"{base_indent * depth}{key}"
+            if isinstance(val, dict):
+                # header-only line, then recurse
+                entries.append((display_key, ""))
+                walk(val, depth + 1)
+            else:
+                entries.append((display_key, format_value(val)))
+
+    # Walk nested dict
+    walk(keys_types, depth=1)
+    max_key_len = max(len(k) for k, _ in entries) + 2
+
+    # Prepare final lines
     lines = ["<task-name>:"]
-    indent = "  "  # base indent for content under task
-
-    # Add top-level keys
-    for key, value in keys_types.items():
-        lines.append(
-            f"{indent}{key}:{' ' * (max_key_len - len(key))}{format_value(value)}"
-        )
-
-    # Add args section
-    if args_types:
-        lines.append(f"{indent}args:")
-        for key, value in args_types.items():
-            indented_key = f"{indent}  {key}"
-            lines.append(
-                f"{indented_key}:{' ' * (max_key_len - len(f'  {key}'))}{format_value(value)}"
-            )
+    for display_key, formatted_value in entries:
+        spaces = " " * max(0, max_key_len - len(display_key))
+        lines.append(f"{display_key}:{spaces}{formatted_value}")
 
     return "\n".join(lines)
 
 
-def check_structure(
+def check_dict_structure(
     obj: Any, expected: FieldTypeDict, allow_default: bool = False
 ) -> bool:
     """
@@ -115,50 +138,25 @@ def check_structure(
         return False
     if set(obj.keys()) != set(expected.keys()):
         return False
-    for key, types in expected.items():
-        if None in types and obj[key] is None:
+    for expected_field, allowed_types in expected.items():
+        # Nested dict
+        if isinstance(allowed_types, dict):
+            if not check_dict_structure(
+                obj[expected_field], expected[expected_field], allow_default
+            ):
+                return False
             continue
-        if allow_default and obj[key] == "default":
+        # 'None' value
+        if obj[expected_field] is None and None in allowed_types:
             continue
-        if type(obj[key]) not in types:
-            return False
+        # 'default' value
+        if obj[expected_field] == "default" and allow_default:
+            continue
+        # type value
+        if type(obj[expected_field]) in allowed_types:
+            continue
+        return False
     return True
-
-
-class ArgsDict(TypedDict):
-    """Dictionary representing task arguments in the default config file."""
-
-    # fmt: off
-    allowed:          Optional[List[str]]
-    default:          List[str]
-    # fmt: on
-
-
-def is_args_dict(
-    obj: Any, include_default: bool = True, include_custom: bool = False
-) -> bool:
-    """
-    Check if an object is a valid ArgsDict
-
-    :param obj: The object to check
-    :type obj: Any
-    :param include_default: Whether to include default args in the check
-    :type include_default: bool
-    :param include_custom: Whether to include custom args in the check
-    :type include_custom: bool
-    :return: True if the object is a valid ArgsDict, False otherwise
-    :rtype: bool
-    """
-    if include_custom:
-        return isinstance(obj, list) and all(
-            isinstance(arg, str) for arg in obj
-        )
-    else:
-        expected_args = dict()
-        if include_default:
-            expected_args |= TASK_ARGS_DEFAULT
-
-        return check_structure(obj, expected_args, include_custom)
 
 
 class TaskDict(TypedDict):
@@ -173,44 +171,8 @@ class TaskDict(TypedDict):
     depends_on:     List[str]
     privileged:     bool
     supercedes:     Optional[List[str]]
-    args:           Union[ArgsDict, List[str]]
+    args:           Union[Dict[str, List[str]], List[str]]
     # fmt: on
-
-
-def is_task_dict(
-    obj: Any, include_default: bool = True, include_custom: bool = False
-) -> bool:
-    """
-    Check if an object is a valid TaskDict.
-
-    :param obj: The object to check
-    :type obj: Any
-    :param include_default: Whether to include default properties in the check
-    :type include_default: bool
-    :param include_custom: Whether to include custom properties in the check
-    :type include_custom: bool
-    :return: True if the object is a valid TaskDict, False otherwise
-    :rtype: bool
-    """
-    expected_keys = dict()
-    if include_default:
-        expected_keys |= TASK_PROPERTIES_DEFAULT
-    if include_custom:
-        expected_keys |= TASK_PROPERTIES_CUSTOM
-
-    if not isinstance(obj, dict):
-        return False
-
-    if not include_custom:
-        obj_noargs = {k: v for k, v in obj.items() if k != "args"}
-        obj_args = obj.get("args")
-        return check_structure(obj_noargs, expected_keys) and is_args_dict(
-            obj_args,
-            include_default=include_default,
-            include_custom=include_custom,
-        )
-    else:
-        return check_structure(obj, expected_keys, include_custom)
 
 
 TaskDictCollection = Dict[str, TaskDict]
@@ -218,8 +180,7 @@ TaskDictCollection = Dict[str, TaskDict]
 
 def get_invalid_tasks_from_task_dict_collection(
     obj: Dict[Any, Any],
-    include_default: bool = True,
-    include_custom: bool = False,
+    default: bool,
 ) -> Optional[List[str]]:
     """
     Check if an object is a valid collection of TaskDicts.
@@ -227,25 +188,23 @@ def get_invalid_tasks_from_task_dict_collection(
 
     :param obj: The object to check
     :type obj: Dict[Any, Any]
-    :param include_default: Whether to include default properties in the check
-    :type include_default: bool
-    :param include_custom: Whether to include custom properties in the check
-    :type include_custom: bool
+    :param default: Whether to use default task fields (True) or custom task fields (False)
+    :type default: bool
     :return: List of invalid task names, or None if the object is not a dict
     :rtype: List[str] | None
     """
     if not isinstance(obj, dict):
         return None
 
-    invalid_tasks = []
-    for key, value in obj.items():
-        if not isinstance(key, str) or not is_task_dict(
+    return [
+        key
+        for key, value in obj.items()
+        if not check_dict_structure(
             value,
-            include_default=include_default,
-            include_custom=include_custom,
-        ):
-            invalid_tasks.append(key)
-    return invalid_tasks
+            TASK_PROPERTIES_DEFAULT if default else TASK_PROPERTIES_CUSTOM,
+            not default,
+        )
+    ]
 
 
 @dataclass(frozen=True)

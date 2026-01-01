@@ -17,11 +17,6 @@ def load_yaml(yaml_file: Path) -> Optional[Dict[str, Any]]:
     :rtype: Dict[str, Any] | None
     """
 
-    def join_constructor(loader, node):
-        """Custom !join constructor to concatenate strings and aliases."""
-        parts = loader.construct_sequence(node)
-        return "".join(parts)
-
     def normalize_yaml(obj: Any) -> Any:
         """
         Recursively normalize YAML content:
@@ -73,7 +68,6 @@ def load_yaml(yaml_file: Path) -> Optional[Dict[str, Any]]:
         return None
 
     yaml = YAML(typ="safe")
-    yaml.constructor.add_constructor("!join", join_constructor)
     with open(yaml_file, "r") as f:
         try:
             content = yaml.load(f) or {}

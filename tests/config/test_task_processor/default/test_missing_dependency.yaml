@@ -1,8 +1,0 @@
-# Test task with a missing script file
-some-task:
-  script: package://cmstp/../../tests/config/test_task_processor/dummy_script.py
-  function: null
-  depends_on: [some-missing-task]
-  args:
-    allowed: null
-    default: []

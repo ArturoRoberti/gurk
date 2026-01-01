@@ -1,5 +1,0 @@
-# Template custom config file
-some-task:
-  enabled: true
-some-other-task:
-  enabled: true

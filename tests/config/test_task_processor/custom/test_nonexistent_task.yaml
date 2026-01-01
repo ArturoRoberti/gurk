@@ -1,5 +1,0 @@
-# This task does not exist in the default config
-some-task:              # Placeholder valid task to avoid eventual empty config
-  enabled: true
-some-nonexistent-task:  # Invalid task
-  enabled: true
