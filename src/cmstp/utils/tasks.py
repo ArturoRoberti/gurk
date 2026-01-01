@@ -11,7 +11,7 @@ from typing import (
     Union,
 )
 
-from cmstp.utils.common import Command
+from cmstp.utils.scripts import Command
 
 FieldTypeDict: TypeAlias = Mapping[str, List[Optional[type]] | "FieldTypeDict"]
 

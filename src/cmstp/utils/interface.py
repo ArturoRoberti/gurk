@@ -9,10 +9,10 @@ from rich.prompt import Confirm
 from cmstp.utils.common import (
     PACKAGE_SRC_PATH,
     PIPX_PYTHON_PATH,
-    Command,
     CommandKind,
     FilePath,
 )
+from cmstp.utils.scripts import Command
 
 PACKAGE_BASH_HELPERS_PATH = (
     PACKAGE_SRC_PATH / "scripts" / "bash" / "helpers" / "helpers.bash"

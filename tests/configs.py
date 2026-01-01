@@ -42,9 +42,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
 
         config_file: Optional[str] = task["config_file"]
         if config_file:
-            full_path = get_config_path(
-                config_file, task_name.split("-", 1)[0]
-            )
+            full_path = get_config_path(config_file, task_name.split("-")[0])
             if not full_path.is_file():
                 pytest.fail(
                     f"Config file '{config_file}' for task '{task_name}' does not exist"

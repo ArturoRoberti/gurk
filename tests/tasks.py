@@ -21,7 +21,7 @@ def test_task(task: str, monkeypatch: pytest.MonkeyPatch) -> None:
             argv=["-t", task, "--enable-dependencies", "-v"],
             prog="",
             description="",
-            cmd=task.split("-", 1)[0],
+            cmd=task.split("-")[0],
             _captured=captured,
         )
     assert (

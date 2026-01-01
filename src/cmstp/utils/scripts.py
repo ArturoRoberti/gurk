@@ -1,6 +1,8 @@
 import ast
 from copy import deepcopy
+from dataclasses import dataclass, field
 from enum import Enum, auto
+from functools import cached_property
 from pathlib import Path
 from typing import Iterator, List, Optional, Set, Tuple, TypedDict
 
@@ -11,6 +13,7 @@ from cmstp.utils.common import (
     SCRIPT_LANGUAGES,
     CommandKind,
     FilePath,
+    ScriptExtension,
 )
 from cmstp.utils.patterns import PatternCollection
 
@@ -169,6 +172,51 @@ def get_block_spans(path: FilePath) -> List[ScriptBlock]:
             merged_positions.append(block)
 
     return merged_positions
+
+
+@dataclass(frozen=True)
+class Command:
+    """Represents a command to be executed, including its script and optional function."""
+
+    # fmt: off
+    script:     str           = field()
+    function:   Optional[str] = field(default=None)
+    check_func: bool          = field(default=True)
+    # fmt: on
+
+    def __post_init__(self) -> None:
+        # Check 'script'
+        if not Path(self.script).is_file():
+            raise FileNotFoundError(f"Script file not found: {self.script}")
+        try:
+            self.kind  # Trigger 'kind' property to validate script type
+        except ValueError:
+            raise ValueError(
+                f"Unsupported script type for file {self.script} - supported "
+                f"types: {[ext.name.lower() for ext in ScriptExtension]}"
+            )
+
+        # Check 'function'
+        blocks = get_block_spans(self.script)
+        if self.check_func and self.function is not None:
+            available_functions = [
+                b["name"]
+                for b in blocks
+                if b["type"] == ScriptBlockTypes.FUNCTION
+            ]
+            if self.function not in available_functions:
+                raise ValueError(
+                    f"'{self.function}' function not found in script "
+                    f"{self.script}\nAvailable functions: {available_functions}",
+                )
+
+    @cached_property
+    def kind(self) -> CommandKind:
+        return CommandKind.from_script(self.script)
+
+    def __str__(self) -> str:
+        func_suffix = f"@{self.function}" if self.function else ""
+        return f"{Path(self.script).stem}{func_suffix}"
 
 
 def _iter_command_files(

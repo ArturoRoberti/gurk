@@ -265,34 +265,38 @@ class CoreCliProcessor:
 
         self.logger.debug(f"System information: {system_info}")
 
-    # TODO: Use logfile instead of manual capture
     def prepare(self) -> None:
         """
         Prepare the system for setup.
         """
-        error_msg = None
         requirements_id = self.logger.add_task("cmstp-requirements", total=2)
+        log_file = self.logger.generate_logfile_path(requirements_id)
 
+        # Update apt packages
         result_update = subprocess.run(
             ["sudo", "apt-get", "update"],
             capture_output=True,
             text=True,
         )
         self.logger.update_task(requirements_id, "Updated apt packages")
-        self.logger.debug(
-            f"Preparation apt update output:\n{result_update.stdout}\n{result_update.stderr}"
-        )
+        with open(log_file, "a") as lf:
+            lf.write(
+                f"=== APT UPDATE OUTPUT ===\n{result_update.stdout}\n{result_update.stderr}\n"
+            )
 
+        # Upgrade apt packages
         result_upgrade = subprocess.run(
             ["sudo", "apt-get", "-y", "upgrade"],
             capture_output=True,
             text=True,
         )
         self.logger.update_task(requirements_id, "Upgraded apt packages")
-        self.logger.debug(
-            f"Preparation apt upgrade output:\n{result_upgrade.stdout}\n{result_upgrade.stderr}"
-        )
+        with open(log_file, "a") as lf:
+            lf.write(
+                f"=== APT UPGRADE OUTPUT ===\n{result_upgrade.stdout}\n{result_upgrade.stderr}\n"
+            )
 
+        # Determine and return success
         success = (
             result_update.returncode == 0 and result_upgrade.returncode == 0
         )
@@ -302,15 +306,8 @@ class CoreCliProcessor:
             if success
             else TaskTerminationType.FAILURE,
         )
-
         if not success:
-            error_msg = "Failed to update/upgrade apt packages"
-            if result_update.returncode != 0:
-                error_msg += f"\nUpdate output:\n{result_update.stdout}\n{result_update.stderr}"
-            if result_upgrade.returncode != 0:
-                error_msg += f"\nUpgrade output:\n{result_upgrade.stdout}\n{result_upgrade.stderr}"
-            self.logger.fatal(error_msg)
+            self.logger.fatal("Failed to run preparation steps")
 
         self.logger.debug("System preparation completed successfully")
-
         return success
