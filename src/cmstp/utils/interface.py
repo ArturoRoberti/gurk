@@ -6,8 +6,13 @@ from typing import List, Optional, Union
 
 from rich.prompt import Confirm
 
-from cmstp.utils.command import Command, CommandKind
-from cmstp.utils.common import PACKAGE_SRC_PATH, PIPX_PYTHON_PATH, FilePath
+from cmstp.utils.common import (
+    PACKAGE_SRC_PATH,
+    PIPX_PYTHON_PATH,
+    Command,
+    CommandKind,
+    FilePath,
+)
 
 PACKAGE_BASH_HELPERS_PATH = (
     PACKAGE_SRC_PATH / "scripts" / "bash" / "helpers" / "helpers.bash"

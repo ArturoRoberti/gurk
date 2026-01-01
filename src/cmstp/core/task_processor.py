@@ -9,8 +9,7 @@ import networkx as nx
 
 from cmstp.core.logger import Logger
 from cmstp.utils.cli import CoreCliArgs
-from cmstp.utils.command import Command
-from cmstp.utils.common import DEFAULT_CONFIG_FILE, get_script_path
+from cmstp.utils.common import DEFAULT_CONFIG_FILE, Command, get_script_path
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
     TASK_PROPERTIES_CUSTOM,

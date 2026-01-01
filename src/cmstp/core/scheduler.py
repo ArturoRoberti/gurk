@@ -14,7 +14,7 @@ from threading import Event, Lock, Thread
 from typing import Dict, List, Optional, Set, TextIO, Tuple
 
 from cmstp.core.logger import Logger
-from cmstp.utils.command import Command, CommandKind
+from cmstp.utils.common import Command, CommandKind
 from cmstp.utils.interface import run_script_function
 from cmstp.utils.logger import TaskTerminationType
 from cmstp.utils.patterns import PatternCollection

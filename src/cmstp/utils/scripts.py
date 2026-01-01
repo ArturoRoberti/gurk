@@ -5,8 +5,12 @@ from pathlib import Path
 from typing import Iterator, List, Optional, Set, Tuple, TypedDict
 
 from cmstp.cli.utils import CORE_COMMANDS
-from cmstp.utils.command import SCRIPT_LANGUAGES, CommandKind
-from cmstp.utils.common import PACKAGE_CONFIG_PATH, PACKAGE_SRC_PATH
+from cmstp.utils.common import (
+    PACKAGE_CONFIG_PATH,
+    PACKAGE_SRC_PATH,
+    SCRIPT_LANGUAGES,
+    CommandKind,
+)
 from cmstp.utils.patterns import PatternCollection
 
 
