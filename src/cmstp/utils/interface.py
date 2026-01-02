@@ -85,13 +85,10 @@ def _run_bash_script_function(
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
     """
-    # TODO: See if this (needing to activate venv) is not maybe wrong? Does 'activate' even exist?
     # Source pipx venv and helpers
-    #   NOTE: Not existing/necessary in github runner, thus "-f" check
-    activate_exe = PIPX_PYTHON_PATH.parent / "activate"
     sourcing = dedent(
         f"""\
-        [ -f {activate_exe} ] && source {activate_exe}
+        source {PIPX_PYTHON_PATH.parent / 'activate'}
         source {PACKAGE_BASH_HELPERS_PATH}
     """
     )

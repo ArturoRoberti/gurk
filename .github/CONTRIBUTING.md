@@ -29,6 +29,18 @@ The hooks will then run on each commit. You can also run the hooks manually via
 pre-commit run --all-files
 ```
 
+# Pytests
+Please ensure your code is up-to date via the pre-commit hooks mentioned above. Furthermore, you can test the validity of package configs and scripts you may have edited/created via
+```bash
+cmstp pytest tests/configs.py
+cmstp pytest tests/scripts.py
+```
+
+You can also test individual tasks via either using the cmstp core commands as any user would or using
+```bash
+cmstp pytest tests/tasks.py --tasks TASK1[,TASK2,TASK3,...]
+```
+
 Please ensure clear and concise descriptions in your commit messages.
 
 ## Code of Conduct

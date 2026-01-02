@@ -72,5 +72,22 @@ def info_cmd(ctx: click.Context):
     )
 
 
+@main.command(name="pytest", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def pytest_cmd(ctx: click.Context):
+    """Run pytest (able to import this package). Use as you would the normal 'pytest' command."""
+    try:
+        import pytest
+    except ImportError:
+        raise RuntimeError(
+            "'pytest' is not installed. Please install this package with the "
+            "'dev' extras to use this command via: 'pipx install -e .[dev]'"
+        )
+    raise SystemExit(pytest.main(ctx.args))
+
+
+main.commands["pytest"].category = "Developer Commands"
+
+
 if __name__ == "__main__":
     main()

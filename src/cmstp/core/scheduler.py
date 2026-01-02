@@ -70,19 +70,19 @@ class Scheduler:
         with original_path.open(
             "r", encoding="utf-8", errors="replace"
         ) as src, tmp_path.open("w", encoding="utf-8") as dst:
-            for line in src:
+            for idx, line in enumerate(src):
                 # Detect current block
-                current_block = [
+                curr_block = [
                     block
                     for block in script_blocks
-                    if block["lines"][0] <= src.tell() <= block["lines"][1]
+                    if block["lines"][0] <= idx <= block["lines"][1]
                 ]
-                if not current_block:
-                    current_block = ScriptBlock(
+                if not curr_block:
+                    curr_block = ScriptBlock(
                         type=ScriptBlockTypes.OTHER, name=None, lines=(0, 0)
                     )
                 else:
-                    current_block = current_block[0]
+                    curr_block = curr_block[0]
 
                 # Look for STEP instances
                 step_patterns = PatternCollection.STEP.patterns
@@ -104,12 +104,12 @@ class Scheduler:
                 if (
                     (
                         command.function
-                        and current_block.type == ScriptBlockTypes.FUNCTION
-                        and current_block.name == command.function
+                        and curr_block["type"] == ScriptBlockTypes.FUNCTION
+                        and curr_block["name"] == command.function
                     )
                     or (
                         not command.function
-                        and current_block.type == ScriptBlockTypes.ENTRYPOINT
+                        and curr_block["type"] == ScriptBlockTypes.ENTRYPOINT
                     )
                 ) and m_comment:
                     # Replace STEP comments with print statements
