@@ -1,6 +1,6 @@
+import os
 import platform
 import subprocess
-import sys
 from typing import Optional, TypedDict
 
 import distro
@@ -74,8 +74,8 @@ def get_system_info() -> SystemInfo:
     system_info["type"] = platform.system().lower()
     # x86_64, aarch64, etc.
     system_info["kernel"] = platform.machine()
-    # Simulate Hardware (e.g. GPU) - TODO: Update this to check if host system is a github runner
-    system_info["simulate_hardware"] = "pytest" in sys.modules
+    # Simulate Hardware (e.g. GPU) in CI
+    system_info["simulate_hardware"] = os.getenv("GITHUB_ACTIONS") == "true"
     if system_info["type"] == "linux":
         # ubuntu, debian, etc.
         system_info["name"] = distro.id().lower()

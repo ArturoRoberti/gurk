@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install package
-        run: pipx install -e .
+        run: pipx install -e .[dev]
 
       - name: Compute affected tasks, based on changed files
         run: |
