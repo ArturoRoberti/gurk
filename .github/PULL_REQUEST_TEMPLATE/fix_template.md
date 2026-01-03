@@ -2,6 +2,6 @@
 
 [Your description of how you fixed a reported bug]
 
-Fixes #[issue]
+Addresses #[issue]
 
 <!-- Please add a "bug" label (and other applicable ones) via the UI -->

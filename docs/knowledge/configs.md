@@ -1,0 +1,20 @@
+# Overview
+As mentioned in the [commands overview](commands.md#1-use-a-config-file), you may use a config file to customize which tasks run and with which arguments.
+
+Furthermore, some tasks use their own config files to read lists of packages, settings, etc. to apply. This document describes how to work with these config files.
+
+# Config directory structure
+By default, cmstp uses a built-in config directory located inside the installation. You can find its location by running (for any core command):
+```bash
+cmstp <command> --help
+```
+and looking for the `--config-directory` flag's default in its description. There, in each config file, you can see the expected structure and file formats. In general, the config directory is has one subfolder for each core command.
+
+# Use custom config directories
+You can point cmstp to your own config directory (local path or git URL) via the `--config-directory` flag on any core command. This config directory should mirror the default layout, with subfolders for each core command containing equally named config files. Should a task-specific config file be missing, cmstp disables that task if enabled.
+
+The config directory can also be specified via a git repo, e.g.
+```bash
+cmstp <command> --config-directory git@github.com:ArturoRoberti/cmstp_config.git
+```
+We can **highly recommend** to create your own config directory in a git repository and point cmstp to it via the `--config-directory` flag, so that you can easily set up any new system with your preferred settings and packages. This is what is done in the above [example config repo](https://github.com/ArturoRoberti/cmstp_config.git).

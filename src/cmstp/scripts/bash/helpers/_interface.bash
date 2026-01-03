@@ -4,6 +4,7 @@ get_config_args() {
 	Populates global variables:
 	  - SYSTEM_INFO:       Associative array of system information key-value pairs.
 	  - CONFIG_FILE:       Path to the task configuration file.
+	  - FORCE:             Boolean indicating if the --force flag was provided.
 	  - REMAINING_ARGS:    Array of any additional arguments not parsed.
 
 	Args:
@@ -15,8 +16,8 @@ get_config_args() {
 	'
 	declare -gA SYSTEM_INFO=() # TODO: Use "simulate_hardware" entry
 	declare -g CONFIG_FILE=""
-	declare -g -a REMAINING_ARGS=()
 	declare -g FORCE=false
+	declare -g -a REMAINING_ARGS=()
 
 	local system_info_raw=""
 
