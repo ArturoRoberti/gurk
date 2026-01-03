@@ -40,6 +40,8 @@ pipx install cmstp
 ```
 
 # Usage
+Apart from here, you can also find some more information in the [example README](example/README.md) and the [documentation](docs/knowledge/).
+
 ## Setup
 We recommend setting up the following before running the main installation/configuration tasks:
 - Configuring SSH keys for git (GitHub, GitLab, etc.) - some tasks may require cloning private repositories
