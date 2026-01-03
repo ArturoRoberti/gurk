@@ -71,9 +71,9 @@ def get_block_spans(path: FilePath) -> List[ScriptBlock]:
                     )
 
     # Collect regex patterns for block detection
-    func_re = PatternCollection[kind.name].patterns["blocks"]["FUNCTION"]
-    class_re = PatternCollection[kind.name].patterns["blocks"]["CLASS"]
-    entrypoint_re = PatternCollection[kind.name].patterns["entrypoint"]
+    func_re = PatternCollection[kind.name].patterns["FUNCTION"]
+    class_re = PatternCollection[kind.name].patterns["CLASS"]
+    entrypoint_re = PatternCollection[kind.name].patterns["ENTRYPOINT"]
 
     # Find other blocks
     positions = deepcopy(imports)

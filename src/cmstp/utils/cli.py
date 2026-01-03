@@ -269,7 +269,7 @@ class CoreCliProcessor:
         """
         Prepare the system for setup.
         """
-        requirements_id = self.logger.add_task("cmstp-requirements", total=2)
+        requirements_id = self.logger.add_task("cmstp-preparation", total=2)
         log_file = self.logger.generate_logfile_path(requirements_id)
 
         # Update apt packages

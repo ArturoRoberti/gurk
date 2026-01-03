@@ -56,7 +56,7 @@ def _check_script_blocks(path: Path) -> bool:
 
     # Check that python functions only capture '*args'
     if CommandKind.from_script(path.name) == CommandKind.PYTHON:
-        pattern = PatternCollection.PYTHON.patterns["blocks"]["FUNCTION"]
+        pattern = PatternCollection.PYTHON.patterns["FUNCTION"]
         matches = [
             match
             for line in path.read_text().splitlines()

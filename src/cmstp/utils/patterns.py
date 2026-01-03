@@ -2,24 +2,6 @@ import re
 from enum import Enum
 from typing import Optional, Protocol, TypedDict, TypeVar
 
-T = TypeVar("T")
-
-
-class ScriptBlockPatterns(TypedDict):
-    """Patterns for different script block types."""
-
-    # fmt: off
-    FUNCTION:   re.Pattern
-    CLASS:      Optional[re.Pattern]
-    IF:         re.Pattern
-    ELIF:       re.Pattern
-    ELSE:       re.Pattern
-    CASE:       Optional[re.Pattern]
-    FOR:        re.Pattern
-    WHILE:      re.Pattern
-    UNTIL:      Optional[re.Pattern]
-    # fmt: on
-
 
 class PatternFactory(Protocol):
     """Callable that produces a regex pattern based on progress flag."""
@@ -77,13 +59,20 @@ class StepPatterns(TypedDict):
     # fmt: on
 
 
-# TODO: Merge "entrypoint" pattern into "blocks" and then actually remove necessity of "blocks" subcategory
 class ScriptPatterns(TypedDict):
     """Patterns for different script types."""
 
     # fmt: off
-    entrypoint: Optional[re.Pattern]
-    blocks:     ScriptBlockPatterns
+    ENTRYPOINT: re.Pattern
+    FUNCTION:   re.Pattern
+    CLASS:      Optional[re.Pattern]
+    IF:         re.Pattern
+    ELIF:       re.Pattern
+    ELSE:       re.Pattern
+    CASE:       Optional[re.Pattern]
+    FOR:        re.Pattern
+    WHILE:      re.Pattern
+    UNTIL:      Optional[re.Pattern]
     # fmt: on
 
 
@@ -98,6 +87,9 @@ class PathPatterns(TypedDict):
     # fmt: on
 
 
+T = TypeVar("T")
+
+
 class EnumValue(Protocol[T]):
     """Protocol for enum values containing patterns."""
 
@@ -109,44 +101,40 @@ class PatternCollection(Enum):
 
     # fmt: off
     STEP: EnumValue[StepPatterns] = {
-        "any":          pattern_factory("any"),
-        "output":       pattern_factory("output"),
-        "comment":      pattern_factory("comment"),
+        "any":        pattern_factory("any"),
+        "output":     pattern_factory("output"),
+        "comment":    pattern_factory("comment"),
     }
     BASH: EnumValue[ScriptPatterns] = {
-        "entrypoint":   re.compile(r"if\s+\[\[.*BASH_SOURCE.*\]\];?\s*"),
-        "blocks": {
-            "FUNCTION": re.compile(r"\s*(?:function\s+|)(\w+)\s*\(\)\s*{\s*$"),
-            "CLASS":    None,  # Bash has no classes
-            "IF":       re.compile(r"^\s*if\s+(.*);\s*then\s*$"),
-            "ELIF":     re.compile(r"^\s*elif\s+(.*);\s*then\s*$"),
-            "ELSE":     re.compile(r"^\s*else\s*$"),
-            "CASE":     re.compile(r"^\s*case\s+(.*)\s*in\s*$"),
-            "FOR":      re.compile(r"^\s*for\s+(.*);\s*do\s*$"),
-            "WHILE":    re.compile(r"^\s*while\s+(.*);\s*do\s*$"),
-            "UNTIL":    re.compile(r"^\s*until\s+(.*);\s*do\s*$"),
-        },
+        "ENTRYPOINT": re.compile(r"if\s+\[\[.*BASH_SOURCE.*\]\];?\s*"),
+        "FUNCTION":   re.compile(r"\s*(?:function\s+|)(\w+)\s*\(\)\s*{\s*$"),
+        "CLASS":      None,  # Bash has no classes
+        "IF":         re.compile(r"^\s*if\s+(.*);\s*then\s*$"),
+        "ELIF":       re.compile(r"^\s*elif\s+(.*);\s*then\s*$"),
+        "ELSE":       re.compile(r"^\s*else\s*$"),
+        "CASE":       re.compile(r"^\s*case\s+(.*)\s*in\s*$"),
+        "FOR":        re.compile(r"^\s*for\s+(.*);\s*do\s*$"),
+        "WHILE":      re.compile(r"^\s*while\s+(.*);\s*do\s*$"),
+        "UNTIL":      re.compile(r"^\s*until\s+(.*);\s*do\s*$"),
     }
     PYTHON: EnumValue[ScriptPatterns] = {
-        "entrypoint":   re.compile(r'if __name__\s*==\s*[\'"]__main__[\'"]\s*:'),
-        "blocks": {
-            "FUNCTION": re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*[^:]+)?\s*:\s*$"),
-            "CLASS":    re.compile(r"^\s*class\s+(\w+)\s*(\(.*\))?:\s*$"),
-            "IF":       re.compile(r"^\s*if\s+(.*):\s*$"),
-            "ELIF":     re.compile(r"^\s*elif\s+(.*):\s*$"),
-            "ELSE":     re.compile(r"^\s*else\s*:\s*$"),
-            "CASE":     None,  # Python has no "case"
-            "FOR":      re.compile(r"^\s*for\s+(.*):\s*$"),
-            "WHILE":    re.compile(r"^\s*while\s+(.*):\s*$"),
-            "UNTIL":    None,  # Python has no "until"
-        },
+        "ENTRYPOINT": re.compile(r'if __name__\s*==\s*[\'"]__main__[\'"]\s*:'),
+        "FUNCTION":   re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*[^:]+)?\s*:\s*$"),
+        "CLASS":      re.compile(r"^\s*class\s+(\w+)\s*(\(.*\))?:\s*$"),
+        "IF":         re.compile(r"^\s*if\s+(.*):\s*$"),
+        "ELIF":       re.compile(r"^\s*elif\s+(.*):\s*$"),
+        "ELSE":       re.compile(r"^\s*else\s*:\s*$"),
+        "CASE":       None,  # Python has no "case"
+        "FOR":        re.compile(r"^\s*for\s+(.*):\s*$"),
+        "WHILE":      re.compile(r"^\s*while\s+(.*):\s*$"),
+        "UNTIL":      None,  # Python has no "until"
     }
     # TODO: Remove "path" - instead, only make it a link if "link://" is prepended. Also, allow concatenation of "link://package://"
     PATH: EnumValue[PathPatterns] = {
-        "path":         re.compile(r"^path://(.*)$"),
-        "link":         re.compile(r"^link://(.*)$"),
-        "package":      re.compile(r"^package://([^/]+)/(.*)$"),
-        "url":          re.compile(r"^https?://[^\s]+$"),
+        "path":       re.compile(r"^path://(.*)$"),
+        "link":       re.compile(r"^link://(.*)$"),
+        "package":    re.compile(r"^package://([^/]+)/(.*)$"),
+        "url":        re.compile(r"^https?://[^\s]+$"),
     }
     # fmt: on
 
