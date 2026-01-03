@@ -55,7 +55,6 @@ def get_clean_lines(filename: Path) -> List[str]:
     return clean_lines
 
 
-# TODO: If a single package fails, finish task with neither "success" nor "failure", but "warning" status
 def install_packages_from_list(
     install_command: InstallCommands, packages: List[str]
 ) -> None:

@@ -232,7 +232,7 @@ configure-bashrc:
   config_file: configure_bashrc.bash
 configure-filestructure:
   <<: *defaults
-  description: Create a predefined filestructure in the user's home directory
+  description: Create a predefined filestructure in on the user's system
   script: simple_configurations.py
   function: configure_filestructure
   config_file: configure_filestructure.yaml

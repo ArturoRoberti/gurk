@@ -18,7 +18,7 @@ Please install the package via
 pipx install -e .[dev]
 ```
 
-You can find further developer instructions in the corresponding [documentation](../docs/dev/).
+You can find further developer instructions in the corresponding [documentation](https://github.com/ArturoRoberti/cmstp/blob/main/docs/dev/).
 
 ## Pre-commit hooks
 Please install the pre-commit hooks for this repo, to ensure code quality. The pre-commit hooks will also run in GitHub PRs and are required to pass.

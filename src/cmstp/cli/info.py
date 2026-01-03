@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from cmstp.core.logger import Logger, LoggerSeverity
-from cmstp.utils.common import DEFAULT_CONFIG_FILE, ENABLED_CONFIG_FILE
+from cmstp.utils.common import (
+    DEFAULT_CONFIG_FILE,
+    ENABLED_CONFIG_FILE,
+    get_config_path,
+)
 from cmstp.utils.system_info import get_system_info
 from cmstp.utils.yaml import load_yaml
 
@@ -176,7 +180,10 @@ def main(argv, prog, description):
                 print_dict_aligned(task_info, sort=False)
 
                 # Task config file
-                task_config_file = default_config[task_name]["config_file"]
+                task_config_file = get_config_path(
+                    default_config[task_name]["config_file"],
+                    task_name.split("-")[0],
+                )
                 if task_config_file is not None:
                     Logger.richprint(
                         "\n--- Configuration file ---",
