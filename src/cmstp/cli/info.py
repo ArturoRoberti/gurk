@@ -105,7 +105,10 @@ def main(argv, prog, description):
     parser = ArgumentParser(
         prog=prog,
         description=description,
-        formatter_class=ArgumentDefaultsHelpFormatter,
+        formatter_class=lambda prog: ArgumentDefaultsHelpFormatter(
+            prog=prog,
+            max_help_position=60,
+        ),
     )
     parser.add_argument(
         "-s",

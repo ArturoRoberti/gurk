@@ -1,2 +1,0 @@
-install-apt-packages:
-  enabled: true
