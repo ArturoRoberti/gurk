@@ -11,7 +11,7 @@ requires-python = ">=3.8"
 dependencies = [ "click", "rich", "distro", "ruamel.yaml", "commentjson", "networkx", "GitPython", "requests", "packaging",]
 classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: POSIX :: Linux", "Environment :: Console", "Topic :: System :: Installation/Setup", "Intended Audience :: End Users/Desktop",]
 [[project.authors]]
-name = "Arturo Roberti"
+name = "Arturo J. Roberti"
 email = "arturo.roberti@outlook.com"
 
 [project.license]
