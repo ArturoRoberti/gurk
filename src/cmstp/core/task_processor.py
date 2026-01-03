@@ -7,10 +7,11 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 
+from cmstp.cli.utils import CORE_COMMANDS
 from cmstp.core.logger import Logger
 from cmstp.utils.cli import CoreCliArgs
-from cmstp.utils.command import Command
 from cmstp.utils.common import DEFAULT_CONFIG_FILE, get_script_path
+from cmstp.utils.scripts import Command
 from cmstp.utils.tasks import (
     DEFAULT_CUSTOM_CONFIG,
     TASK_PROPERTIES_CUSTOM,
@@ -194,7 +195,6 @@ class TaskProcessor:
             ]
             return wrong_args, not wrong_args
 
-    # TODO: Check that all tasks belong to some command (use CORE_COMMANDS)
     def check_default_config(self) -> TaskDictCollection:
         """
         Check that the default config file is valid.
@@ -252,6 +252,14 @@ class TaskProcessor:
         # Check everything else
         existing_scripts = set()
         for task_name, task in default_config.items():
+            # Check task name
+            task_command = task_name.split("-")[0]
+            if task_command not in CORE_COMMANDS:
+                fatal(
+                    f"Task command ('{task_command}') does not exist",
+                    task_name,
+                )
+
             # Check 'description' field
             if not task["description"]:
                 fatal("Description is empty", task_name)
@@ -265,7 +273,7 @@ class TaskProcessor:
             else:
                 try:
                     task["script"] = get_script_path(
-                        task["script"], task_name.split("-", 1)[0]
+                        task["script"], task_name.split("-")[0]
                     )
                 except ValueError as e:
                     fatal(str(e), task_name)
@@ -487,11 +495,11 @@ class TaskProcessor:
             if task["config_file"] is not None:
                 config_file = (
                     self.processed_args.config_directory
-                    / task_name.split("-", 1)[0]
+                    / task_name.split("-")[0]
                     / task["config_file"]
                 ).resolve()
 
-                if not config_file.exists():
+                if not config_file.is_file():
                     task["config_file"] = None
                     task["enabled"] = False
                     self.logger.warning(

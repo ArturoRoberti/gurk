@@ -1,5 +1,3 @@
-# TODO: Figure out why a sudo pwd is still being asked for when running this (manually)
-
 import subprocess
 from typing import Optional
 
@@ -19,8 +17,10 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
     # Disable/Replace prompts
     monkeypatch.setattr(core, "get_sudo_askpass", _get_sudo_askpass)
     monkeypatch.setattr(
-        core.CoreCliProcessor, "prompt_pre_setup", lambda self: None
+        core.CoreCliProcessor, "prompt_setup", lambda self: None
     )
+
+    # Disable running scheduled tasks (only process configs)
     monkeypatch.setattr(core.Scheduler, "run", lambda self: None)
 
     # Process tasks (without running them) using the package configs
@@ -42,10 +42,8 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
 
         config_file: Optional[str] = task["config_file"]
         if config_file:
-            full_path = get_config_path(
-                config_file, task_name.split("-", 1)[0]
-            )
-            if not full_path.exists():
+            full_path = get_config_path(config_file, task_name.split("-")[0])
+            if not full_path.is_file():
                 pytest.fail(
                     f"Config file '{config_file}' for task '{task_name}' does not exist"
                 )

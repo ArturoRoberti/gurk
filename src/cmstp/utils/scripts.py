@@ -1,12 +1,20 @@
 import ast
 from copy import deepcopy
+from dataclasses import dataclass, field
 from enum import Enum, auto
+from functools import cached_property
 from pathlib import Path
 from typing import Iterator, List, Optional, Set, Tuple, TypedDict
 
 from cmstp.cli.utils import CORE_COMMANDS
-from cmstp.utils.command import SCRIPT_LANGUAGES, CommandKind
-from cmstp.utils.common import PACKAGE_CONFIG_PATH, PACKAGE_SRC_PATH
+from cmstp.utils.common import (
+    PACKAGE_CONFIG_PATH,
+    PACKAGE_SRC_PATH,
+    SCRIPT_LANGUAGES,
+    CommandKind,
+    FilePath,
+    ScriptExtension,
+)
 from cmstp.utils.patterns import PatternCollection
 
 
@@ -35,17 +43,17 @@ class ScriptBlock(TypedDict):
     # fmt: on
 
 
-def get_block_spans(path: Path) -> List[ScriptBlock]:
+def get_block_spans(path: FilePath) -> List[ScriptBlock]:
     """
     Returns list of (block_type, start_line, end_line) for top-level script blocks in the given file.
 
     :param path: Path to the script file
-    :type path: Path
+    :type path: FilePath
     :return: List of ScriptBlock dictionaries with block type and line spans
     :rtype: List[ScriptBlock]
     """
     kind = CommandKind.from_script(path)
-    source = path.read_text(encoding="utf-8", errors="replace")
+    source = Path(path).read_text(encoding="utf-8", errors="replace")
 
     # Find imports (python only)
     imports = []
@@ -63,9 +71,9 @@ def get_block_spans(path: Path) -> List[ScriptBlock]:
                     )
 
     # Collect regex patterns for block detection
-    func_re = PatternCollection[kind.name].patterns["blocks"]["FUNCTION"]
-    class_re = PatternCollection[kind.name].patterns["blocks"]["CLASS"]
-    entrypoint_re = PatternCollection[kind.name].patterns["entrypoint"]
+    func_re = PatternCollection[kind.name].patterns["FUNCTION"]
+    class_re = PatternCollection[kind.name].patterns["CLASS"]
+    entrypoint_re = PatternCollection[kind.name].patterns["ENTRYPOINT"]
 
     # Find other blocks
     positions = deepcopy(imports)
@@ -164,6 +172,51 @@ def get_block_spans(path: Path) -> List[ScriptBlock]:
             merged_positions.append(block)
 
     return merged_positions
+
+
+@dataclass(frozen=True)
+class Command:
+    """Represents a command to be executed, including its script and optional function."""
+
+    # fmt: off
+    script:     str           = field()
+    function:   Optional[str] = field(default=None)
+    check_func: bool          = field(default=True)
+    # fmt: on
+
+    def __post_init__(self) -> None:
+        # Check 'script'
+        if not Path(self.script).is_file():
+            raise FileNotFoundError(f"Script file not found: {self.script}")
+        try:
+            self.kind  # Trigger 'kind' property to validate script type
+        except ValueError:
+            raise ValueError(
+                f"Unsupported script type for file {self.script} - supported "
+                f"types: {[ext.name.lower() for ext in ScriptExtension]}"
+            )
+
+        # Check 'function'
+        blocks = get_block_spans(self.script)
+        if self.check_func and self.function is not None:
+            available_functions = [
+                b["name"]
+                for b in blocks
+                if b["type"] == ScriptBlockTypes.FUNCTION
+            ]
+            if self.function not in available_functions:
+                raise ValueError(
+                    f"'{self.function}' function not found in script "
+                    f"{self.script}\nAvailable functions: {available_functions}",
+                )
+
+    @cached_property
+    def kind(self) -> CommandKind:
+        return CommandKind.from_script(self.script)
+
+    def __str__(self) -> str:
+        func_suffix = f"@{self.function}" if self.function else ""
+        return f"{Path(self.script).stem}{func_suffix}"
 
 
 def _iter_command_files(

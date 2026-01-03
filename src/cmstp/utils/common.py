@@ -1,8 +1,8 @@
-# TODO: Merge with utils/command.py
-
 import os
+import re
 import shutil
 import sys
+from enum import Enum
 from importlib import resources
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
@@ -20,48 +20,6 @@ PIPX_PYTHON_PATH = Path(sys.executable)
 
 
 FilePath = Union[Path, str]
-
-
-def get_script_path(script: FilePath, command: str) -> Path:
-    """
-    Create a full path to a script inside the package's scripts directory.
-
-    :param script: Name of the script file
-    :type script: FilePath
-    :param command: Name of the command that uses the script
-    :type command: str
-    :return: Full path to the script file
-    :rtype: Path
-    """
-    if not isinstance(script, (str, Path)):
-        raise TypeError("script must be a str or Path")
-
-    if command not in CORE_COMMANDS:
-        raise ValueError(f"Unknown command: {command}")
-
-    # TODO: Use commandkind here, after merging with command.py
-    language = "bash" if str(script).endswith(".bash") else "python"
-    return PACKAGE_SRC_PATH / "scripts" / language / command / script
-
-
-def get_config_path(config_file: FilePath, command: str) -> Path:
-    """
-    Create a full path to a config file inside the package's config directory.
-
-    :param config_file: Name of the config file
-    :type config_file: FilePath
-    :param command: Name of the command that uses the config file
-    :type command: str
-    :return: Full path to the config file
-    :rtype: Path
-    """
-    if not isinstance(config_file, (str, Path)):
-        raise TypeError("config_file must be a str or Path")
-
-    if command not in CORE_COMMANDS:
-        raise ValueError(f"Unknown command: {command}")
-
-    return PACKAGE_CONFIG_PATH / command / config_file
 
 
 def generate_random_path(
@@ -99,7 +57,11 @@ def generate_random_path(
 def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
     """
     Resolve paths that may refer to package resources. Package paths are in the format:
-        "package://<package-name>/relative/path/inside/package"
+    ```
+    package://<package-name>/relative/path/inside/package
+    ```
+    The `package://` pattern does not need to be at the start of the string, and can appear
+    multiple times in the string, but only the first occurrence of it is replaced.
 
     :param raw_script: Raw script path
     :type raw_script: FilePath
@@ -110,23 +72,33 @@ def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
     if not isinstance(raw_script, (Path, str)):
         return raw_script
 
-    # Resolve package paths
-    match = PatternCollection.PATH.patterns["package"].match(str(raw_script))
-    if match:
+    raw_str = str(raw_script)
+
+    def _replace_package(match: re.Match) -> str:
         pkg_name, rel_path = match.groups()
         try:
-            resolved_path = Path(resources.files(pkg_name)) / rel_path
+            pkg_root = Path(resources.files(pkg_name))
         except ModuleNotFoundError:
-            return None
-    else:
-        # NOTE: We use 'os' and no built-in 'Path' method to retain '<type>://' multiple slashes
-        resolved_path = os.path.expanduser(str(raw_script))
+            raise
+
+        return str(pkg_root / rel_path)
+
+    try:
+        # Replace ALL occurrences of package://... anywhere in the string
+        resolved_str = PatternCollection.PATH.patterns["package"].sub(
+            _replace_package, raw_str
+        )
+    except ModuleNotFoundError:
+        return None
+
+    # NOTE: We use 'os' and no built-in 'Path' method to retain consecutive slashes
+    resolved_str = os.path.expanduser(resolved_str)
 
     # Return same type as input
     if isinstance(raw_script, Path):
-        return Path(resolved_path)
-    else:  # str
-        return str(resolved_path)
+        return Path(resolved_str)
+    else:
+        return resolved_str
 
 
 def stream_print(text: str, stderr: bool = False) -> None:
@@ -142,3 +114,89 @@ def stream_print(text: str, stderr: bool = False) -> None:
         print(text, file=sys.stderr)
     else:
         print(text)
+
+
+class ScriptExtension(Enum):
+    """Enumeration of supported script file extensions."""
+
+    # fmt: off
+    BASH   = "bash"
+    PYTHON = "py"
+    # fmt: on
+
+
+class CommandKind(Enum):
+    """Enumeration of supported command kinds with their executables."""
+
+    # fmt: off
+    BASH   = shutil.which("bash")
+    PYTHON = str(PIPX_PYTHON_PATH)
+    # fmt: on
+
+    @property
+    def exe(self) -> str:
+        return self.value
+
+    @property
+    def ext(self) -> str:
+        try:
+            return ScriptExtension[self.name].value
+        except KeyError:
+            raise ValueError(f"Unsupported CommandKind: {self.name}")
+
+    @staticmethod
+    def from_script(script: FilePath) -> "CommandKind":
+        """
+        Determine the command kind based on the script file extension.
+
+        :param script: Path to the script file
+        :type script: FilePath
+        :return: CommandKind corresponding to the script type
+        :rtype: CommandKind
+        """
+        suffix = Path(script).suffix.replace(".", "")
+        return CommandKind[ScriptExtension(suffix).name]
+
+
+SCRIPT_LANGUAGES = [kind.name for kind in CommandKind]
+
+
+def get_script_path(script: FilePath, command: str) -> Path:
+    """
+    Create a full path to a script inside the package's scripts directory.
+
+    :param script: Name of the script file
+    :type script: FilePath
+    :param command: Name of the command that uses the script
+    :type command: str
+    :return: Full path to the script file
+    :rtype: Path
+    """
+    if not isinstance(script, (str, Path)):
+        raise TypeError("script must be a str or Path")
+
+    if command not in CORE_COMMANDS:
+        raise ValueError(f"Unknown command: {command}")
+
+    language = CommandKind.from_script(script).name.lower()
+    return PACKAGE_SRC_PATH / "scripts" / language / command / script
+
+
+def get_config_path(config_file: FilePath, command: str) -> Path:
+    """
+    Create a full path to a config file inside the package's config directory.
+
+    :param config_file: Name of the config file
+    :type config_file: FilePath
+    :param command: Name of the command that uses the config file
+    :type command: str
+    :return: Full path to the config file
+    :rtype: Path
+    """
+    if not isinstance(config_file, (str, Path)):
+        raise TypeError("config_file must be a str or Path")
+
+    if command not in CORE_COMMANDS:
+        raise ValueError(f"Unknown command: {command}")
+
+    return PACKAGE_CONFIG_PATH / command / config_file

@@ -1,9 +1,9 @@
 import sys
 from collections import OrderedDict
+from importlib.metadata import version
 from pathlib import Path
 from typing import List
 
-import toml
 from click import Group
 
 GROUP_CONTEXT_SETTINGS = {
@@ -15,9 +15,7 @@ SUBCOMMAND_CONTEXT_SETTINGS = {
     "allow_extra_args": True,
     "help_option_names": [],
 }
-VERSION = toml.load(f"{Path(__file__).parents[3]}/pyproject.toml")["project"][
-    "version"
-]
+VERSION = version("cmstp")
 
 CORE_COMMANDS = ["install", "uninstall", "configure"]
 

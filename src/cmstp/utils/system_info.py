@@ -1,6 +1,6 @@
+import os
 import platform
 import subprocess
-import sys
 from typing import Optional, TypedDict
 
 import distro
@@ -41,7 +41,6 @@ def get_architecture() -> str:
         return result.stdout.strip().lower()
 
 
-# TODO: Test if this works without having to install "dmidecode" first (via apt) on a fresh system
 def get_manufacturer() -> str:
     """
     Retrieve the system manufacturer using dmidecode.
@@ -49,17 +48,17 @@ def get_manufacturer() -> str:
     :return: System manufacturer string
     :rtype: str
     """
-    result = subprocess.run(
-        ["sudo", "dmidecode", "-s", "system-manufacturer"],
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode != 0:
+    try:
+        with open("/sys/class/dmi/id/sys_vendor") as f:
+            manufacturer = f.read().strip()
+            if manufacturer:
+                return manufacturer.lower()
+            else:
+                raise RuntimeError("Manufacturer info is empty")
+    except Exception as e:
         raise RuntimeError(
-            f"Failed to retrieve manufacturer info via dmidecode: {result.stderr.strip()}"
+            f"Failed to retrieve manufacturer info via sysfs: {e}"
         )
-    else:
-        return result.stdout.strip().lower()
 
 
 def get_system_info() -> SystemInfo:
@@ -70,29 +69,27 @@ def get_system_info() -> SystemInfo:
     :rtype: SystemInfo
     """
     system_info = SystemInfo()
-    # linux, darwin, etc.
+    # OS-independent values
+    ## linux, darwin, etc.
     system_info["type"] = platform.system().lower()
-    # x86_64, aarch64, etc.
+    ## x86_64, aarch64, etc.
     system_info["kernel"] = platform.machine()
-    # Simulate Hardware (e.g. GPU) - TODO: Update this to check if host system is a github runner
-    system_info["simulate_hardware"] = "pytest" in sys.modules
-    if system_info["type"] == "linux":
-        # ubuntu, debian, etc.
-        system_info["name"] = distro.id().lower()
-        # focal, jammy, buster, bullseye, etc.
-        system_info["codename"] = distro.codename().lower()
-        # 20.04, 22.04, etc.
-        system_info["version"] = distro.version()
-        # amd64, arm64, etc.
-        system_info["arch"] = get_architecture()
-        # manufacturer
-        system_info["manufacturer"] = get_manufacturer()
-    else:
+    ## Simulate Hardware (e.g. GPU) in CI
+    system_info["simulate_hardware"] = os.getenv("GITHUB_ACTIONS") == "true"
+
+    # Linux-specific values
+    if system_info["type"] != "linux":
         # Unsupported OS
-        system_info["name"] = None
-        system_info["codename"] = None
-        system_info["version"] = None
-        system_info["arch"] = None
-        system_info["manufacturer"] = None
+        raise RuntimeError(f"Unsupported OS: {system_info['type']}")
+    ## ubuntu, debian, etc.
+    system_info["name"] = distro.id().lower()
+    ## focal, jammy, buster, bullseye, etc.
+    system_info["codename"] = distro.codename().lower()
+    ## 20.04, 22.04, etc.
+    system_info["version"] = distro.version()
+    ## amd64, arm64, etc.
+    system_info["arch"] = get_architecture()
+    ## manufacturer
+    system_info["manufacturer"] = get_manufacturer()
 
     return system_info

@@ -4,6 +4,9 @@ Look for TODOs in code. Otherwise, look at:
 - Docs (incl. pytests)
 - Pytests: Handle/Fix `RUNNER_SPECIFIC_TASKS` (see `utils/tasks.py`). These should make use of the `simulate_hardware` flag.    - ...
 - Expand uninstallation scripts. These can then also be used to lessen the size of installations on CI runners.
+- Output handling in PTY has issues
+    - Tracebacks are unclear (just lots of `^` characters) - maybe reduce to last file in traceback only?
+    - `Logger.logrichprint` colored output is not properly rendered
 
 # Minor
 ## Core

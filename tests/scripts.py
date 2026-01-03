@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from cmstp.utils.common import stream_print
+from cmstp.utils.common import CommandKind, stream_print
+from cmstp.utils.patterns import PatternCollection
 from cmstp.utils.scripts import ScriptBlockTypes, get_block_spans, iter_scripts
 
 
@@ -23,6 +24,7 @@ def _check_script_blocks(path: Path) -> bool:
     # Error variables
     errors = []
     errors_prefix = "ERROR: "
+    errors_prefix_empty = " " * len(errors_prefix)
 
     # Check there are no CLASS or OTHER blocks
     disallowed_blocks = [
@@ -37,8 +39,47 @@ def _check_script_blocks(path: Path) -> bool:
         errors.append(
             f"'{path}:{disallowed_blocks[0]['lines'][0]}' contains disallowed "
             f"top-level blocks (not FUNCTION, ENTRYPOINT, or IMPORT).\n"
-            f"{' ' * len(errors_prefix)}Disallowed lines: {disallowed_lines}"
+            f"{errors_prefix_empty}Disallowed lines: {disallowed_lines}"
         )
+
+    # Check that each function name is unique
+    function_names = [
+        b["name"] for b in blocks if b["type"] == ScriptBlockTypes.FUNCTION
+    ]
+    duplicates_names = [
+        name for name in function_names if function_names.count(name) > 1
+    ]
+    if duplicates_names:
+        errors.append(
+            f"'{path}' contains duplicate function names: {', '.join(duplicates_names)}"
+        )
+
+    # Check that python functions only capture '*args'
+    if CommandKind.from_script(path.name) == CommandKind.PYTHON:
+        pattern = PatternCollection.PYTHON.patterns["FUNCTION"]
+        matches = [
+            match
+            for line in path.read_text().splitlines()
+            if (match := pattern.search(line.strip()))
+        ]
+        for match in matches:
+            # Extract top-level function names and args
+            function_name, args = match.groups()
+            if function_name not in function_names:
+                # Skip nested functions
+                continue
+
+            # Check args
+            arg_list = [arg.strip() for arg in args.split(",") if arg.strip()]
+            if not (
+                len(arg_list) == 1 and arg_list[0].split(":")[0] == "*args"
+            ):
+                captured = ", ".join([arg.split(":")[0] for arg in arg_list])
+                errors.append(
+                    f"'{function_name}' function in '{path}' does "
+                    f"not only capture '*args' as an argument, but:\n"
+                    f"{errors_prefix_empty}{captured}"
+                )
 
     # Check that there is at most one ENTRYPOINT block and it is at the end
     entrypoints = [
@@ -48,7 +89,7 @@ def _check_script_blocks(path: Path) -> bool:
         entrypoint_lines = ", ".join(str(b["lines"]) for b in entrypoints)
         errors.append(
             f"'{path}:{entrypoints[0]['lines'][0]}' contains more than one ENTRYPOINT block.\n"
-            f"{' ' * len(errors_prefix)}ENTRYPOINT blocks at lines: {entrypoint_lines}"
+            f"{errors_prefix_empty}ENTRYPOINT blocks at lines: {entrypoint_lines}"
         )
 
     # Check that ENTRYPOINT is at the end
@@ -56,7 +97,7 @@ def _check_script_blocks(path: Path) -> bool:
         entrypoint_lines = ", ".join(str(b["lines"]) for b in entrypoints)
         errors.append(
             f"'{path}:{entrypoints[0]['lines'][0]}' ENTRYPOINT block in {path} is not at the end of the script.\n"
-            f"{' ' * len(errors_prefix)}ENTRYPOINT block(s) at lines: {entrypoint_lines}"
+            f"{errors_prefix_empty}ENTRYPOINT block(s) at lines: {entrypoint_lines}"
         )
 
     # Report errors if any

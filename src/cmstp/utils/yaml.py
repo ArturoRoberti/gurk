@@ -64,7 +64,7 @@ def load_yaml(yaml_file: Path) -> Optional[Dict[str, Any]]:
             # Should not happen
             pass
 
-    if not yaml_file.exists():
+    if not yaml_file.is_file():
         return None
 
     yaml = YAML(typ="safe")

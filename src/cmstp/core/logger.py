@@ -139,7 +139,7 @@ class Logger:
 
     def set_total(self, task_id: TaskID, total: int) -> None:
         """
-        Set the total number of steps for a task.
+        Set the total number of steps for a task, in case it was unknown at creation.
 
         :param task_id: ID of the task
         :type task_id: TaskID
