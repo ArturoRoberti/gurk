@@ -2,13 +2,12 @@
 #     structure under ROOT will be placed into the root directory ("/") (requires '--root' arg to enable).
 # The final values may be
 # - null (indicating an empty directory/file to create)
-#   (type (folder/file) is inferred from if a suffix is present (e.g. '.txt'))
+#     (type (folder/file) is inferred from if a suffix is present (e.g. '.txt'))
 # - (str) a github repository reference (indicating a repo to clone from)
-#   (see see 'parse_git_ref' function in this repo for expected format)
-# - (str) "path://<source>" (indicating local path to copy from)
-# - (str) "link://<source>" (indicati a symlink to create)
-# Path sources may include the $HOME environment variable, and should otherwise be absolute paths. Relative
-#   paths will be considered relative to the host's current working directory, which is not ideal.
+#           (see see 'parse_git_ref' function in this repo for expected format)
+# - (str) a URL (indicating a file to download from), starting with "http(s)://"
+# - (str) a local path (indicating a file/directory to copy from) you may add the "symlink://" prefix
+#           to create a symlink instead of copying. Also, the user's home (~) will be expanded.
 # Recommended: Add custom executable scripts and aliases in $HOME/.cmds, then add it to PATH
 HOME:
   .cmds:
@@ -24,4 +23,4 @@ HOME:
 ROOT:
   usr:
     bin:
-      python: link:///usr/bin/python3
+      python: symlink:///usr/bin/python3

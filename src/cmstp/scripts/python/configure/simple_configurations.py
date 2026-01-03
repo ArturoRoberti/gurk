@@ -9,6 +9,7 @@ import requests
 from cmstp.core.logger import Logger, LoggerSeverity
 from cmstp.scripts.python.helpers._interface import get_config_args
 from cmstp.scripts.python.helpers.processing import get_clean_lines
+from cmstp.utils.common import resolve_package_path
 from cmstp.utils.git_repos import clone_git_files, is_git_repo
 from cmstp.utils.interface import bash_check, revert_sudo_permissions
 from cmstp.utils.patterns import PatternCollection
@@ -83,48 +84,27 @@ def configure_filestructure(*args: List[str]) -> None:
                     # It's a directory
                     dest_path.mkdir(exist_ok=True)
             elif isinstance(content, str):
-                # Get directory/path from somewhere (git repo, URL, local path)
+                # Detect URL or symlink
                 url_match = PatternCollection.PATH.patterns["url"].match(
                     content
                 )
-                path_match = PatternCollection.PATH.patterns["path"].match(
-                    content
-                )
-                link_match = PatternCollection.PATH.patterns["link"].match(
-                    content
-                )
-                # TODO: Add package pattern. Also, see PatternCollection for related ToDo
-                if is_git_repo(content):
-                    string_type = "git"
-                elif url_match:
-                    string_type = "url"
-                elif path_match:
-                    path = path_match.group(1)
-                    content = Path(path).expanduser()
-                    string_type = "path"
-                elif link_match:
-                    path = link_match.group(1)
-                    content = Path(path).expanduser()
-                    string_type = "link"
-                else:
-                    Logger.step(
-                        f"Unsupported string content '{content}' for destination path '{dest_path}'. Skipping...",
-                        warning=True,
-                    )
-                    continue
+                symlink_match = PatternCollection.PATH.patterns[
+                    "symlink"
+                ].match(content)
 
-                # Check existence for local paths
-                if (
-                    string_type == "link" or string_type == "path"
-                ) and not content.exists():
+                # Resolve package path (if applicable)
+                content = resolve_package_path(
+                    content if not symlink_match else symlink_match.group(1)
+                )
+                if content is None:
                     Logger.step(
-                        f"Source {string_type} {content} does not exist. Skipping...",
+                        f"Package resource in path '{content}' could not be resolved. Skipping...",
                         warning=True,
                     )
                     continue
 
                 # Get content based on type
-                if string_type == "git":
+                if is_git_repo(content):
                     Logger.step(
                         f"Cloning git repository {content} into {dest_path}..."
                     )
@@ -138,7 +118,7 @@ def configure_filestructure(*args: List[str]) -> None:
                             warning=True,
                         )
                         continue
-                elif string_type == "url":
+                elif url_match:
                     Logger.step(
                         f"Downloading file from {content} to {dest_path}..."
                     )
@@ -152,25 +132,29 @@ def configure_filestructure(*args: List[str]) -> None:
                             f"Failed to download file from {content}. HTTP status code: {response.status_code}",
                             warning=True,
                         )
-                elif string_type == "path":
-                    Logger.step(
-                        f"Copying from local path {content} to {dest_path}..."
-                    )
-                    if content.is_file():
-                        copy2(content, dest_path)
-                    elif content.is_dir():
-                        copytree(content, dest_path, dirs_exist_ok=True)
-                elif string_type == "link":
-                    Logger.step(
-                        f"Creating symlink from {content} to {dest_path}..."
-                    )
-                    dest_path.symlink_to(content)
                 else:
-                    Logger.step(
-                        f"Unknown string type '{string_type}' for {dest_path} (SHOULD NOT HAPPEN). Skipping...",
-                        warning=True,
-                    )
-                    continue
+                    # Assumed local path (possibly symlinked)
+                    content = Path(content).expanduser()
+                    if not content.exists():
+                        Logger.step(
+                            f"Source '{content}' does not exist. Skipping...",
+                            warning=True,
+                        )
+                        continue
+
+                    if symlink_match:
+                        Logger.step(
+                            f"Creating symlink from {content} to {dest_path}..."
+                        )
+                        dest_path.symlink_to(content)
+                    else:
+                        Logger.step(
+                            f"Copying from local path {content} to {dest_path}..."
+                        )
+                        if content.is_file():
+                            copy2(content, dest_path)
+                        elif content.is_dir():
+                            copytree(content, dest_path, dirs_exist_ok=True)
             elif isinstance(content, dict):
                 # It's a directory with further contents
                 dest_path.mkdir(exist_ok=True)

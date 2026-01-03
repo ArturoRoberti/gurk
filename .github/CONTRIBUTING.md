@@ -10,10 +10,15 @@ For new feature suggestions or bug fixes, please
 4. **Commit and push your changes** with clear, descriptive messages
 5. **Create a pull request** using a proposed pull request template in the [Pull Requests](https://github.com/ArturoRoberti/cmstp/pulls) tab. As github only allows one PR template (see [issue](https://github.com/refined-github/refined-github/issues/1621)), please follow its instructions guiding you to the other templates. Also, please add applicable labels to your PR.
 
-Furthermore, feel free to fork this repo to implement more personal touches. If you do something you think others may benefit from, please contribute back to this main repository.
+Furthermore, feel free to fork this repository or its example config repository to implement more personal touches. If you do something you think others may benefit from, please contribute back to them.
 
-## Code Guidelines
-Please follow the guidelines defined in the [documentation](../docs/).
+## Developer instructions
+Please install the package via
+```bash
+pipx install -e .[dev]
+```
+
+You can find further developer instructions in the corresponding [documentation](../docs/dev/).
 
 ## Pre-commit hooks
 Please install the pre-commit hooks for this repo, to ensure code quality. The pre-commit hooks will also run in GitHub PRs and are required to pass.

@@ -80,8 +80,7 @@ class PathPatterns(TypedDict):
     """Patterns for different path types."""
 
     # fmt: off
-    path:    re.Pattern
-    link:    re.Pattern
+    symlink: re.Pattern
     package: re.Pattern
     url:     re.Pattern
     # fmt: on
@@ -129,11 +128,9 @@ class PatternCollection(Enum):
         "WHILE":      re.compile(r"^\s*while\s+(.*):\s*$"),
         "UNTIL":      None,  # Python has no "until"
     }
-    # TODO: Remove "path" - instead, only make it a link if "link://" is prepended. Also, allow concatenation of "link://package://"
     PATH: EnumValue[PathPatterns] = {
-        "path":       re.compile(r"^path://(.*)$"),
-        "link":       re.compile(r"^link://(.*)$"),
-        "package":    re.compile(r"^package://([^/]+)/(.*)$"),
+        "symlink":    re.compile(r"^symlink://(.*)$"),
+        "package":    re.compile(r"package://([^/]+)/(.*?)"),
         "url":        re.compile(r"^https?://[^\s]+$"),
     }
     # fmt: on

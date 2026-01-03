@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import sys
 from enum import Enum
@@ -56,7 +57,11 @@ def generate_random_path(
 def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
     """
     Resolve paths that may refer to package resources. Package paths are in the format:
-        "package://<package-name>/relative/path/inside/package"
+    ```
+    package://<package-name>/relative/path/inside/package
+    ```
+    The `package://` pattern does not need to be at the start of the string, and can appear
+    multiple times in the string, but only the first occurrence of it is replaced.
 
     :param raw_script: Raw script path
     :type raw_script: FilePath
@@ -67,23 +72,33 @@ def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
     if not isinstance(raw_script, (Path, str)):
         return raw_script
 
-    # Resolve package paths
-    match = PatternCollection.PATH.patterns["package"].match(str(raw_script))
-    if match:
+    raw_str = str(raw_script)
+
+    def _replace_package(match: re.Match) -> str:
         pkg_name, rel_path = match.groups()
         try:
-            resolved_path = Path(resources.files(pkg_name)) / rel_path
+            pkg_root = Path(resources.files(pkg_name))
         except ModuleNotFoundError:
-            return None
-    else:
-        # NOTE: We use 'os' and no built-in 'Path' method to retain '<type>://' multiple slashes
-        resolved_path = os.path.expanduser(str(raw_script))
+            raise
+
+        return str(pkg_root / rel_path)
+
+    try:
+        # Replace ALL occurrences of package://... anywhere in the string
+        resolved_str = PatternCollection.PATH.patterns["package"].sub(
+            _replace_package, raw_str
+        )
+    except ModuleNotFoundError:
+        return None
+
+    # NOTE: We use 'os' and no built-in 'Path' method to retain consecutive slashes
+    resolved_str = os.path.expanduser(resolved_str)
 
     # Return same type as input
     if isinstance(raw_script, Path):
-        return Path(resolved_path)
-    else:  # str
-        return str(resolved_path)
+        return Path(resolved_str)
+    else:
+        return resolved_str
 
 
 def stream_print(text: str, stderr: bool = False) -> None:
