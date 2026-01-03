@@ -1,5 +1,3 @@
-# TODO: Figure out why a sudo pwd is still being asked for when running this (manually)
-
 import subprocess
 from typing import Optional
 
@@ -21,6 +19,8 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         core.CoreCliProcessor, "prompt_setup", lambda self: None
     )
+
+    # Disable running scheduled tasks (only process configs)
     monkeypatch.setattr(core.Scheduler, "run", lambda self: None)
 
     # Process tasks (without running them) using the package configs
