@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import List, Tuple
 
-from cmstp.utils.common import stream_print
+from gurk.utils.common import stream_print
 
 
 def _get_sudo_askpass() -> str:

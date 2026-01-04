@@ -1,11 +1,9 @@
 from pytest import Metafunc, Parser
 
 try:
-    from cmstp import __version__  # noqa: F401
+    from gurk import __version__  # noqa: F401
 except ImportError:
-    raise ImportError(
-        "The cmstp package needs to be installed to run pytests."
-    )
+    raise ImportError("The gurk package needs to be installed to run pytests.")
 
 
 def pytest_addoption(parser: Parser):

@@ -14,14 +14,14 @@
 Displays information about available tasks, configurations, and system status.
 
 # Use core commands to run tasks
-Tasks are the building blocks of cmstp operations. Each core command provides a series of tasks. To see which tasks are available, run `cmstp info --available-tasks`.
+Tasks are the building blocks of gurk operations. Each core command provides a series of tasks. To see which tasks are available, run `gurk info --available-tasks`.
 
 You can customize which tasks run and how via command-line flags and config files:
 
 ## Run core command with defaults
-The simplest way to use cmstp is to run a core command without extra flags. This uses the built-in default task selections. For example:
+The simplest way to use gurk is to run a core command without extra flags. This uses the built-in default task selections. For example:
 ```bash
-cmstp install
+gurk install
 ```
 This installs and configures a standard set of packages and settings. Note that some heavier tasks (e.g., CUDA, NVIDIA drivers, IsaacSim/Lab, ROS) are off by default, as not to bloat an average install.
 
@@ -45,18 +45,18 @@ You can specify which tasks to run and arguments to pass via a YAML config file 
 ```
 > **Note**: If no args are passed, default args (if any) are used. Also, task names should be prefixed by the core command name, e.g. `install-nvidia-driver`
 
-You can also specify to enable all tasks or dependecies of specified tasks via the `enable-all: true` resp. `enable-dependencies: true` keys at the top level. For more information, use `cmstp info --custom-config`.
+You can also specify to enable all tasks or dependecies of specified tasks via the `enable-all: true` resp. `enable-dependencies: true` keys at the top level. For more information, use `gurk info --custom-config`.
 
 Then, you can pass this config file via:
 ```bash
-cmstp install --config-file /path/to/config.yaml
+gurk install --config-file /path/to/config.yaml
 ```
 
 ### 2. Use command-line flags
 You can specify which tasks to run and arguments to pass via the CLI by passing task names and optional colon-separated args of the form:
 ```bash
-cmstp install <task1>:<arg1>:<arg2> <task2> <task3>:<arg1> ...
+gurk install <task1>:<arg1>:<arg2> <task2> <task3>:<arg1> ...
 ```
 > **NOTE**: Task names passed via the CLI should be without the core command prefix, e.g. `nvidia-driver`
 
-For more information, use `cmstp <command> --help` to see available flags for each core command.
+For more information, use `gurk <command> --help` to see available flags for each core command.

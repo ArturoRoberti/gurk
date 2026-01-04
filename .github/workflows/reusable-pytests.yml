@@ -23,15 +23,15 @@ jobs:
 
       - name: Compute affected tasks, based on changed files
         run: |
-          VENV_PYTHON=$(pipx environment --value PIPX_HOME)/venvs/cmstp/bin/python
+          VENV_PYTHON=$(pipx environment --value PIPX_HOME)/venvs/gurk/bin/python
           git diff -U0 -b origin/${{ github.base_ref }}...HEAD \
-            | $VENV_PYTHON .github/scripts/cmstp_find_affected_tasks.py
+            | $VENV_PYTHON .github/scripts/gurk_find_affected_tasks.py
 
       - name: Run pytest for package configs
-        run: cmstp pytest -v tests/configs.py
+        run: gurk pytest -v tests/configs.py
 
       - name: Run pytest for package scripts
-        run: cmstp pytest -v tests/scripts.py
+        run: gurk pytest -v tests/scripts.py
 
       - name: Run pytest for affected tasks
         run: |
@@ -42,4 +42,4 @@ jobs:
 
           echo "Running pytest for affected tasks: ${AFFECTED_TASKS}"
 
-          cmstp pytest -v tests/tasks.py --tasks="${AFFECTED_TASKS}"
+          gurk pytest -v tests/tasks.py --tasks="${AFFECTED_TASKS}"

@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from cmstp.utils.common import CommandKind, stream_print
-from cmstp.utils.patterns import PatternCollection
-from cmstp.utils.scripts import ScriptBlockTypes, get_block_spans, iter_scripts
+from gurk.utils.common import CommandKind, stream_print
+from gurk.utils.patterns import PatternCollection
+from gurk.utils.scripts import ScriptBlockTypes, get_block_spans, iter_scripts
 
 
 def _check_script_blocks(path: Path) -> bool:

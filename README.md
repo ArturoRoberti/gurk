@@ -1,15 +1,15 @@
-[![Contributing](https://img.shields.io/badge/contributing-guidelines-blue.svg)](https://github.com/ArturoRoberti/cmstp/blob/main/.github/CONTRIBUTING.md)
-[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/ArturoRoberti/cmstp/blob/main/LICENSE)
+[![Contributing](https://img.shields.io/badge/contributing-guidelines-blue.svg)](https://github.com/ArturoRoberti/gurk/blob/main/.github/CONTRIBUTING.md)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/ArturoRoberti/gurk/blob/main/LICENSE)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/cmstp)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/gurk)
 
 
-# cmstp - computer setup
+# gurk - computer setup
 
 Contains anything related to setting up a new computer (desktop) system.
 
 # Disclaimer - Use at your own risk
-This project is currently (12.2025) coded solely by me. As a junior developer, there is probably a lot that can be improved and although I have tested each task, there may be some unforeseen issues. Please use with caution and report any issues you find (see the [contributing](https://github.com/ArturoRoberti/cmstp/blob/main/README.md#contributing) section).
+This project is currently (12.2025) coded solely by me. As a junior developer, there is probably a lot that can be improved and although I have tested each task, there may be some unforeseen issues. Please use with caution and report any issues you find (see the [contributing](https://github.com/ArturoRoberti/gurk/blob/main/README.md#contributing) section).
 
 During this project's initial development, I recommend using it solely on fresh machines.
 
@@ -34,19 +34,19 @@ Not supported yet.
 Not supported yet.
 
 ## Main Installation
-Then, install `cmstp` via `pipx`:
+Then, install `gurk` via `pipx`:
 ```bash
-pipx install cmstp
+pipx install gurk
 ```
 
 # Usage
-Please have a brief look at the [documentation](https://github.com/ArturoRoberti/cmstp/blob/main/docs/knowledge/).
+Please have a brief look at the [documentation](https://github.com/ArturoRoberti/gurk/blob/main/docs/knowledge/).
 
 # Contributing
-Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/cmstp/blob/main/.github/CONTRIBUTING.md) for contribution guidelines.
+Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/gurk/blob/main/.github/CONTRIBUTING.md) for contribution guidelines.
 
 # License
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/ArturoRoberti/cmstp/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/ArturoRoberti/gurk/blob/main/LICENSE) file for details.
 
 # TODO
-Please see [TODO.md](https://github.com/ArturoRoberti/cmstp/blob/main/TODO.md) for a list of planned improvements and features.
+Please see [TODO.md](https://github.com/ArturoRoberti/gurk/blob/main/TODO.md) for a list of planned improvements and features.
