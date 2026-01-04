@@ -68,7 +68,7 @@ class CoreCliArgs:
     """
 
     # fmt: off
-    gurk_cmd:           str       = field(init=False, default=None)
+    gurk_cmd:            str       = field(init=False, default=None)
     config_file:         Path      = field(init=False, default=None)
     config_directory:    Path      = field(init=False, default=None)
     tasks:               List[str] = field(init=False, default_factory=list)

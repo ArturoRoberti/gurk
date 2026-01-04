@@ -8,11 +8,6 @@
 
 Contains anything related to setting up a new computer (desktop) system.
 
-# Disclaimer - Use at your own risk
-This project is currently (12.2025) coded solely by me. As a junior developer, there is probably a lot that can be improved and although I have tested each task, there may be some unforeseen issues. Please use with caution and report any issues you find (see the [contributing](https://github.com/ArturoRoberti/gurk/blob/main/README.md#contributing) section).
-
-During this project's initial development, I recommend using it solely on fresh machines.
-
 # Installation
 ## Prerequisites
 ### Ubuntu 24.04+
