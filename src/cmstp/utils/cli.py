@@ -91,6 +91,7 @@ class CoreCliProcessor:
     logger:  Logger        = field(repr=False)
     args:    CoreCliArgs   = field(repr=False)
     argv:    List[str]     = field(repr=False)
+    tasks:   List[str]     = field(repr=False)
     command: str           = field(repr=False)
     # fmt: on
 
@@ -133,7 +134,7 @@ class CoreCliProcessor:
         main_setup_args.cmstp_cmd = self.command
 
         # Tasks
-        main_setup_args.tasks = self.args.tasks or []
+        main_setup_args.tasks = self.tasks or []
 
         # Config directory
         if is_git_repo(str(self.args.config_directory)):
@@ -172,7 +173,7 @@ class CoreCliProcessor:
 
         # Config file
         ## Check existence
-        if self.args.tasks and self.args.config_file == ENABLED_CONFIG_FILE:
+        if self.tasks and self.args.config_file == ENABLED_CONFIG_FILE:
             # If tasks are specified without a config file, ignore the config file
             self.args.config_file = None
         elif not self.args.config_file.is_file():
@@ -202,7 +203,7 @@ class CoreCliProcessor:
         ##   "--enable-all" is used, don't use package config file
         if (
             self.args.config_file == ENABLED_CONFIG_FILE
-            and not self.args.tasks
+            and not self.tasks
             and self.args.enable_all
         ):
             self.logger.debug(
@@ -257,11 +258,10 @@ class CoreCliProcessor:
         """
         Check if the system is compatible for setup.
         """
-        system_info = get_system_info()
-        if system_info["name"] is None:
-            self.logger.fatal(
-                f"Unsupported OS type '{system_info['type']}'",
-            )
+        try:
+            system_info = get_system_info()
+        except Exception as e:
+            self.logger.fatal(e)
 
         self.logger.debug(f"System information: {system_info}")
 

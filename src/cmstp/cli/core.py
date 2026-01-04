@@ -36,14 +36,6 @@ def main(argv, prog, description, cmd, _captured=None):
         help="Path to the configuration directory",
     )
     parser.add_argument(
-        "-t",
-        "--tasks",
-        type=str,
-        nargs="+",
-        default=None,
-        help="Specify the tasks to run (default: all enabled tasks in the config file)",
-    )
-    parser.add_argument(
         "--enable-all",
         action="store_true",
         help="Enable all tasks in the configuration file, unless explicitly disabled",
@@ -70,7 +62,7 @@ def main(argv, prog, description, cmd, _captured=None):
         action="store_true",
         help="Automatically answer 'yes' to all prompts",
     )
-    args = parser.parse_args(argv)
+    args, tasks = parser.parse_known_args(argv)
 
     # Set default values in case of early exception
     logger, cloned_config_dir, askpass_path = None, None, None
@@ -80,7 +72,7 @@ def main(argv, prog, description, cmd, _captured=None):
         askpass_path = get_sudo_askpass()
 
         with Logger(args.verbose) as logger:
-            setup_processor = CoreCliProcessor(logger, args, argv, cmd)
+            setup_processor = CoreCliProcessor(logger, args, argv, tasks, cmd)
 
             # Prompt pre-setup if this was never run before
             setup_processor.prompt_setup()

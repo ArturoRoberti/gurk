@@ -468,7 +468,7 @@ class TaskProcessor:
         processed_tasks = dict()
         for task_str in self.processed_args.tasks:
             parts = [p for p in task_str.split(":") if p]
-            task_name = parts[0]
+            task_name = f"{self.processed_args.cmstp_cmd}-{parts[0]}"
             task_args = parts[1:]
 
             processed_tasks[task_name] = {"enabled": True}

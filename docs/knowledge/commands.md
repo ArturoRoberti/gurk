@@ -43,7 +43,7 @@ You can specify which tasks to run and arguments to pass via a YAML config file 
     enabled: <true|false>
     args: [<arg1>, ...]
 ```
-> **Note**: If no args are passed, default args (if any) are used.
+> **Note**: If no args are passed, default args (if any) are used. Also, task names should be prefixed by the core command name, e.g. `install-nvidia-driver`
 
 You can also specify to enable all tasks or dependecies of specified tasks via the `enable-all: true` resp. `enable-dependencies: true` keys at the top level. For more information, use `cmstp info --custom-config`.
 
@@ -53,8 +53,10 @@ cmstp install --config-file /path/to/config.yaml
 ```
 
 ### 2. Use command-line flags
-You can specify which tasks to run and arguments to pass via the `--tasks` flag followed by task names and optional colon-separated args of the form:
+You can specify which tasks to run and arguments to pass via the CLI by passing task names and optional colon-separated args of the form:
 ```bash
-cmstp install --tasks <task1>:<arg1>:<arg2> <task2> <task3>:<arg1> ...
+cmstp install <task1>:<arg1>:<arg2> <task2> <task3>:<arg1> ...
 ```
+> **NOTE**: Task names passed via the CLI should be without the core command prefix, e.g. `nvidia-driver`
+
 For more information, use `cmstp <command> --help` to see available flags for each core command.

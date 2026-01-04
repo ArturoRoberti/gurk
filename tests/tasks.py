@@ -18,7 +18,7 @@ def test_task(task: str, monkeypatch: pytest.MonkeyPatch) -> None:
     captured = []
     with pytest.raises(SystemExit) as e:
         core.main(
-            argv=["-t", task, "--enable-dependencies", "-v"],
+            argv=[task, "--enable-dependencies", "-v"],
             prog="",
             description="",
             cmd=task.split("-")[0],
