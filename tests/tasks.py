@@ -1,6 +1,6 @@
 import pytest
 
-from cmstp.cli import core
+from gurk.cli import core
 
 from .utils import _get_sudo_askpass, padded_print, print_task_outputs
 
@@ -18,7 +18,7 @@ def test_task(task: str, monkeypatch: pytest.MonkeyPatch) -> None:
     captured = []
     with pytest.raises(SystemExit) as e:
         core.main(
-            argv=["-t", task, "--enable-dependencies", "-v"],
+            argv=[task, "--enable-dependencies", "-v"],
             prog="",
             description="",
             cmd=task.split("-")[0],

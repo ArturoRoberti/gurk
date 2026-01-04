@@ -9,7 +9,7 @@ This package uses pre-commit hooks that
 Please install these pre-commit hooks when contributing to the project; via:
 ```bash
 pipx install pre-commit
-cd <cmstp_repo> && pre-commit install
+cd <gurk_repo> && pre-commit install
 ```
 
 They will run automatically before each commit. Alternatively, you can run them manually via:

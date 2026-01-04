@@ -1,0 +1,254 @@
+#################################################################################################################
+# The fields do the following:                                                                                  #
+# - (str) 'description' provides a short description of the task                                                #
+# - (str) 'script' specifies the bash script to run                                                             #
+# - (str|null) 'function' specifies the function to call within the script                                      #
+#   - If null, the whole script will be run (./<script>)                                                        #
+#   - If not null, the script will be sourced and the function called (source <script> && <function>)           #
+# - (str|null) 'config_file' specifies a configuration file to be used by the script/function                   #
+#   - If null, no configuration file is used by the task                                                        #
+#   - The config directory (default or specified) is prepended to the config_file path at runtime               #
+# - (list) 'depends_on' specifies a list of tasks that must be completed before the task can run                #
+# - (bool) 'privileged' specifies whether the task needs to be run with elevated privileges (sudo). This is     #
+#           only needed for python scripts that need sudo permissions without calling "sudo" via a subprocess   #
+# - (list) 'supercedes' specifies a list of tasks that are disabled if this task is enabled (as conflicting)    #
+# - (dict) 'args' specifies arguments for the task                                                              #
+#     - (list) 'allowed' specifies a list of allowed args                                                       #
+#       If empty ([]), then no args are allowed, except for '--force', which is always allowed.                 #
+#       Wildcards are allowed (e.g., "nvidia-driver-*"). Thus, set to '["*"]' only to allow all args.           #
+#     - (list) 'default' specifies a list of default args                                                       #
+#    After processing, the final args are then passed to the script/function as:                                #
+#     -  (bash)  Normal input (accessible via "$1", "$2", ..., "$@")                                            #
+#     - (python) Either the '*args' input (if a function is specified) or 'sys.argv[1:]'                        #
+#                (if no function is specified)                                                                  #
+#    In both cases, a helper function "get_config_args" is available to parse the args.                         #
+#    See the resp. helpers/_interface.<ext> files for details.                                                  #
+#################################################################################################################
+
+# TODO: In the future, dependencies could be split into "required" and "optional" dependencies. "Optional" dependencies
+#       would allow the dependency to run first (if it is enabled), but would not disable the task if the dependency
+#       is not enabled. This would be useful for tasks like "install-mamba" (mamba, not micromamba) which requires conda
+#       to be installed, but could be skipped if micromamba is used instead.
+#       This could also be used to configure the filestructure first, then copy repos and symlinks. And this could be
+#       used for pinning apps after installing any packages
+
+# Helpers
+## '_defaults' - 'description', 'script', 'function' have
+##               to be specified per task, even if 'null'
+_defaults: &defaults
+  config_file: null
+  depends_on: []
+  privileged: false
+  supercedes: []
+  args:
+    allowed: []
+    default: []
+
+#################################################################################################################
+#################################################### Install ####################################################
+#################################################################################################################
+install-apt-packages:
+  <<: *defaults
+  description: Install a list of apt packages
+  script: package_managers.py
+  function: install_apt_packages
+  config_file: install_apt_packages.txt
+install-conda:
+  <<: *defaults
+  description: Install Conda (Miniconda/Anaconda)
+  script: conda.bash
+  function: install_conda
+  args:
+    allowed: [miniconda, anaconda]
+    default: [miniconda]
+install-conda-environments:
+  <<: *defaults
+  description: Install Conda/Mamba environments
+  script: environments.py
+  function: install_conda_environments
+  config_file: install_conda_environments.jsonc
+  args:
+    allowed: [--update]
+install-cuda:  # TODO: Allow version specification, and then adapt driver version to that (default: "latest" as is right now)
+  <<: *defaults
+  description: Install NVIDIA CUDA Toolkit (and compatible driver). WARNING -
+    Removes driver prime-selection!
+  script: nvidia.bash
+  function: install_cuda
+  supercedes: [install-nvidia-driver]
+install-docker:
+  <<: *defaults
+  description: Install Docker. Optionally installs NVIDIA Container Toolkit and
+    DevContainers CLI.
+  script: docker.bash
+  function: null
+  args:
+    allowed: [nvidia-container-toolkit, devcontainers-cli, distrobox]
+    default: [nvidia-container-toolkit, devcontainers-cli, distrobox]
+install-docker-images:
+  <<: *defaults
+  description: Pull a list of Docker images
+  script: package_managers.py
+  function: install_docker_images
+  config_file: install_docker_images.jsonc
+  depends_on: [install-docker]
+install-flatpak-packages:
+  <<: *defaults
+  description: Install a list of flatpak packages. Optionally makes handy
+    aliases for running the apps.
+  script: package_managers.py
+  function: install_flatpak_packages
+  config_file: install_flatpak_packages.txt
+  args:
+    allowed: [--create-aliases]
+    default: [--create-aliases]
+install-fzf:
+  <<: *defaults
+  description: Install fzf (allows fuzzy searching in terminal)
+  script: simple_installations.bash
+  function: install_fzf
+  depends_on: [install-docker]
+install-isaaclab:
+  <<: *defaults
+  description: Install NVIDIA IsaacLab
+  script: isaac.bash
+  function: install_isaaclab
+  depends_on: [install-isaacsim, install-conda]
+  args:
+    allowed: [recommended, latest, v2.*]
+    default: [recommended]
+install-isaacsim:
+  <<: *defaults
+  description: Install NVIDIA IsaacSim
+  script: isaac.bash
+  function: install_isaacsim
+  args:
+    allowed: [latest, 4.*, 5.*]
+    default: [latest]
+install-js-repositories:
+  <<: *defaults
+  description: Clone and install a list of packages using JavaScript. Optionally
+    makes handy aliases for running the apps.
+  script: js.py
+  function: install_js_repositories
+  config_file: install_js_repositories.txt
+  args:
+    allowed: [--create-aliases]
+    default: [--create-aliases]
+install-loki-shell:
+  <<: *defaults
+  description: Install Loki shell (allows shared fuzzy searching over different
+    machines (SSH, Docker, ...))
+  script: simple_installations.bash
+  function: install_loki_shell
+  depends_on: [install-fzf]
+install-mamba:  # NOTE: "mamba" requires conda, "micromamba" does not (is standalone)
+  <<: *defaults
+  description: Install (Micro)Mamba
+  script: conda.bash
+  function: install_mamba
+  args:
+    allowed: [micromamba, mamba]
+    default: [micromamba]
+install-npm-packages:
+  <<: *defaults
+  description: Install a list of npm packages
+  script: package_managers.py
+  function: install_npm_packages
+  config_file: install_npm_packages.txt
+install-nvidia-driver:
+  <<: *defaults
+  description: Install NVIDIA driver (standalone). WARNING - Removes CUDA
+    compatibility!
+  script: nvidia.bash
+  function: install_nvidia_driver
+  args:
+    allowed: [recommended, latest, nvidia-driver-*, --include-server,
+        --include-open, --prime-select]
+    default: [recommended, --prime-select]
+install-pip-environments:
+  <<: *defaults
+  description: Install Python pip virtual environments
+  script: environments.py
+  function: install_pip_environments
+  config_file: install_pip_environments.jsonc
+install-pipx-packages:
+  <<: *defaults
+  description: Install a list of pipx CLI packages
+  script: package_managers.py
+  function: install_pipx_packages
+  config_file: install_pipx_packages.txt
+install-ros:
+  <<: *defaults
+  description: Install ROS (Robot Operating System)
+  script: ros.bash
+  function: null
+  args:
+    allowed: [latest, --include-future, ardent, bouncy, crystal, dashing,
+        eloquent, foxy, galactic, humble, iron, jazzy, kilted, lyrical]
+    default: [latest]
+install-snap-packages:
+  <<: *defaults
+  description: Install a list of snap packages
+  script: package_managers.py
+  function: install_snap_packages
+  config_file: install_snap_packages.txt
+install-vscode:
+  <<: *defaults
+  description: Install Visual Studio Code
+  script: simple_installations.bash
+  function: install_vscode
+install-vscode-extensions:
+  <<: *defaults
+  description: Install a list of Visual Studio Code extensions
+  script: package_managers.py
+  function: install_vscode_extensions
+  config_file: install_vscode_extensions.txt
+  depends_on: [install-vscode]
+
+#################################################################################################################
+################################################### Uninstall ###################################################
+#################################################################################################################
+uninstall-fzf:
+  <<: *defaults
+  description: Uninstall fzf
+  script: simple_uninstallations.bash
+  function: uninstall_fzf
+  depends_on: [uninstall-loki-shell]
+uninstall-loki-shell:
+  <<: *defaults
+  description: Uninstall loki-shell
+  script: simple_uninstallations.bash
+  function: uninstall_loki_shell
+
+#################################################################################################################
+################################################### Configure ###################################################
+#################################################################################################################
+configure-bashrc:
+  <<: *defaults
+  description: Copy lines from a template bashrc file to the user's .bashrc
+  script: simple_configurations.bash
+  function: configure_bashrc
+  config_file: configure_bashrc.bash
+configure-filestructure:
+  <<: *defaults
+  description: Create a predefined filestructure in on the user's system
+  script: simple_configurations.py
+  function: configure_filestructure
+  config_file: configure_filestructure.yaml
+  privileged: true
+  args:
+    allowed: [--root]
+configure-pinned-apps:
+  <<: *defaults
+  description: Determine pinned applications
+  script: simple_configurations.py
+  function: configure_pinned_apps
+  config_file: configure_pinned_apps.txt
+configure-vscode-keybindings:
+  <<: *defaults
+  description: Configure Visual Studio Code keybindings
+  script: simple_configurations.py
+  function: configure_vscode_keybindings
+  config_file: configure_vscode_keybindings.jsonc
+  depends_on: [install-vscode]

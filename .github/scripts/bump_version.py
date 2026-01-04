@@ -16,7 +16,7 @@ local_ver = Version(data["project"]["version"])
 # Load PyPI versions
 pypi_versions = []
 resp = requests.get(
-    "https://pypi.org/pypi/cmstp/json",
+    "https://pypi.org/pypi/gurk/json",
     timeout=10,
     headers={"Accept-Encoding": "*"},
 )

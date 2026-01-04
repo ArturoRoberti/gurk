@@ -1,5 +1,5 @@
 # Task structure
-Any task has the following structure in the default config file (`src/cmstp/config/default.yaml`):
+Any task has the following structure in the default config file (`src/gurk/config/default.yaml`):
 ```yaml
 <task-name>:
 	description: <Task description>
@@ -24,20 +24,20 @@ my-mock-task:
 	function: my_mock_function
 ```
 
-Further information on the task structure can be found at the top of the default config file itself (`src/cmstp/config/default.yaml`) or by using
+Further information on the task structure can be found at the top of the default config file itself (`src/gurk/config/default.yaml`) or by using
 ```bash
-cmstp info --default-config
+gurk info --default-config
 ```
 
 # Add a new task
-1. **Edit `src/cmstp/config/default.yaml`:** Add a new task entry, setting all fields as described above.
+1. **Edit `src/gurk/config/default.yaml`:** Add a new task entry, setting all fields as described above.
 2. **Implement the script/function:**
-	 - Add the function in the appropriate script (or create one) under `src/cmstp/scripts/<language>/<command>/<script>.<ext>`
+	 - Add the function in the appropriate script (or create one) under `src/gurk/scripts/<language>/<command>/<script>.<ext>`
 	 - If the script is meant to be run fully, add an entrypoint instead (see existings scripts for reference) and set the `function` field to `null`.
-3. **(Optional) Add a config file:** Place a config file in `src/cmstp/config/<command>/` if the task uses one.
+3. **(Optional) Add a config file:** Place a config file in `src/gurk/config/<command>/` if the task uses one.
 
 # Add a new task field
 To add a new field, you need to:
-1. Update the `TASK_PROPERTIES_*` variables in `src/cmstp/utils/tasks.py` to include the new field and its default type(s).
+1. Update the `TASK_PROPERTIES_*` variables in `src/gurk/utils/tasks.py` to include the new field and its default type(s).
 2. Update the task processor to handle/check the new field accordingly
-3. If the variable propagates to the scheduler, edit the `ResolvedTask` dataclass in `src/cmstp/utils/tasks.py`, set the value at the end of the task processor's `__post__init__` method, and update the scheduler accordingly
+3. If the variable propagates to the scheduler, edit the `ResolvedTask` dataclass in `src/gurk/utils/tasks.py`, set the value at the end of the task processor's `__post__init__` method, and update the scheduler accordingly

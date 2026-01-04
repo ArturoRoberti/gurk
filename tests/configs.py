@@ -4,9 +4,9 @@ from typing import Optional
 import commentjson
 import pytest
 
-from cmstp.cli import core
-from cmstp.utils.common import DEFAULT_CONFIG_FILE, get_config_path
-from cmstp.utils.yaml import load_yaml
+from gurk.cli import core
+from gurk.utils.common import DEFAULT_CONFIG_FILE, get_config_path
+from gurk.utils.yaml import load_yaml
 
 from .utils import _get_sudo_askpass
 
