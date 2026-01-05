@@ -4,11 +4,9 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/gurk)
 
 
-# gurk
+# 🥒🌿 gurk — desktop setup in seconds 🌱🖥️
 
-![Gurk — The Green Desktop Setup](assets/cover.png)
-
-# 🥒🌿 Gurk — The Green Desktop Setup 🌱🖥️
+<img src="assets/cover.png" alt="Gurk — The Green Desktop Setup" width="400" />
 
 Contains anything related to setting up a new computer (desktop) system.
 
