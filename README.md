@@ -6,6 +6,10 @@
 
 # gurk
 
+![Gurk — The Green Desktop Setup](assets/cover.png)
+
+# 🥒🌿 Gurk — The Green Desktop Setup 🌱🖥️
+
 Contains anything related to setting up a new computer (desktop) system.
 
 # Installation
