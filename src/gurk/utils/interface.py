@@ -27,7 +27,7 @@ def run_script_function(
     capture_output: bool = False,
     sudo: bool = False,
     check: bool = True,
-) -> Union[str, subprocess.CompletedProcess]:
+) -> Union[str, subprocess.CompletedProcess[str]]:
     """
     Build a wrapper script string for the specified command kind and optionally execute it.
 
@@ -68,7 +68,7 @@ def _run_bash_script_function(
     args: List[str],
     run: bool,
     capture_output: bool,
-) -> Union[str, subprocess.CompletedProcess]:
+) -> Union[str, subprocess.CompletedProcess[str]]:
     """
     Build a bash wrapper script string and optionally execute it.
 
@@ -146,7 +146,7 @@ def _run_python_script_function(
     run: bool,
     capture_output: bool,
     sudo: bool,
-) -> Union[str, subprocess.CompletedProcess]:
+) -> Union[str, subprocess.CompletedProcess[str]]:
     """
     Build a Python wrapper script string and optionally execute it.
 
@@ -206,7 +206,7 @@ def _run_python_script_function(
     return wrapper_src
 
 
-def bash_check(check_name: str) -> subprocess.CompletedProcess:
+def bash_check(check_name: str) -> subprocess.CompletedProcess[str]:
     """
     Run a (helper) check function
 

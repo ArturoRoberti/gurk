@@ -4,10 +4,12 @@ import shutil
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, TypedDict
+from typing import Dict, Literal, Optional, TypedDict, overload
 from urllib.parse import parse_qs, urlparse
 
 import git
+
+from gurk.utils.common import PACKAGE_CACHE_PATH, generate_random_path
 
 
 def run_git_command(
@@ -121,6 +123,102 @@ def gitref_dict2str(git_ref_info: GitRefInfo) -> GitRef:
         return url
 
 
+@overload
+def get_remote_heads(url: str, HEAD: Literal[False] = False) -> Dict[str, str]:
+    ...
+
+
+@overload
+def get_remote_heads(url: str, HEAD: Literal[True]) -> str:
+    ...
+
+
+def get_remote_heads(url: str, HEAD: bool = False):
+    """
+    Get remote Git repository heads (branches) and their commit hashes.
+
+    :param url: URL of the remote Git repository
+    :type url: str
+    :param HEAD: If True, return the default branch's commit hash only (default: False)
+    :type HEAD: bool
+    """
+    flags = " --heads" if not HEAD else ""
+    result = run_git_command(f"git ls-remote{flags} {url}", timeout=10)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr)
+
+    heads = {}
+    for line in result.stdout.strip().splitlines():
+        commit, ref = line.split()
+        branch = ref.removeprefix("refs/heads/")
+        heads[branch] = commit
+
+    return heads
+
+
+def get_cached_repo(repo: GitRef) -> Optional[Path]:
+    """
+    Check if a Git repository with the specified commit exists in the cache.
+
+    :param repo: GitRef string of the repository to check
+    :type repo: GitRef
+    :return: None if not cached, or Path to cached repo if found
+    :rtype: Optional[Path]
+    """
+    parsed = parse_git_ref(repo)
+    if parsed["commit"]:
+        # Case 1: commit specified
+        parsed["commit"] = parsed["commit"]
+    elif parsed["branch"]:
+        # Case 2: branch specified → resolve to commit
+        heads = get_remote_heads(parsed["url"])
+        if parsed["branch"] not in heads:
+            raise ValueError(
+                f"Branch '{parsed['branch']}' not found on remote"
+            )
+
+        parsed["commit"] = heads[parsed["branch"]]
+    else:
+        # Case 3: neither commit nor branch specified → use default branch HEAD
+        parsed["commit"] = get_remote_heads(parsed["url"], HEAD=True)
+
+    # Check cache
+    cached_repo = None
+    for repo_dir in (PACKAGE_CACHE_PATH / "git").iterdir():
+        if not repo_dir.is_dir():
+            continue
+
+        # Check if it's a git repo
+        try:
+            repo_obj = git.Repo(repo_dir)
+        except (git.InvalidGitRepositoryError, git.NoSuchPathError):
+            continue
+
+        # Check if it has an 'origin' remote
+        try:
+            origin = repo_obj.remotes.origin
+        except AttributeError:
+            continue
+
+        # Check remote URL
+        if origin.url != parsed["url"]:
+            continue
+
+        # Repo found
+        if repo_obj.head.commit.hexsha == parsed["commit"]:
+            # Already at desired commit
+            cached_repo = repo_dir
+        else:
+            # Checkout desired commit
+            repo_obj.git.fetch("origin", parsed["commit"])
+            repo_obj.git.checkout(parsed["commit"])
+
+        # Repo matched, no need to check further
+        break
+
+    return cached_repo
+
+
 def is_git_repo(repo: GitRef) -> bool:
     """
     Check if a string is a valid Git repository URL.
@@ -185,25 +283,33 @@ def clone_git_repo(
     if not handle_existing_dest(dest_path, overwrite):
         return None
 
-    try:
-        git_clone_cmd = f"git clone {parsed['url']} {dest_path}"
-        if parsed["branch"]:
-            git_clone_cmd += f" --branch {parsed['branch']}"
-        if parsed["depth"] is not None:
-            git_clone_cmd += f" --depth {parsed['depth']}"
-        result = run_git_command(git_clone_cmd)
-        if result.returncode != 0:
-            print(f"Git clone failed for {parsed['url']}")
+    temp_repo = get_cached_repo(repo)
+    if not temp_repo:
+        tmp_dir = generate_random_path()
+        try:
+            git_clone_cmd = f"git clone {parsed['url']} {tmp_dir}"
+            if parsed["branch"]:
+                git_clone_cmd += f" --branch {parsed['branch']}"
+            if parsed["depth"] is not None:
+                git_clone_cmd += f" --depth {parsed['depth']}"
+            result = run_git_command(git_clone_cmd)
+            if result.returncode != 0:
+                print(f"Git clone failed for {parsed['url']}")
+                return None
+            repo_obj = git.Repo(tmp_dir)
+
+            if parsed["commit"]:
+                repo_obj.git.fetch("origin", parsed["commit"])
+                repo_obj.git.checkout(parsed["commit"])
+
+            temp_repo = tmp_dir
+        except git.exc.GitCommandError:
             return None
-        repo_obj = git.Repo(dest_path)
 
-        if parsed["commit"]:
-            repo_obj.git.fetch("origin", parsed["commit"])
-            repo_obj.git.checkout(parsed["commit"])
+    # Copy from cache or temporary location
+    shutil.copytree(temp_repo, dest_path)
 
-        return dest_path
-    except git.exc.GitCommandError:
-        return None
+    return dest_path
 
 
 def clone_git_files(

@@ -108,7 +108,6 @@ def configure_filestructure(*args: List[str]) -> None:
                     Logger.step(
                         f"Cloning git repository {content} into {dest_path}..."
                     )
-                    # TODO: Optimize cloning for if the repo exists multiple times in the yaml. Maybe in general have tmpdir with all git repos and some caching?
                     cloned_path = clone_git_files(
                         content, dest_path, overwrite
                     )

@@ -19,6 +19,11 @@ PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
 
 
+PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
+if not PACKAGE_CACHE_PATH.exists():
+    PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
+
+
 FilePath = Union[Path, str]
 
 
@@ -28,7 +33,8 @@ def generate_random_path(
     create: bool = False,
 ) -> Path:
     """
-    Generate a random temporary file or directory path.
+    Generate a random temporary file if an extension is
+    provided in the suffix, else a directory path.
 
     :param suffix: Suffix for the temporary file or directory
     :type suffix: Optional[str]

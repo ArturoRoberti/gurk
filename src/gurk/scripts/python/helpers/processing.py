@@ -23,7 +23,7 @@ class InstallCommands(Enum):
         return f"sudo flock /var/lib/dpkg/lock-frontend {cmd}"
 
     # fmt: off
-    APT     = _flock_command("apt-get install -y")  # TODO: Add '--reinstall' here and in other InstallCommands?
+    APT     = _flock_command("apt-get install -y")
     SNAP    = "sudo snap install"
     FLATPAK = "sudo flatpak install -y"
     NPM     = "sudo npm install -g"
