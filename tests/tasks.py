@@ -10,9 +10,7 @@ def test_task(task: str, monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Disable/Replace prompts
     monkeypatch.setattr(core, "get_sudo_askpass", _get_sudo_askpass)
-    monkeypatch.setattr(
-        core.CoreCliProcessor, "prompt_setup", lambda self: None
-    )
+    monkeypatch.setattr(core, "prompt_setup", lambda self: None)
 
     # Run task and capture task results
     captured = []

@@ -15,9 +15,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Disable/Replace prompts
     monkeypatch.setattr(core, "get_sudo_askpass", _get_sudo_askpass)
-    monkeypatch.setattr(
-        core.CoreCliProcessor, "prompt_setup", lambda self: None
-    )
+    monkeypatch.setattr(core, "prompt_setup", lambda self: None)
 
     # Disable running scheduled tasks (only process configs)
     monkeypatch.setattr(core.Scheduler, "run", lambda self: None)
