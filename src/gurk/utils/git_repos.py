@@ -184,7 +184,9 @@ def get_cached_repo(repo: GitRef) -> Path | None:
 
     # Check cache
     cached_repo = None
-    for repo_dir in (PACKAGE_CACHE_PATH / "git").iterdir():
+    git_cache_dir = PACKAGE_CACHE_PATH / "git"
+    git_cache_dir.mkdir(parents=True, exist_ok=True)
+    for repo_dir in git_cache_dir.iterdir():
         if not repo_dir.is_dir():
             continue
 

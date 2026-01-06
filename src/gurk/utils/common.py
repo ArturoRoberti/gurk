@@ -18,11 +18,8 @@ ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
 SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
-
-
 PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
-if not PACKAGE_CACHE_PATH.exists():
-    PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
+PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
 
 
 FilePath: TypeAlias = Path | str
