@@ -1,7 +1,7 @@
 import os
 import platform
 import subprocess
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 import distro
 
@@ -12,11 +12,11 @@ class SystemInfo(TypedDict):
     # fmt: off
     type:              str
     kernel:            str
-    name:              Optional[str]
-    codename:          Optional[str]
-    version:           Optional[str]
-    arch:              str
     simulate_hardware: bool
+    name:              str
+    codename:          str
+    version:           str
+    arch:              str
     manufacturer:      str
     # fmt: on
 

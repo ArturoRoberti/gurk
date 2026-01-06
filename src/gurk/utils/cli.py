@@ -5,11 +5,11 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import List, Optional, Tuple
 
 from gurk.core.logger import Logger
 from gurk.utils.common import (
     ENABLED_CONFIG_FILE,
+    SETUP_DONE_FILE,
     generate_random_path,
     resolve_package_path,
 )
@@ -35,7 +35,7 @@ def get_sudo_askpass() -> Path:
         attempts = 3
         while attempts > 0:
             response = getpass.getpass(
-                "[sudo] password for {}: ".format(getpass.getuser())
+                "[gurk] password for {}: ".format(getpass.getuser())
             )
             test_response = subprocess.run(
                 ["sudo", "-S", "-v"],
@@ -51,7 +51,7 @@ def get_sudo_askpass() -> Path:
                     print("Sorry, try again.")
                 attempts -= 1
         else:
-            print("sudo: 3 incorrect password attempts")
+            print("gurk: 3 incorrect password attempts")
             sys.exit(1)
 
         askpass_file.write("#!/bin/sh\n" f"echo '{response}'\n")
@@ -59,6 +59,32 @@ def get_sudo_askpass() -> Path:
 
     os.chmod(askpass_path, 0o700)
     return askpass_path
+
+
+def prompt_setup(yes: bool) -> None:
+    """
+    Prompt the user to run setup if it has never been run before.
+
+    :param yes: Whether to answer 'y' to all prompts
+    :type yes: bool
+    """
+    if not SETUP_DONE_FILE.is_file():
+        print(
+            "It seems that this is the first time you are running gurk. "
+            "It is recommended to run the setup first to ensure all "
+            "possible manual steps are taken care of."
+        )
+        if prompt_bool(
+            "Would you like to run the setup now?",
+            "y" if yes else None,
+        ):
+            from gurk.cli.setup import main as setup_main
+
+            setup_main([], "", "")
+
+        # Mark setup as done
+        SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SETUP_DONE_FILE.touch()
 
 
 @dataclass
@@ -71,14 +97,11 @@ class CoreCliArgs:
     gurk_cmd:            str       = field(init=False, default=None)
     config_file:         Path      = field(init=False, default=None)
     config_directory:    Path      = field(init=False, default=None)
-    tasks:               List[str] = field(init=False, default_factory=list)
+    tasks:               list[str] = field(init=False, default_factory=list)
     enable_all:          bool      = field(init=False, default=False)
     enable_dependencies: bool      = field(init=False, default=False)
     disable_preparation: bool      = field(init=False, default=False)
     # fmt: on
-
-
-SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
 
 
 @dataclass
@@ -90,42 +113,17 @@ class CoreCliProcessor:
     # fmt: off
     logger:  Logger        = field(repr=False)
     args:    CoreCliArgs   = field(repr=False)
-    argv:    List[str]     = field(repr=False)
-    tasks:   List[str]     = field(repr=False)
+    argv:    list[str]     = field(repr=False)
+    tasks:   list[str]     = field(repr=False)
     command: str           = field(repr=False)
     # fmt: on
 
-    def prompt_setup(self) -> None:
-        """
-        Prompt the user to run setup if it has never been run before.
-        """
-        if not SETUP_DONE_FILE.is_file():
-            print(
-                "It seems that this is the first time you are running gurk. "
-                "It is recommended to run the setup first to ensure all "
-                "possible manual steps are taken care of."
-            )
-            if prompt_bool(
-                "Would you like to run the setup now?",
-                "y" if self.args.yes else None,
-            ):
-                from gurk.cli.setup import main as setup_main
-
-                setup_main([], "", "")
-                self.logger.info("Setup completed")
-            else:
-                self.logger.warning("Skipping setup")
-
-            # Mark setup as done
-            SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            SETUP_DONE_FILE.touch()
-
-    def process_args(self) -> Tuple[CoreCliArgs, Optional[Path]]:
+    def process_args(self) -> tuple[CoreCliArgs, Path | None]:
         """
         Docstring for process_args
 
         :return: Processed main setup arguments and optional cloned config directory path
-        :rtype: Tuple[CoreCliArgs, Path | None]
+        :rtype: tuple[CoreCliArgs, Path | None]
         """
         main_setup_args = CoreCliArgs()
         cloned_config_dir = None

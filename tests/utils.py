@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import List, Tuple
 
 from gurk.utils.common import stream_print
 
@@ -21,13 +20,13 @@ def _get_sudo_askpass() -> str:
 
 
 def print_task_outputs(
-    tasks: List[Tuple[str, str, bool]], stderr: bool = False
+    tasks: list[tuple[str, str, bool]], stderr: bool = False
 ) -> None:
     """
     Print the contents of task output files.
 
     :param tasks: List of tuples containing task name, output file path, and success status
-    :type tasks: List[Tuple[str, str, bool]]
+    :type tasks: list[tuple[str, str, bool]]
     :param stderr: Whether to print to stderr instead of stdout
     :type stderr: bool
     """

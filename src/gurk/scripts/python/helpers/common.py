@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from gurk.core.logger import Logger
+from gurk.utils.interface import PACKAGE_BASH_HELPERS_PATH, run_script_function
 
 
-# TODO: Use gurk markers instead
 def add_alias(command: str) -> None:
     """
     Add an alias to ~/.bashrc if it doesn't already exist.
@@ -11,14 +11,12 @@ def add_alias(command: str) -> None:
     :param command: The alias command to add
     :type command: str
     """
-    bashrc_path = Path.home() / ".bashrc"
     alias_cmd = f"alias {command}"
-    with open(bashrc_path, "r", encoding="utf-8") as bashrc:
-        if alias_cmd in bashrc.read():
-            Logger.step(f"Alias already exists: {alias_cmd}")
-            return
-
-    with open(bashrc_path, "a", encoding="utf-8") as bashrc:
-        bashrc.write(f"\n{alias_cmd}\n")
-
+    run_script_function(
+        script=PACKAGE_BASH_HELPERS_PATH,
+        function="write_marked",
+        args=[alias_cmd, str(Path.home() / ".bashrc")],
+        run=True,
+        check=False,
+    )
     Logger.step(f"Sucessfully added alias: {alias_cmd}")

@@ -8,13 +8,12 @@ import termios
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Queue
-from re import sub
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import Event, Lock, Thread
-from typing import Dict, List, Optional, Set, TextIO, Tuple
+from typing import TextIO
 
 from gurk.core.logger import Logger
-from gurk.utils.common import CommandKind
+from gurk.utils.common import CommandKind, generate_random_path
 from gurk.utils.interface import run_script_function
 from gurk.utils.logger import TaskTerminationType
 from gurk.utils.patterns import PatternCollection
@@ -34,18 +33,18 @@ class Scheduler:
 
     # fmt: off
     logger:       Logger             = field(repr=False)
-    tasks:        List[ResolvedTask] = field(repr=False)
+    tasks:        list[ResolvedTask] = field(repr=False)
     askpass_file: str                = field(repr=False)
 
-    results:   Dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
-    scheduled: Set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
+    results:   dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
+    scheduled: set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
 
     lock:      Lock  = field(init=False, repr=False, default_factory=Lock)
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
     # fmt: on
 
     @staticmethod
-    def _prepare_script(command: Command) -> Tuple[Path, int]:
+    def _prepare_script(command: Command) -> tuple[Path, int]:
         """
         Prepare a copy of the desired script that
         - Uses STEP statements only if in the desired function (or entrypoint)
@@ -54,13 +53,13 @@ class Scheduler:
         :param command: Command to prepare
         :type command: Command
         :return: Tuple of (path to modified script, number of steps)
-        :rtype: Tuple[Path, int]
+        :rtype: tuple[Path, int]
         """
         # Create temporary file to run later
         original_path = Path(command.script)
-        tmp = NamedTemporaryFile(delete=False, suffix=f"_{original_path.name}")
-        tmp_path = Path(tmp.name)
-        tmp.close()
+        tmp_path = generate_random_path(
+            suffix=f"_{original_path.name}", prefix="modified_"
+        )
 
         # Analyze script blocks
         script_blocks = get_block_spans(original_path)
@@ -134,13 +133,13 @@ class Scheduler:
         return tmp_path, n_steps
 
     def _spawn_and_stream(
-        self, proc_cmd: List[str], flog: TextIO, task_id: int
+        self, proc_cmd: list[str], flog: TextIO, task_id: int
     ) -> TaskTerminationType:
         """
         Spawn a subprocess and stream its output to the logfile and progress tracker.
 
         :param proc_cmd: Command to run
-        :type proc_cmd: List[str]
+        :type proc_cmd: list[str]
         :param flog: Log file to write output to
         :type flog: TextIO
         :param task_id: ID of the task for progress tracking
@@ -148,7 +147,7 @@ class Scheduler:
         :return: Task termination type (SUCCESS, FAILURE, PARTIAL)
         :rtype: TaskTerminationType
         """
-        # 1. Initialize Event for PARTIAL status tracking
+        # 1. Initialize Event for PARTIAL status tracking and log output
         warning_event = Event()
 
         # 2. Create the PTY master and slave file descriptors
@@ -161,6 +160,10 @@ class Scheduler:
             # Use os.fdopen in a 'with' block to guarantee closing the master_fd upon exit.
             with os.fdopen(master_fd, "rb", 0) as master_file:
                 try:
+                    # Save partial lines (not yet terminated with newline) for clean logging
+                    _partial_line = ""
+
+                    # Main reading loop
                     while True:
                         # Read data and check end of file (EOF)
                         try:
@@ -180,11 +183,23 @@ class Scheduler:
                         data = raw_data.decode(
                             encoding="utf-8", errors="replace"
                         )
-                        data = sub(r"\r+\n|\r{2,}", "\n", data)
-                        data = data.replace("\r", "")
+                        data = PatternCollection.ANSI.patterns.sub("", data)
 
-                        for line_raw in data.splitlines():
-                            line = line_raw.rstrip("\n")
+                        # Split data into lines, handling partial lines
+                        buffer = _partial_line + data.rstrip("\n")
+                        lines = buffer.split("\n")
+                        _partial_line = (
+                            "" if data.endswith("\n") else lines.pop()
+                        )
+
+                        # Process each line for STEP statements
+                        for line_raw in lines:
+                            # Handle carriage return - only keep last part
+                            if "\r" in line_raw.rstrip("\r"):
+                                parts = line_raw.rstrip("\r").split("\r")
+                                line = parts[-1]
+                            else:
+                                line = line_raw
 
                             # Write to logfile
                             flog.write(line + "\n")
@@ -220,6 +235,11 @@ class Scheduler:
                                     match.group(1).strip(),
                                     advance=False,
                                 )
+
+                    # Log any remaining partial line
+                    if _partial_line:
+                        flog.write(_partial_line + "\n")
+                        flog.flush()
 
                 except Exception as e:
                     self.logger.debug(f"PTY reader encountered an error: {e}")
@@ -265,7 +285,10 @@ class Scheduler:
         env["SUDO_ASKPASS"] = self.askpass_file
         env["PATH"] = f"{create_sudo_wrapper()}:{env.get('PATH', '')}"
 
-        # 5. Spawn the process with PTY connections
+        # 6. Set non-interactive environment variables
+        env["DEBIAN_FRONTEND"] = "noninteractive"
+
+        # 7. Spawn the process with PTY connections
         process = subprocess.Popen(
             proc_cmd,
             bufsize=0,
@@ -277,18 +300,18 @@ class Scheduler:
             text=False,
         )
 
-        # 6. Parent closes its reference to the PTY slave
+        # 8. Parent closes its reference to the PTY slave
         os.close(slave_fd)
 
-        # 7. Start the single reader thread on the PTY master
+        # 9. Start the single reader thread on the PTY master
         t_out = Thread(target=pty_reader, args=(master_fd,), daemon=True)
         t_out.start()
 
-        # 8. Wait for process exit and clean up
+        # 10. Wait for process exit and clean up
         exit_code = process.wait()
         t_out.join()
 
-        # 9. Final Termination Logic: Check status and PARTIAL event
+        # 11. Final Termination Logic: Check status and PARTIAL event
         if exit_code != 0:
             self.logger.debug("Task failed with non-zero exit code.")
             return TaskTerminationType.FAILURE
@@ -321,14 +344,16 @@ class Scheduler:
             modified_script, task.name, ext=task.command.kind.ext
         )
 
-        def safe_unlink(path: Optional[Path]) -> None:
+        def safe_unlink(path: Path | str) -> None:
             """
             Unlink files that may or may not have been unlinked yet
 
             :param path: Path to the file to unlink
-            :type path: Optional[Path]
+            :type path: Path | str
             """
-            if path and isinstance(path, Path) and path.exists():
+            if not isinstance(path, (str, Path)):
+                return
+            elif Path(path).exists():
                 try:
                     path.unlink()
                 except Exception:
@@ -391,9 +416,9 @@ class Scheduler:
         # Run and stream
         try:
             success = self._spawn_and_stream(proc_cmd, flog, task_id)
-        except Exception:
+        except Exception as e:
             self.logger.debug(
-                f"Task '{task.name}' failed, as an exception occurred during '_spawn_and_stream'."
+                f"Task '{task.name}' failed, as an exception occurred during '_spawn_and_stream': {e}"
             )
             success = TaskTerminationType.FAILURE
         finally:
@@ -412,9 +437,9 @@ class Scheduler:
         task_id = self.logger.add_task(task.name, total=1)
         try:
             success = self.run_task(task, task_id)
-        except Exception:
+        except Exception as e:
             self.logger.debug(
-                f"Task '{task.name}' failed, as an exception occurred during 'run_task'."
+                f"Task '{task.name}' failed, as an exception occurred during 'run_task': {e}"
             )
             success = TaskTerminationType.FAILURE
         finally:
@@ -481,12 +506,12 @@ class Scheduler:
             running[finished].join()
             del running[finished]
 
-    def get_results(self) -> List[Tuple[str, str, bool]]:
+    def get_results(self) -> list[tuple[str, str, bool]]:
         """
         Get a list of all tasks with their results.
 
         :return: List of tasks in the format [task_name, task_logfile, successful]
-        :rtype: List[Tuple[str, str, bool]]
+        :rtype: list[tuple[str, str, bool]]
         """
         all_tasks = []
         for task, result in self.results.items():

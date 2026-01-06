@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 from shutil import copy2, copytree
-from typing import Any, Dict, List
+from typing import Any
 
 import commentjson
 import requests
@@ -16,7 +16,7 @@ from gurk.utils.patterns import PatternCollection
 from gurk.utils.yaml import load_yaml
 
 
-def configure_pinned_apps(*args: List[str]) -> None:
+def configure_pinned_apps(*args: list[str]) -> None:
     """
     Configure pinned applications in the GNOME desktop environment.
 
@@ -24,7 +24,7 @@ def configure_pinned_apps(*args: List[str]) -> None:
           No error is raised by 'gsettings' if an app does not exist.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -46,12 +46,12 @@ def configure_pinned_apps(*args: List[str]) -> None:
 
 
 # TODO: Expand any "[/].../.../..." paths to dicts. Pay attention not to merge with existing dicts.
-def configure_filestructure(*args: List[str]) -> None:
+def configure_filestructure(*args: list[str]) -> None:
     """
     Create a predefined file structure based on a YAML mapping.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, force, remaining_args = get_config_args(args)
@@ -63,7 +63,7 @@ def configure_filestructure(*args: List[str]) -> None:
         return
 
     def recursive_create_structure(
-        base_path: Path, structure: Dict[str, Any], overwrite: bool, sudo: bool
+        base_path: Path, structure: dict[str, Any], overwrite: bool, sudo: bool
     ) -> None:
         for name, content in structure.items():
             dest_path = base_path / name
@@ -108,7 +108,6 @@ def configure_filestructure(*args: List[str]) -> None:
                     Logger.step(
                         f"Cloning git repository {content} into {dest_path}..."
                     )
-                    # TODO: Optimize cloning for if the repo exists multiple times in the yaml. Maybe in general have tmpdir with all git repos and some caching?
                     cloned_path = clone_git_files(
                         content, dest_path, overwrite
                     )
@@ -198,12 +197,12 @@ def configure_filestructure(*args: List[str]) -> None:
             )
 
 
-def configure_vscode_keybindings(*args: List[str]) -> None:
+def configure_vscode_keybindings(*args: list[str]) -> None:
     """
     Configure VSCode keybindings.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)

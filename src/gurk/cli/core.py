@@ -8,7 +8,7 @@ from pathlib import Path
 from gurk.core.logger import Logger, LoggerSeverity
 from gurk.core.scheduler import Scheduler
 from gurk.core.task_processor import TaskProcessor
-from gurk.utils.cli import CoreCliProcessor, get_sudo_askpass
+from gurk.utils.cli import CoreCliProcessor, get_sudo_askpass, prompt_setup
 from gurk.utils.common import ENABLED_CONFIG_FILE, PACKAGE_CONFIG_PATH
 
 
@@ -64,6 +64,11 @@ def main(argv, prog, description, cmd, _captured=None):
     )
     args, tasks = parser.parse_known_args(argv)
 
+    # Handle unknown options masquerading as tasks
+    invalid = [t for t in tasks if t.startswith("-")]
+    if invalid:
+        parser.error(f"unrecognized arguments: {' '.join(invalid)}")
+
     # Set default values in case of early exception
     logger, cloned_config_dir, askpass_path = None, None, None
 
@@ -71,11 +76,11 @@ def main(argv, prog, description, cmd, _captured=None):
         # Request sudo access at the start
         askpass_path = get_sudo_askpass()
 
+        # Prompt to run the 'setup' command upon first usage
+        prompt_setup(args.yes)
+
         with Logger(args.verbose) as logger:
             setup_processor = CoreCliProcessor(logger, args, argv, tasks, cmd)
-
-            # Prompt pre-setup if this was never run before
-            setup_processor.prompt_setup()
 
             # Process args
             processed_args, cloned_config_dir = setup_processor.process_args()
@@ -86,7 +91,7 @@ def main(argv, prog, description, cmd, _captured=None):
             # Load config file and process tasks
             task_processor = TaskProcessor(logger, processed_args)
 
-            # Pre-setup
+            # Preparation
             if not processed_args.disable_preparation:
                 setup_processor.prepare()
 

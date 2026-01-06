@@ -5,7 +5,6 @@ import traceback
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from gurk.core.logger import Logger, LoggerSeverity
 from gurk.utils.cli import SETUP_DONE_FILE
@@ -20,8 +19,8 @@ class SSHKeysManager:
     """
 
     # fmt: off
-    ssh_directory: Path           = field(init=False, default=Path("~/.ssh").expanduser())
-    curr_ssh_key:  Optional[Path] = field(init=False, repr=False, default=None)
+    ssh_directory: Path        = field(init=False, default=Path("~/.ssh").expanduser())
+    curr_ssh_key:  Path | None = field(init=False, repr=False, default=None)
     # fmt: on
 
     @property

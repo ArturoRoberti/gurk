@@ -2,7 +2,6 @@ import json
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List
 
 from packaging import version
 
@@ -21,12 +20,12 @@ from gurk.utils.git_repos import (
 )
 
 
-def install_js_repositories(*args: List[str]) -> None:
+def install_js_repositories(*args: list[str]) -> None:
     """
     Clone and install JS repositories from a list of git URLs.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, force, remaining_args = get_config_args(args)

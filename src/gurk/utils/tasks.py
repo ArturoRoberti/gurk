@@ -1,19 +1,11 @@
 from dataclasses import dataclass, field
-from typing import (
-    Any,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-    Tuple,
-    TypeAlias,
-    TypedDict,
-    Union,
-)
+from typing import Any, Mapping, TypeAlias, TypedDict, Union
 
 from gurk.utils.scripts import Command
 
-FieldTypeDict: TypeAlias = Mapping[str, List[Optional[type]] | "FieldTypeDict"]
+FieldTypeDict: TypeAlias = Mapping[
+    str, Union[list[type | None], "FieldTypeDict"]
+]
 
 # Required in default config
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
@@ -41,7 +33,6 @@ DEFAULT_CUSTOM_CONFIG = {
     for key, val in TASK_PROPERTIES_CUSTOM.items()
 }
 
-# HARDWARE_SPECIFIC_TASKS = ["install-cuda", "install-nvidia-driver"]
 
 # Explanations:
 # - install-isaaclab: Hangs (may be an issue with the install itself, not the runner)
@@ -166,32 +157,32 @@ class TaskDict(TypedDict):
     enabled:        bool
     description:    str
     script:         str
-    function:       Optional[str]
-    config_file:    Optional[str]
-    depends_on:     List[str]
+    function:       str | None
+    config_file:    str | None
+    depends_on:     list[str]
     privileged:     bool
-    supercedes:     Optional[List[str]]
-    args:           Union[Dict[str, List[str]], List[str]]
+    supercedes:     list[str] | None
+    args:           dict[str, list[str]] | list[str]
     # fmt: on
 
 
-TaskDictCollection = Dict[str, TaskDict]
+TaskDictCollection: TypeAlias = dict[str, TaskDict]
 
 
 def get_invalid_tasks_from_task_dict_collection(
-    obj: Dict[Any, Any],
+    obj: dict[Any, Any],
     default: bool,
-) -> Optional[List[str]]:
+) -> list[str] | None:
     """
     Check if an object is a valid collection of TaskDicts.
         NOTE: This allows empty dicts (no tasks) as valid input
 
     :param obj: The object to check
-    :type obj: Dict[Any, Any]
+    :type obj: dict[Any, Any]
     :param default: Whether to use default task fields (True) or custom task fields (False)
     :type default: bool
     :return: List of invalid task names, or None if the object is not a dict
-    :rtype: List[str] | None
+    :rtype: list[str] | None
     """
     if not isinstance(obj, dict):
         return None
@@ -214,8 +205,8 @@ class ResolvedTask:
     # fmt: off
     name:        str           = field()
     command:     Command       = field()
-    config_file: Optional[str] = field(default=None)
-    depends_on:  Tuple[str]    = field(default_factory=tuple)
+    config_file: str | None    = field(default=None)
+    depends_on:  tuple[str]    = field(default_factory=tuple)
     privileged:  bool          = field(default=False)
-    args:        Tuple[str]    = field(default_factory=tuple)
+    args:        tuple[str]    = field(default_factory=tuple)
     # fmt: on

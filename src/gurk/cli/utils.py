@@ -2,7 +2,6 @@ import sys
 from collections import OrderedDict
 from importlib.metadata import version
 from pathlib import Path
-from typing import List
 
 from click import Group
 
@@ -54,14 +53,14 @@ class OrderedGroup(Group):
             with formatter.section(section_name):
                 formatter.write_dl(rows)
 
-    def list_commands(self, ctx) -> List[str]:
+    def list_commands(self, ctx) -> list[str]:
         """
         (Overrides default) List commands in the order they were added.
 
         :param ctx: Click context
         :type ctx: click.Context
         :return: List of command names
-        :rtype: List[str]
+        :rtype: list[str]
         """
         return list(self.commands.keys())
 

@@ -58,7 +58,6 @@ check_install_mamba() {
 	fi
 }
 
-# TODO: Seems to fail?
 check_install_fzf() {
 	: '
 	Check if fzf is installed.
@@ -150,8 +149,11 @@ check_install_nvidia_driver() {
 	Returns:
 	  0 if installed, 1 otherwise
 	'
-	# TODO: bash -ic necessary?
-	local nvidia_smi_path=$(bash -ic 'sudo modprobe nvidia && command -v nvidia-smi || true')
+	# Ensure kernel module is loaded
+	sudo modprobe nvidia
+
+	# Actual check
+	local nvidia_smi_path=$(command -v nvidia-smi)
 	if [ -n "$nvidia_smi_path" ]; then
 		echo "$nvidia_smi_path"
 		return 0
@@ -171,8 +173,7 @@ check_install_cuda() {
 	Returns:
 	  0 if installed, 1 otherwise
 	'
-	# TODO: bash -ic necessary?
-	local nvcc_path=$(bash -ic 'command -v nvcc || true')
+	local nvcc_path=$(command -v nvcc)
 	if [ -n "$nvcc_path" ]; then
 		echo "$nvcc_path"
 		return 0

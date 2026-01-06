@@ -2,7 +2,6 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
 
 import networkx as nx
 
@@ -26,7 +25,7 @@ except ImportError:
     )
 
 
-def _parse_diff_changed_lines(diff_text: str) -> Dict[str, Set[int]]:
+def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
     """
     Parse a unified diff text and return a mapping of file paths to changed line numbers.
         NOTE: This currently also counts changed comments and blank lines.
@@ -34,9 +33,9 @@ def _parse_diff_changed_lines(diff_text: str) -> Dict[str, Set[int]]:
     :param diff_text: The unified diff text
     :type diff_text: str
     :return: Mapping of file paths to sets of changed line numbers
-    :rtype: Dict[str, Set[int]]
+    :rtype: dict[str, set[int]]
     """
-    changed: Dict[str, Set[int]] = {}
+    changed: dict[str, set[int]] = {}
     current_file = None
     hunk_re = re.compile(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
     file_re = re.compile(r"^\+\+\+ b/(.+)$")
@@ -61,7 +60,7 @@ def _parse_diff_changed_lines(diff_text: str) -> Dict[str, Set[int]]:
     }
 
 
-def _affected_blocks(path: Path, changed_lines: Set[int]) -> Set[str]:
+def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
     """
     Determine which top-level blocks (functions/entrypoint) are affected by the changed lines.
         NOTE: Assumes scripts are valid, i.e. only contain functions and an entrypoint (and imports for Python)
@@ -69,9 +68,9 @@ def _affected_blocks(path: Path, changed_lines: Set[int]) -> Set[str]:
     :param path: Path to the script file
     :type path: Path
     :param changed_lines: Set of changed line numbers in the script
-    :type changed_lines: Set[int]
+    :type changed_lines: set[int]
     :return: Set of affected block names (function names or None for entrypoint)
-    :rtype: Set[str]
+    :rtype: set[str]
     """
     affected_blocks = set()
     blocks = [
@@ -88,20 +87,20 @@ def _affected_blocks(path: Path, changed_lines: Set[int]) -> Set[str]:
     return affected_blocks
 
 
-def compute_affected_tasks(diff_text: str) -> List[str]:
+def compute_affected_tasks(diff_text: str) -> list[str]:
     """
     Compute the set of affected tasks based on the given diff text.
 
     :param diff_text: The unified diff text
     :type diff_text: str
     :return: Set of affected task names
-    :rtype: Set[str]
+    :rtype: set[str]
     """
     # Parse diff to get changed line numbers per file
     changed_lines_map = _parse_diff_changed_lines(diff_text)
 
     # Find affected script blocks (functions/entrypoints)
-    affected_script_blocks: Dict[Path, Set[str]] = {}
+    affected_script_blocks: dict[Path, set[str]] = {}
     for file_path in iter_scripts():
         affected_script_blocks[file_path] = _affected_blocks(
             file_path, changed_lines_map.get(str(file_path), set())
@@ -116,7 +115,7 @@ def compute_affected_tasks(diff_text: str) -> List[str]:
     # Determine affected tasks
     default_config = load_yaml(DEFAULT_CONFIG_FILE)
     tasks = {k: v for k, v in default_config.items() if not k.startswith("_")}
-    affected_tasks: Set[str] = set()
+    affected_tasks: set[str] = set()
     for task_name, task in tasks.items():
         # Affected script block
         command = task_name.split("-", 1)[0]

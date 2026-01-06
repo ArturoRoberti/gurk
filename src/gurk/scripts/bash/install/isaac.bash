@@ -97,14 +97,15 @@ install_isaacsim() {
 	fi
 	rm "$download_path"
 
-	# Add environment variables to bashrc - TODO: Use util for this
-	local bashrc_path="${HOME}/.bashrc"
-	{
-		echo ""
-		echo "# IsaacSim Environment Variables"
-		echo "export ISAACSIM_PATH=\"${install_path}\""
-		echo "export ISAACSIM_PYTHON_EXE=\"\${ISAACSIM_PATH}/python.sh\""
-	} >>"$bashrc_path"
+	# Add environment variables to bashrc
+	local tmpfile=$(mktemp --suffix=".sh")
+	tee "$tmpfile" >/dev/null <<-EOF
+		# IsaacSim Environment Variables
+		export ISAACSIM_PATH="${install_path}"
+		export ISAACSIM_PYTHON_EXE="\${ISAACSIM_PATH}/python.sh"
+	EOF
+	write_marked "$tmpfile" "$HOME/.bashrc"
+	rm "$tmpfile"
 
 	# Verify installation
 	check_install_isaacsim

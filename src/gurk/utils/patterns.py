@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Optional, Protocol, TypedDict, TypeVar
+from typing import Protocol, TypedDict, TypeVar
 
 
 class PatternFactory(Protocol):
@@ -65,14 +65,14 @@ class ScriptPatterns(TypedDict):
     # fmt: off
     ENTRYPOINT: re.Pattern
     FUNCTION:   re.Pattern
-    CLASS:      Optional[re.Pattern]
+    CLASS:      re.Pattern | None
     IF:         re.Pattern
     ELIF:       re.Pattern
     ELSE:       re.Pattern
-    CASE:       Optional[re.Pattern]
+    CASE:       re.Pattern | None
     FOR:        re.Pattern
     WHILE:      re.Pattern
-    UNTIL:      Optional[re.Pattern]
+    UNTIL:      re.Pattern | None
     # fmt: on
 
 
@@ -133,6 +133,8 @@ class PatternCollection(Enum):
         "package":    re.compile(r"package://([^/]+)/(.*?)"),
         "url":        re.compile(r"^https?://[^\s]+$"),
     }
+    ANSI:           EnumValue[re.Pattern] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+    TRACEBACK_FILE: EnumValue[re.Pattern] = re.compile(r'^\s*File\s+"([^"]+)",\s+line\s+(\d+)')
     # fmt: on
 
     @property

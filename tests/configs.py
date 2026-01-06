@@ -1,5 +1,4 @@
 import subprocess
-from typing import Optional
 
 import commentjson
 import pytest
@@ -16,9 +15,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Disable/Replace prompts
     monkeypatch.setattr(core, "get_sudo_askpass", _get_sudo_askpass)
-    monkeypatch.setattr(
-        core.CoreCliProcessor, "prompt_setup", lambda self: None
-    )
+    monkeypatch.setattr(core, "prompt_setup", lambda self: None)
 
     # Disable running scheduled tasks (only process configs)
     monkeypatch.setattr(core.Scheduler, "run", lambda self: None)
@@ -40,7 +37,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
             # Skip helpers
             continue
 
-        config_file: Optional[str] = task["config_file"]
+        config_file: str | None = task["config_file"]
         if config_file:
             full_path = get_config_path(config_file, task_name.split("-")[0])
             if not full_path.is_file():

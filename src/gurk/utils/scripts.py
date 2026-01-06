@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import Iterator, List, Optional, Set, Tuple, TypedDict
+from typing import Iterator, TypedDict
 
 from gurk.cli.utils import CORE_COMMANDS
 from gurk.utils.common import (
@@ -38,19 +38,19 @@ class ScriptBlock(TypedDict):
 
     # fmt: off
     type:  ScriptBlockTypes
-    name:  Optional[str]
-    lines: Tuple[int, int]  # (start_line, end_line)
+    name:  str | None
+    lines: tuple[int, int]  # (start_line, end_line)
     # fmt: on
 
 
-def get_block_spans(path: FilePath) -> List[ScriptBlock]:
+def get_block_spans(path: FilePath) -> list[ScriptBlock]:
     """
     Returns list of (block_type, start_line, end_line) for top-level script blocks in the given file.
 
     :param path: Path to the script file
     :type path: FilePath
     :return: List of ScriptBlock dictionaries with block type and line spans
-    :rtype: List[ScriptBlock]
+    :rtype: list[ScriptBlock]
     """
     kind = CommandKind.from_script(path)
     source = Path(path).read_text(encoding="utf-8", errors="replace")
@@ -180,7 +180,7 @@ class Command:
 
     # fmt: off
     script:     str           = field()
-    function:   Optional[str] = field(default=None)
+    function:   str | None = field(default=None)
     check_func: bool          = field(default=True)
     # fmt: on
 
@@ -220,7 +220,7 @@ class Command:
 
 
 def _iter_command_files(
-    base_path: Path, script_languages: Optional[Set[str]] = None
+    base_path: Path, script_languages: set[str] | None = None
 ) -> Iterator[Path]:
     """
     Yields all files under `<base_path>/scripts/<language>/<command>/`
@@ -229,7 +229,7 @@ def _iter_command_files(
     :param base_path: Path to the base directory
     :type base_path: Path
     :param script_languages: Set of script languages to filter by
-    :type script_languages: Optional[Set[str]]
+    :type script_languages: set[str] | None
     :return: Iterator of Paths to command files
     :rtype: Iterator[Path]
     """

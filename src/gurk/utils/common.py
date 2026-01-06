@@ -6,7 +6,7 @@ from enum import Enum
 from importlib import resources
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
-from typing import Optional, Union
+from typing import TypeAlias
 
 from gurk.cli.utils import CORE_COMMANDS
 from gurk.utils.patterns import PatternCollection
@@ -17,23 +17,27 @@ DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"
 ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
+SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
+PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
+PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
 
 
-FilePath = Union[Path, str]
+FilePath: TypeAlias = Path | str
 
 
 def generate_random_path(
-    suffix: Optional[str] = None,
-    prefix: Optional[str] = None,
+    suffix: str | None = None,
+    prefix: str | None = None,
     create: bool = False,
 ) -> Path:
     """
-    Generate a random temporary file or directory path.
+    Generate a random temporary file if an extension is
+    provided in the suffix, else a directory path.
 
     :param suffix: Suffix for the temporary file or directory
-    :type suffix: Optional[str]
+    :type suffix: str | None
     :param prefix: Prefix for the temporary file or directory
-    :type prefix: Optional[str]
+    :type prefix: str | None
     :param create: Whether to create the file or directory
     :type create: bool
     :return: Path to the temporary file or directory
@@ -54,7 +58,7 @@ def generate_random_path(
     return Path(path)
 
 
-def resolve_package_path(raw_script: FilePath) -> Optional[FilePath]:
+def resolve_package_path(raw_script: FilePath) -> FilePath | None:
     """
     Resolve paths that may refer to package resources. Package paths are in the format:
     ```
