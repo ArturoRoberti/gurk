@@ -7,6 +7,7 @@ from .utils import _get_sudo_askpass, padded_print, print_task_outputs
 
 def test_task(task: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """Parametrized test for any task. Used mainly in github actions to test affected tasks only."""
+    task_prefix, task_suffix = task.split("-", 1)
 
     # Disable/Replace prompts
     monkeypatch.setattr(core, "get_sudo_askpass", _get_sudo_askpass)
@@ -16,10 +17,10 @@ def test_task(task: str, monkeypatch: pytest.MonkeyPatch) -> None:
     captured = []
     with pytest.raises(SystemExit) as e:
         core.main(
-            argv=[task, "--enable-dependencies", "-v"],
+            argv=[task_suffix, "--enable-dependencies", "-v"],
             prog="",
             description="",
-            cmd=task.split("-")[0],
+            cmd=task_prefix,
             _captured=captured,
         )
     assert (
