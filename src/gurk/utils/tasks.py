@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Mapping, TypeAlias, TypedDict
+from typing import Any, Mapping, TypeAlias, TypedDict, Union
 
 from gurk.utils.scripts import Command
 
-FieldTypeDict: TypeAlias = Mapping[str, list[type | None] | "FieldTypeDict"]
+FieldTypeDict: TypeAlias = Mapping[
+    str, Union[list[type | None], "FieldTypeDict"]
+]
 
 # Required in default config
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
