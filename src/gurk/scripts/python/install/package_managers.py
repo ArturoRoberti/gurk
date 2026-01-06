@@ -1,4 +1,5 @@
 import subprocess
+import time
 from typing import List, TypedDict
 
 import commentjson
@@ -53,7 +54,53 @@ def install_snap_packages(*args: List[str]) -> None:
 
     # (STEP) Installing Requirement(s)
     install_packages_from_list(InstallCommands.APT, ["snapd"])
-    # TODO: Ensure snapd service is running
+
+    # (STEP) Ensuring that snapd service is running
+    def start_snapd_service(remaining_attempts: int = 3) -> None:
+        # Exit if max attempts are reached
+        if remaining_attempts <= 0:
+            msg = "Failed to start snapd service after multiple attempts."
+            Logger.logrichprint(
+                LoggerSeverity.FATAL,
+                msg,
+            )
+            raise EnvironmentError(msg)
+
+        # Check if snapd is active
+        try:
+            result = subprocess.run(
+                ["systemctl", "is-active", "snapd"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            running = result.stdout.strip() == "active"
+        except subprocess.CalledProcessError:
+            running = False
+
+        if running:
+            Logger.logrichprint(
+                LoggerSeverity.INFO,
+                "snapd service is running.",
+            )
+            return
+
+        # Try to start snapd if not running
+        Logger.logrichprint(
+            LoggerSeverity.WARNING,
+            "Attempting to start snapd service...",
+        )
+        try:
+            subprocess.run(["sudo", "systemctl", "start", "snapd"], check=True)
+            time.sleep(3)  # Wait a bit for the service to start
+        except subprocess.CalledProcessError:
+            Logger.logrichprint(
+                LoggerSeverity.WARNING,
+                "Attempt to start snapd service failed.",
+            )
+            start_snapd_service(remaining_attempts - 1)
+
+    start_snapd_service()
 
     # (STEP) Installing snap packages
     install_packages_from_txt_file(InstallCommands.SNAP, config_file)

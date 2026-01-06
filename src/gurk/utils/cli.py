@@ -35,7 +35,7 @@ def get_sudo_askpass() -> Path:
         attempts = 3
         while attempts > 0:
             response = getpass.getpass(
-                "[sudo] password for {}: ".format(getpass.getuser())
+                "[gurk] password for {}: ".format(getpass.getuser())
             )
             test_response = subprocess.run(
                 ["sudo", "-S", "-v"],
@@ -51,7 +51,7 @@ def get_sudo_askpass() -> Path:
                     print("Sorry, try again.")
                 attempts -= 1
         else:
-            print("sudo: 3 incorrect password attempts")
+            print("gurk: 3 incorrect password attempts")
             sys.exit(1)
 
         askpass_file.write("#!/bin/sh\n" f"echo '{response}'\n")
@@ -59,6 +59,35 @@ def get_sudo_askpass() -> Path:
 
     os.chmod(askpass_path, 0o700)
     return askpass_path
+
+
+SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
+
+
+def prompt_setup(yes: bool) -> None:
+    """
+    Prompt the user to run setup if it has never been run before.
+
+    :param yes: Whether to answer 'y' to all prompts
+    :type yes: bool
+    """
+    if not SETUP_DONE_FILE.is_file():
+        print(
+            "It seems that this is the first time you are running gurk. "
+            "It is recommended to run the setup first to ensure all "
+            "possible manual steps are taken care of."
+        )
+        if prompt_bool(
+            "Would you like to run the setup now?",
+            "y" if yes else None,
+        ):
+            from gurk.cli.setup import main as setup_main
+
+            setup_main([], "", "")
+
+        # Mark setup as done
+        SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SETUP_DONE_FILE.touch()
 
 
 @dataclass
@@ -78,9 +107,6 @@ class CoreCliArgs:
     # fmt: on
 
 
-SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
-
-
 @dataclass
 class CoreCliProcessor:
     """
@@ -94,31 +120,6 @@ class CoreCliProcessor:
     tasks:   List[str]     = field(repr=False)
     command: str           = field(repr=False)
     # fmt: on
-
-    def prompt_setup(self) -> None:
-        """
-        Prompt the user to run setup if it has never been run before.
-        """
-        if not SETUP_DONE_FILE.is_file():
-            print(
-                "It seems that this is the first time you are running gurk. "
-                "It is recommended to run the setup first to ensure all "
-                "possible manual steps are taken care of."
-            )
-            if prompt_bool(
-                "Would you like to run the setup now?",
-                "y" if self.args.yes else None,
-            ):
-                from gurk.cli.setup import main as setup_main
-
-                setup_main([], "", "")
-                self.logger.info("Setup completed")
-            else:
-                self.logger.warning("Skipping setup")
-
-            # Mark setup as done
-            SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            SETUP_DONE_FILE.touch()
 
     def process_args(self) -> Tuple[CoreCliArgs, Optional[Path]]:
         """

@@ -10,14 +10,14 @@ from gurk.utils.system_info import SystemInfo
 
 def get_config_args(
     args: List[str] = sys.argv[1:],
-) -> Tuple[SystemInfo, Path, List[str]]:
+) -> Tuple[SystemInfo, Path, bool, List[str]]:
     """
     Parse command-line arguments and return system info, config info, and remaining args.
 
     :param args: Configuration arguments
     :type args: List[str]
-    :return: Parsed system info, config file path, and remaining arguments
-    :rtype: Tuple[SystemInfo, Path, List[str]]
+    :return: Parsed system info, config file path, force flag and remaining arguments
+    :rtype: Tuple[SystemInfo, Path, bool, List[str]]
     """
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--system-info", type=str, default=None)

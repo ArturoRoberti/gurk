@@ -31,7 +31,7 @@ install_vscode() {
 	#       "New" file is cat "/etc/apt/sources.list.d/vscode.sources"
 
 	# (STEP) Installing VSCode
-	apt_install code # TODO: Hangs (probably due to interactive window - maybe set (generally, not just here the interactiveness env variable?))
+	apt_install code
 
 	# Verify installation
 	check_install_vscode
@@ -61,7 +61,6 @@ install_fzf() {
 	apt_install git
 
 	# (STEP) Installing fzf
-	# TODO: Still seems to fail, although it works
 	git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
 	~/.fzf/install --all
 

@@ -138,3 +138,6 @@ class PatternCollection(Enum):
     @property
     def patterns(self) -> T:
         return self.value
+
+
+ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")

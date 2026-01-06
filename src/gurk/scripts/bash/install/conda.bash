@@ -172,7 +172,7 @@ install_mamba() {
 	get_config_args "$@"
 
 	# TODO: Give warning that either mamba type may break the other one (if installed)
-	#       Maybe uninstall the other one? Do this via "--force" flag resp FORCE variable or similar?
+	#       Maybe uninstall the other one? Do this via "--force" flag?
 
 	# (STEP) Installing (Micro)Mamba
 	if _contains REMAINING_ARGS "micromamba"; then

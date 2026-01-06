@@ -153,7 +153,7 @@ write_marked() {
 	Args:
 	  - message:          Message string or filepath to log from.
 	  - file:             Path to the destination file.
-	  - check_existing:   Whether or not to check for existing message to avoid duplication (default: false).
+	  - check_existing:   Whether or not to check for existing message to avoid duplication (default: true).
 	Outputs:
 	  None
 	Returns:
@@ -165,17 +165,22 @@ write_marked() {
 		log_step "(write_marked) File not found: $file" true
 		return 1
 	fi
-	local check_existing="${3:-false}"
+	local check_existing="${3:-true}"
 
 	# Prepare content to insert
 	local content
 	if [ -f "$message" ]; then
+		# Check for existing content # NOTE: Only checks if all lines from source file exist individually
+		if ! grep -F -x -v -f "$file" "$message" >/dev/null; then
+			log_step "(write_marked) $message content already exists in $file - Skipping"
+			return 0
+		fi
 		content=$(cat "$message")
 	else
 		content="$message"
 		# Check for existing content
-		if [ "$check_existing" = true ] && grep -Fq "$content" "$file"; then
-			log_step "(write_marked) '$content' already exists in $file - Skipping"
+		if [ "$check_existing" = true ] && grep -F -q "$content" "$file"; then
+			log_step "(write_marked) $content already exists in $file - Skipping"
 			return 0
 		fi
 	fi

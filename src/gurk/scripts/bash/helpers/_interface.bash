@@ -14,7 +14,7 @@ get_config_args() {
 	Returns:
 	  0 if args parsed successfully, 1 otherwise
 	'
-	declare -gA SYSTEM_INFO=() # TODO: Use "simulate_hardware" entry
+	declare -gA SYSTEM_INFO=()
 	declare -g CONFIG_FILE=""
 	declare -g FORCE=false
 	declare -g -a REMAINING_ARGS=()
@@ -96,6 +96,7 @@ log_step() {
 	echo -e "\n__${step_type}__: $message"
 }
 
+# TODO: Match python function (add 'sudo', 'args', ...)
 run_script_function() {
 	: '
 	Runs a script (Bash or Python), optionally invoking a specific function within it.
@@ -154,7 +155,6 @@ run_bash_script_function() {
 	fi
 }
 
-# TODO: Allow running with sudo too. How to differentiate "sudo" arg from other args?
 run_python_script_function() {
 	: '
 	Runs a Python script, optionally invoking a specific function within it.

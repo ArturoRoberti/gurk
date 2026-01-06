@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import venv
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import Dict, List, Optional, TypedDict
 import commentjson
 from ruamel.yaml import YAML
 
-from gurk.core.logger import Logger
+from gurk.core.logger import Logger, LoggerSeverity
 from gurk.scripts.python.helpers._interface import get_config_args
 from gurk.utils.interface import bash_check
 
@@ -21,7 +22,7 @@ def install_pip_environments(*args: List[str]) -> None:
     :type args: List[str]
     """
     # Parse config args
-    _, config_file, _, _ = get_config_args(args)
+    _, config_file, force, _ = get_config_args(args)
     if config_file is None:
         Logger.step(
             "Skipping installation of pip packages, as no task config file is provided",
@@ -40,20 +41,34 @@ def install_pip_environments(*args: List[str]) -> None:
         return
 
     # (STEP) Creating virtual environments in {Path.home() / '.virtualenvs'}
-    env_dir = Path.home() / ".virtualenvs"
-    for env_name, packages in pip_envs.items():
+    base_venv_dir = Path.home() / ".virtualenvs"
+    for venv_name, packages in pip_envs.items():
         if not packages:
             Logger.step(
-                f"Skipping installation of pip packages for environment '{env_name}', as no packages are specified",
+                f"Skipping installation of pip packages for environment '{venv_name}', as no packages are specified",
                 warning=True,
             )
             continue
 
-        # Create virtual environment
-        venv.create(
-            env_dir / env_name, with_pip=True
-        )  # TODO: Is any handling of existing envs needed?
-        pip_executable = env_dir / env_name / "bin" / "pip"
+        # Handle existing virtual environment
+        venv_dir = base_venv_dir / venv_name
+        if venv_dir.exists():
+            if not force:
+                Logger.step(
+                    f"Skipping creation of environment '{venv_name}', as it already exists",
+                    warning=True,
+                )
+                continue
+            else:
+                Logger.logrichprint(
+                    LoggerSeverity.WARNING,
+                    f"Removing existing '{venv_name}' environment to create a new one",
+                )
+                shutil.rmtree(venv_dir)
+
+        # Create new virtual environment
+        venv.create(venv_dir, with_pip=True)
+        pip_executable = venv_dir / "bin" / "pip"
 
         # Install packages
         result = subprocess.run(
@@ -61,16 +76,15 @@ def install_pip_environments(*args: List[str]) -> None:
         )
         if result.returncode != 0:
             Logger.step(
-                f"Failed to install packages for environment '{env_name}'",
+                f"Failed to install packages for environment '{venv_name}'",
                 warning=True,
             )
         else:
             Logger.step(
-                f"Successfully installed packages for environment '{env_name}'"
+                f"Successfully installed packages for environment '{venv_name}'"
             )
 
 
-# TODO: Test, especially the sourcing of bashrc stuff
 def install_conda_environments(*args: List[str]) -> None:
     """
     Install packages into Conda environments (no custom env directory).

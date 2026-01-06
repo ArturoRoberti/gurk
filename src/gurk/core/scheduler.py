@@ -17,7 +17,7 @@ from gurk.core.logger import Logger
 from gurk.utils.common import CommandKind
 from gurk.utils.interface import run_script_function
 from gurk.utils.logger import TaskTerminationType
-from gurk.utils.patterns import PatternCollection
+from gurk.utils.patterns import ANSI_RE, PatternCollection
 from gurk.utils.scripts import (
     Command,
     ScriptBlock,
@@ -180,6 +180,7 @@ class Scheduler:
                         data = raw_data.decode(
                             encoding="utf-8", errors="replace"
                         )
+                        data = ANSI_RE.sub("", data)  # Remove mangled ANSI
                         data = sub(r"\r+\n|\r{2,}", "\n", data)
                         data = data.replace("\r", "")
 
@@ -265,7 +266,10 @@ class Scheduler:
         env["SUDO_ASKPASS"] = self.askpass_file
         env["PATH"] = f"{create_sudo_wrapper()}:{env.get('PATH', '')}"
 
-        # 5. Spawn the process with PTY connections
+        # 6. Set non-interactive environment variables
+        env["DEBIAN_FRONTEND"] = "noninteractive"
+
+        # 7. Spawn the process with PTY connections
         process = subprocess.Popen(
             proc_cmd,
             bufsize=0,
@@ -277,18 +281,18 @@ class Scheduler:
             text=False,
         )
 
-        # 6. Parent closes its reference to the PTY slave
+        # 8. Parent closes its reference to the PTY slave
         os.close(slave_fd)
 
-        # 7. Start the single reader thread on the PTY master
+        # 9. Start the single reader thread on the PTY master
         t_out = Thread(target=pty_reader, args=(master_fd,), daemon=True)
         t_out.start()
 
-        # 8. Wait for process exit and clean up
+        # 10. Wait for process exit and clean up
         exit_code = process.wait()
         t_out.join()
 
-        # 9. Final Termination Logic: Check status and PARTIAL event
+        # 11. Final Termination Logic: Check status and PARTIAL event
         if exit_code != 0:
             self.logger.debug("Task failed with non-zero exit code.")
             return TaskTerminationType.FAILURE

@@ -12,20 +12,18 @@ configure_bashrc() {
 	# Parse config args
 	get_config_args "$@"
 
-	# Check if already configured
-	if check_configure_bashrc && [[ "$FORCE" == false ]]; then
-		log_step "~/.bashrc is already configured - Exiting"
-		return 0
-	fi
-	# TODO?: Remove marker in case of "--force" option
-
+	# Check if config file is provided
 	if [ -z "$CONFIG_FILE" ]; then
 		log_step "Skipping configuration of the ~/.bashrc, as no task config file is provided" true
 		return 0
 	fi
 
 	# Append custom bashrc lines to ~/.bashrc
-	write_marked "$CONFIG_FILE" "$HOME/.bashrc"
+	local check_existing=true
+	if [[ "$FORCE" == true ]]; then
+		check_existing=false
+	fi
+	write_marked "$CONFIG_FILE" "$HOME/.bashrc" "$check_existing"
 
 	# Verify configuration
 	check_configure_bashrc

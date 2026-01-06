@@ -394,8 +394,8 @@ _install_cuda() {
 	sudo apt-get update && apt_install "$cuda_pkg"
 
 	# Update environment variables
-	write_marked 'export PATH=/usr/local/cuda/bin:$PATH' "${HOME}/.bashrc" true
-	write_marked 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' "${HOME}/.bashrc" true
+	write_marked 'export PATH=/usr/local/cuda/bin:$PATH' "${HOME}/.bashrc"
+	write_marked 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' "${HOME}/.bashrc"
 }
 
 install_cuda() {

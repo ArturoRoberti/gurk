@@ -436,7 +436,7 @@ class TaskProcessor:
         for task_name, task in filled_tasks.items():
             if task_name not in self._default_config:
                 self.logger.warning(
-                    f"Task '{task_name}' in is removed because "
+                    f"Task '{task_name}' is removed because "
                     f"it is not defined in the default config"
                 )
                 final_tasks.pop(task_name)
