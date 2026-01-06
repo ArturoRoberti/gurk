@@ -4,7 +4,7 @@ import subprocess
 import venv
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, List, Optional, TypedDict
+from typing import TypedDict
 
 import commentjson
 from ruamel.yaml import YAML
@@ -14,12 +14,12 @@ from gurk.scripts.python.helpers._interface import get_config_args
 from gurk.utils.interface import bash_check
 
 
-def install_pip_environments(*args: List[str]) -> None:
+def install_pip_environments(*args: list[str]) -> None:
     """
     Install packages into python environments using pip.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, force, _ = get_config_args(args)
@@ -31,7 +31,7 @@ def install_pip_environments(*args: List[str]) -> None:
         return
 
     # Get pip environments info
-    pip_envs: Dict[str, List[str]] = commentjson.load(
+    pip_envs: dict[str, list[str]] = commentjson.load(
         config_file.open("r", encoding="utf-8")
     )
     if not pip_envs:
@@ -85,12 +85,12 @@ def install_pip_environments(*args: List[str]) -> None:
             )
 
 
-def install_conda_environments(*args: List[str]) -> None:
+def install_conda_environments(*args: list[str]) -> None:
     """
     Install packages into Conda environments (no custom env directory).
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, force, remaining_args = get_config_args(args)
@@ -105,12 +105,12 @@ def install_conda_environments(*args: List[str]) -> None:
     class CondaEnv(TypedDict):
         # fmt: off
         type:           str                   # "conda", "mamba"
-        conda_packages: Dict[str, List[str]]  # package-name -> [channels]
-        pip_packages:   List[str]
+        conda_packages: dict[str, list[str]]  # package-name -> [channels]
+        pip_packages:   list[str]
         # fmt: on
 
     # Get conda environments info
-    conda_envs: Dict[str, CondaEnv] = commentjson.load(
+    conda_envs: dict[str, CondaEnv] = commentjson.load(
         config_file.open("r", encoding="utf-8")
     )
     if not conda_envs:
@@ -126,7 +126,7 @@ def install_conda_environments(*args: List[str]) -> None:
         if result.returncode == 0:
             conda_exe[conda_type] = result.stdout.strip()
 
-    def check_env_type(env_type: Optional[str]) -> bool:
+    def check_env_type(env_type: str | None) -> bool:
         """Check if conda environment type field is valid."""
         if env_type is None:
             Logger.step(

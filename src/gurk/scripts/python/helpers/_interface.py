@@ -2,22 +2,21 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 from gurk.core.logger import Logger, LoggerSeverity
 from gurk.utils.system_info import SystemInfo
 
 
 def get_config_args(
-    args: List[str] = sys.argv[1:],
-) -> Tuple[SystemInfo, Path, bool, List[str]]:
+    args: list[str] = sys.argv[1:],
+) -> tuple[SystemInfo, Path, bool, list[str]]:
     """
     Parse command-line arguments and return system info, config info, and remaining args.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     :return: Parsed system info, config file path, force flag and remaining arguments
-    :rtype: Tuple[SystemInfo, Path, bool, List[str]]
+    :rtype: tuple[SystemInfo, Path, bool, list[str]]
     """
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--system-info", type=str, default=None)

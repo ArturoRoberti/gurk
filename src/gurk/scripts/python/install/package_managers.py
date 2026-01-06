@@ -1,6 +1,6 @@
 import subprocess
 import time
-from typing import List, TypedDict
+from typing import TypedDict
 
 import commentjson
 
@@ -16,12 +16,12 @@ from gurk.scripts.python.helpers.processing import (
 from gurk.utils.interface import bash_check
 
 
-def install_apt_packages(*args: List[str]) -> None:
+def install_apt_packages(*args: list[str]) -> None:
     """
     Install packages using apt package manager.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -36,12 +36,12 @@ def install_apt_packages(*args: List[str]) -> None:
     install_packages_from_txt_file(InstallCommands.APT, config_file)
 
 
-def install_snap_packages(*args: List[str]) -> None:
+def install_snap_packages(*args: list[str]) -> None:
     """
     Install packages using snap package manager.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -106,12 +106,12 @@ def install_snap_packages(*args: List[str]) -> None:
     install_packages_from_txt_file(InstallCommands.SNAP, config_file)
 
 
-def install_flatpak_packages(*args: List[str]) -> None:
+def install_flatpak_packages(*args: list[str]) -> None:
     """
     Install packages using flatpak package manager.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, remaining_args = get_config_args(args)
@@ -152,12 +152,12 @@ def install_flatpak_packages(*args: List[str]) -> None:
             add_alias(f"{pkg_name}='(flatpak run {pkg} > /dev/null &)'")
 
 
-def install_npm_packages(*args: List[str]) -> None:
+def install_npm_packages(*args: list[str]) -> None:
     """
     Install packages using npm package manager.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -175,12 +175,12 @@ def install_npm_packages(*args: List[str]) -> None:
     install_packages_from_txt_file(InstallCommands.NPM, config_file)
 
 
-def install_pipx_packages(*args: List[str]) -> None:
+def install_pipx_packages(*args: list[str]) -> None:
     """
     Install packages using pipx package manager.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -195,12 +195,12 @@ def install_pipx_packages(*args: List[str]) -> None:
     install_packages_from_txt_file(InstallCommands.PIPX, config_file)
 
 
-def install_vscode_extensions(*args: List[str]) -> None:
+def install_vscode_extensions(*args: list[str]) -> None:
     """
     Install VSCode extensions.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -224,12 +224,12 @@ def install_vscode_extensions(*args: List[str]) -> None:
     install_packages_from_txt_file(InstallCommands.VSC_EXT, config_file)
 
 
-def install_docker_images(*args: List[str]) -> None:
+def install_docker_images(*args: list[str]) -> None:
     """
     Pull docker images from Docker Hub.
 
     :param args: Configuration arguments
-    :type args: List[str]
+    :type args: list[str]
     """
     # Parse config args
     _, config_file, _, _ = get_config_args(args)
@@ -258,7 +258,7 @@ def install_docker_images(*args: List[str]) -> None:
         # fmt: on
 
     # Load docker images - also expand environment variables
-    docker_images_info: List[DockerImageInfo] = commentjson.load(
+    docker_images_info: list[DockerImageInfo] = commentjson.load(
         config_file.open("r", encoding="utf-8")
     )
     docker_images = [

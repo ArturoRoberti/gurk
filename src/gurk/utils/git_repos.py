@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, Literal, Optional, TypedDict, overload
+from typing import Literal, TypeAlias, TypedDict, overload
 from urllib.parse import parse_qs, urlparse
 
 import git
@@ -41,14 +41,14 @@ class GitRefInfo(TypedDict):
 
     # fmt: off
     url:    str
-    branch: Optional[str]
-    commit: Optional[str]
-    path:   Optional[str]
-    depth:  Optional[int]
+    branch: str | None
+    commit: str | None
+    path:   str | None
+    depth:  int | None
     # fmt: on
 
 
-GitRef = str  # See 'parse_git_ref' function for expected format
+GitRef: TypeAlias = str  # See 'parse_git_ref' function for expected format
 
 
 def parse_git_ref(repo: GitRef) -> GitRefInfo:
@@ -124,7 +124,7 @@ def gitref_dict2str(git_ref_info: GitRefInfo) -> GitRef:
 
 
 @overload
-def get_remote_heads(url: str, HEAD: Literal[False] = False) -> Dict[str, str]:
+def get_remote_heads(url: str, HEAD: Literal[False] = False) -> dict[str, str]:
     ...
 
 
@@ -156,14 +156,14 @@ def get_remote_heads(url: str, HEAD: bool = False):
     return heads
 
 
-def get_cached_repo(repo: GitRef) -> Optional[Path]:
+def get_cached_repo(repo: GitRef) -> Path | None:
     """
     Check if a Git repository with the specified commit exists in the cache.
 
     :param repo: GitRef string of the repository to check
     :type repo: GitRef
     :return: None if not cached, or Path to cached repo if found
-    :rtype: Optional[Path]
+    :rtype: Path | None
     """
     parsed = parse_git_ref(repo)
     if parsed["commit"]:
@@ -257,15 +257,15 @@ def handle_existing_dest(dest_path: Path, overwrite: bool) -> bool:
 
 
 def clone_git_repo(
-    repo: GitRef, dest_path: Optional[Path] = None, overwrite: bool = False
-) -> Optional[Path]:
+    repo: GitRef, dest_path: Path | None = None, overwrite: bool = False
+) -> Path | None:
     """
     Clone a Git repository to the specified destination path.
 
     :param repo: GitRef string of the repository to clone
     :type repo: GitRef
     :param dest_path: Destination path to clone the repository into
-    :type dest_path: Optional[Path]
+    :type dest_path: Path | None
     :param overwrite: Whether to overwrite existing path
     :type overwrite: bool
     :return: Path to the cloned repository or None if cloning failed
@@ -313,15 +313,15 @@ def clone_git_repo(
 
 
 def clone_git_files(
-    repo: GitRef, dest_path: Optional[Path] = None, overwrite: bool = False
-) -> Optional[Path]:
+    repo: GitRef, dest_path: Path | None = None, overwrite: bool = False
+) -> Path | None:
     """
     Clone specific files or directories from a Git repository.
 
     :param repo: GitRef string of the repository to clone files from
     :type repo: GitRef
     :param dest_path: Destination path to clone the files into
-    :type dest_path: Optional[Path]
+    :type dest_path: Path | None
     :param overwrite: Whether to overwrite existing path
     :type overwrite: bool
     :return: Path to the cloned files or None if cloning failed

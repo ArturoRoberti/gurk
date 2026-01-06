@@ -1,7 +1,6 @@
 import subprocess
 from enum import Enum
 from pathlib import Path
-from typing import List
 
 from gurk.core.logger import Logger
 
@@ -34,7 +33,7 @@ class InstallCommands(Enum):
     # fmt: on
 
 
-def get_clean_lines(filename: Path) -> List[str]:
+def get_clean_lines(filename: Path) -> list[str]:
     """
     Reads a file and returns a list of lines with comments and extra whitespace removed.
     Lines starting with '#' or empty after stripping are ignored.
@@ -42,7 +41,7 @@ def get_clean_lines(filename: Path) -> List[str]:
     :param filename: Path to the input file
     :type filename: Path
     :return: List of cleaned lines
-    :rtype: List[str]
+    :rtype: list[str]
     """
     clean_lines = []
     with open(filename, "r", encoding="utf-8") as f:
@@ -56,7 +55,7 @@ def get_clean_lines(filename: Path) -> List[str]:
 
 
 def install_packages_from_list(
-    install_command: InstallCommands, packages: List[str]
+    install_command: InstallCommands, packages: list[str]
 ) -> None:
     """
     Installs a list of packages using the specified package manager command.
@@ -64,7 +63,7 @@ def install_packages_from_list(
     :param install_command: InstallCommands enum value specifying the installation command
     :type install_command: InstallCommands
     :param packages: List of package names to install
-    :type packages: List[str]
+    :type packages: list[str]
     """
     for pkg in packages:
         cmd = f"{install_command.value} {pkg}"

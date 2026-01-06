@@ -1,20 +1,20 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ruamel.yaml import YAML
 
 from gurk.utils.common import resolve_package_path
 
 
-def load_yaml(yaml_file: Path) -> Optional[Dict[str, Any]]:
+def load_yaml(yaml_file: Path) -> dict[str, Any] | None:
     """
     Load a YAML file and normalize its content.
 
     :param yaml_file: Path to the YAML file to load
     :type yaml_file: Path
     :return: Normalized content of the YAML file, or None if loading fails
-    :rtype: Dict[str, Any] | None
+    :rtype: dict[str, Any] | None
     """
 
     def normalize_yaml(obj: Any) -> Any:
@@ -76,7 +76,7 @@ def load_yaml(yaml_file: Path) -> Optional[Dict[str, Any]]:
     return normalize_yaml(content)
 
 
-def overlay_dicts(dicts: List[Dict], allow_default: bool = False) -> Dict:
+def overlay_dicts(dicts: list[dict], allow_default: bool = False) -> dict:
     """
     Overlay multiple dictionaries in order, with later dictionaries
     replacing or updating keys in earlier ones. If allow_default is True,
@@ -84,28 +84,28 @@ def overlay_dicts(dicts: List[Dict], allow_default: bool = False) -> Dict:
     the value from the base dictionary.
 
     :param dicts: List of dictionaries to overlay
-    :type dicts: List[Dict]
+    :type dicts: list[dict]
     :param allow_default: Whether to allow "default" values to keep base values
     :type allow_default: bool
     :return: The resulting overlaid dictionary
-    :rtype: Dict
+    :rtype: dict
     """
 
     def _overlay_two_dicts(
-        base: Dict, overlay: Dict, allow_default: bool = False
-    ) -> Dict:
+        base: dict, overlay: dict, allow_default: bool = False
+    ) -> dict:
         """
         Recursively overlay overlay-dict onto base-dict.
         Keys in overlay replace or update those in base, unless the value is "default".
 
         :param base: The base dictionary to overlay onto
-        :type base: Dict
+        :type base: dict
         :param overlay: The overlay dictionary with updates
-        :type overlay: Dict
+        :type overlay: dict
         :param allow_default: Whether to allow "default" values to keep base values
         :type allow_default: bool
         :return: The resulting dictionary after overlay
-        :rtype: Dict
+        :rtype: dict
         """
         overlayed = deepcopy(base)
         for key, value in overlay.items():

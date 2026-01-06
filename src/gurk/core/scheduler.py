@@ -10,7 +10,7 @@ from pathlib import Path
 from queue import Queue
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import Event, Lock, Thread
-from typing import Dict, List, Optional, Set, TextIO, Tuple
+from typing import TextIO
 
 from gurk.core.logger import Logger
 from gurk.utils.common import CommandKind, generate_random_path
@@ -33,18 +33,18 @@ class Scheduler:
 
     # fmt: off
     logger:       Logger             = field(repr=False)
-    tasks:        List[ResolvedTask] = field(repr=False)
+    tasks:        list[ResolvedTask] = field(repr=False)
     askpass_file: str                = field(repr=False)
 
-    results:   Dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
-    scheduled: Set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
+    results:   dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
+    scheduled: set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
 
     lock:      Lock  = field(init=False, repr=False, default_factory=Lock)
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
     # fmt: on
 
     @staticmethod
-    def _prepare_script(command: Command) -> Tuple[Path, int]:
+    def _prepare_script(command: Command) -> tuple[Path, int]:
         """
         Prepare a copy of the desired script that
         - Uses STEP statements only if in the desired function (or entrypoint)
@@ -53,7 +53,7 @@ class Scheduler:
         :param command: Command to prepare
         :type command: Command
         :return: Tuple of (path to modified script, number of steps)
-        :rtype: Tuple[Path, int]
+        :rtype: tuple[Path, int]
         """
         # Create temporary file to run later
         original_path = Path(command.script)
@@ -133,13 +133,13 @@ class Scheduler:
         return tmp_path, n_steps
 
     def _spawn_and_stream(
-        self, proc_cmd: List[str], flog: TextIO, task_id: int
+        self, proc_cmd: list[str], flog: TextIO, task_id: int
     ) -> TaskTerminationType:
         """
         Spawn a subprocess and stream its output to the logfile and progress tracker.
 
         :param proc_cmd: Command to run
-        :type proc_cmd: List[str]
+        :type proc_cmd: list[str]
         :param flog: Log file to write output to
         :type flog: TextIO
         :param task_id: ID of the task for progress tracking
@@ -344,14 +344,16 @@ class Scheduler:
             modified_script, task.name, ext=task.command.kind.ext
         )
 
-        def safe_unlink(path: Optional[Path]) -> None:
+        def safe_unlink(path: Path | str) -> None:
             """
             Unlink files that may or may not have been unlinked yet
 
             :param path: Path to the file to unlink
-            :type path: Optional[Path]
+            :type path: Path | str
             """
-            if path and isinstance(path, Path) and path.exists():
+            if not isinstance(path, (str, Path)):
+                return
+            elif Path(path).exists():
                 try:
                     path.unlink()
                 except Exception:
@@ -504,12 +506,12 @@ class Scheduler:
             running[finished].join()
             del running[finished]
 
-    def get_results(self) -> List[Tuple[str, str, bool]]:
+    def get_results(self) -> list[tuple[str, str, bool]]:
         """
         Get a list of all tasks with their results.
 
         :return: List of tasks in the format [task_name, task_logfile, successful]
-        :rtype: List[Tuple[str, str, bool]]
+        :rtype: list[tuple[str, str, bool]]
         """
         all_tasks = []
         for task, result in self.results.items():

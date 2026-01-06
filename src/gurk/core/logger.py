@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Optional
 
 from rich import print as richprint
 from rich.console import Console
@@ -118,7 +117,7 @@ class Logger:
             }
         return task_id
 
-    def generate_logfile_path(self, task_id: TaskID) -> Optional[Path]:
+    def generate_logfile_path(self, task_id: TaskID) -> Path | None:
         """
         Generate a logfile path for a given task name.
 
@@ -316,14 +315,14 @@ class Logger:
         self._progress.update(task_id, completed=total, description=desc)
 
     @staticmethod
-    def richprint(message: str, color: Optional[str] = None) -> None:
+    def richprint(message: str, color: str | None = None) -> None:
         """
         Print a rich-formatted message with optional color.
 
         :param message: The message to print
         :type message: str
         :param color: Optional color for the message
-        :type color: Optional[str]
+        :type color: str | None
         """
         if color:
             richprint(f"[{color}]{message}[/{color}]")

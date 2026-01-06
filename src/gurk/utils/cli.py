@@ -5,11 +5,11 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import List, Optional, Tuple
 
 from gurk.core.logger import Logger
 from gurk.utils.common import (
     ENABLED_CONFIG_FILE,
+    SETUP_DONE_FILE,
     generate_random_path,
     resolve_package_path,
 )
@@ -61,9 +61,6 @@ def get_sudo_askpass() -> Path:
     return askpass_path
 
 
-SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
-
-
 def prompt_setup(yes: bool) -> None:
     """
     Prompt the user to run setup if it has never been run before.
@@ -100,7 +97,7 @@ class CoreCliArgs:
     gurk_cmd:            str       = field(init=False, default=None)
     config_file:         Path      = field(init=False, default=None)
     config_directory:    Path      = field(init=False, default=None)
-    tasks:               List[str] = field(init=False, default_factory=list)
+    tasks:               list[str] = field(init=False, default_factory=list)
     enable_all:          bool      = field(init=False, default=False)
     enable_dependencies: bool      = field(init=False, default=False)
     disable_preparation: bool      = field(init=False, default=False)
@@ -116,17 +113,17 @@ class CoreCliProcessor:
     # fmt: off
     logger:  Logger        = field(repr=False)
     args:    CoreCliArgs   = field(repr=False)
-    argv:    List[str]     = field(repr=False)
-    tasks:   List[str]     = field(repr=False)
+    argv:    list[str]     = field(repr=False)
+    tasks:   list[str]     = field(repr=False)
     command: str           = field(repr=False)
     # fmt: on
 
-    def process_args(self) -> Tuple[CoreCliArgs, Optional[Path]]:
+    def process_args(self) -> tuple[CoreCliArgs, Path | None]:
         """
         Docstring for process_args
 
         :return: Processed main setup arguments and optional cloned config directory path
-        :rtype: Tuple[CoreCliArgs, Path | None]
+        :rtype: tuple[CoreCliArgs, Path | None]
         """
         main_setup_args = CoreCliArgs()
         cloned_config_dir = None

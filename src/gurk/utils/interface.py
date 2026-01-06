@@ -2,7 +2,6 @@ import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
-from typing import List, Optional, Union
 
 from rich.prompt import Confirm
 
@@ -21,22 +20,22 @@ PACKAGE_BASH_HELPERS_PATH = (
 
 def run_script_function(
     script: FilePath,
-    function: Optional[str] = None,
-    args: List[str] = [],
+    function: str | None = None,
+    args: list[str] = [],
     run: bool = True,
     capture_output: bool = False,
     sudo: bool = False,
     check: bool = True,
-) -> Union[str, subprocess.CompletedProcess[str]]:
+) -> str | subprocess.CompletedProcess[str]:
     """
     Build a wrapper script string for the specified command kind and optionally execute it.
 
     :param script: The path to the script to source or execute.
     :type script: FilePath
     :param function: The function within the script to call. If None, the script is executed directly.
-    :type function: Optional[str]
+    :type function: str | None
     :param args: Arguments to pass to the function or script
-    :type args: List[str]
+    :type args: list[str]
     :param run: If True, executes the script. Otherwise, returns the string.
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
@@ -64,20 +63,20 @@ def run_script_function(
 
 def _run_bash_script_function(
     script: FilePath,
-    function: Optional[str],
-    args: List[str],
+    function: str | None,
+    args: list[str],
     run: bool,
     capture_output: bool,
-) -> Union[str, subprocess.CompletedProcess[str]]:
+) -> str | subprocess.CompletedProcess[str]:
     """
     Build a bash wrapper script string and optionally execute it.
 
     :param script: The path to the script to source or execute.
     :type script: FilePath
     :param function: The function within the script to call. If None, the script is executed directly.
-    :type function: Optional[str]
+    :type function: str | None
     :param args: Arguments to pass to the function or script
-    :type args: List[str]
+    :type args: list[str]
     :param run: If True, executes the script. Otherwise, returns the string.
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
@@ -141,21 +140,21 @@ def _run_bash_script_function(
 
 def _run_python_script_function(
     script: FilePath,
-    function: Optional[str],
-    args: List[str],
+    function: str | None,
+    args: list[str],
     run: bool,
     capture_output: bool,
     sudo: bool,
-) -> Union[str, subprocess.CompletedProcess[str]]:
+) -> str | subprocess.CompletedProcess[str]:
     """
     Build a Python wrapper script string and optionally execute it.
 
     :param script: The path to the script to source or execute.
     :type script: FilePath
     :param function: The function within the script to call. If None, the script is executed directly.
-    :type function: Optional[str]
+    :type function: str | None
     :param args: Arguments to pass to the function or script
-    :type args: List[str]
+    :type args: list[str]
     :param run: If True, executes the script. Otherwise, returns the string.
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
@@ -260,14 +259,14 @@ def revert_sudo_permissions(path: FilePath) -> None:
     )
 
 
-def prompt_bool(message: str, answer: Optional[str] = None) -> bool:
+def prompt_bool(message: str, answer: str | None = None) -> bool:
     """
     Prompt the user for a yes/no response.
 
     :param message: The prompt message.
     :type message: str
     :param answer: Optional predefined answer for non-interactive usage.
-    :type answer: Optional[str]
+    :type answer: str | None
     :return: True if the user responds with 'y', False for 'n'.
     :rtype: bool
     """

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import networkx as nx
 
@@ -34,12 +34,12 @@ class TaskProcessor:
 
     enable_all:          bool               = field(init=False, default=False)
     enable_dependencies: bool               = field(init=False, default=False)
-    resolved_tasks:      List[ResolvedTask] = field(init=False, repr=False, default=None)
+    resolved_tasks:      list[ResolvedTask] = field(init=False, repr=False, default=None)
 
     # Internal
     _default_cfg_path: Path                 = field(init=False, repr=False, default=DEFAULT_CONFIG_FILE)
     _default_config:   TaskDictCollection   = field(init=False, repr=False, default=None)
-    _allowed_args:     Dict[str, List[str]] = field(init=False, repr=False, default_factory=dict)
+    _allowed_args:     dict[str, list[str]] = field(init=False, repr=False, default_factory=dict)
     _dependency_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
     _supercedes_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
     # fmt: on
@@ -147,22 +147,22 @@ class TaskProcessor:
 
     @staticmethod
     def check_allowed(
-        allowed_args: List[str],
-        args: Union[str, List[str]],
+        allowed_args: list[str],
+        args: str | list[str],
         allow_default: bool = False,
-    ) -> Tuple[List[str], bool]:
+    ) -> tuple[list[str], bool]:
         """
         Check if an argument is in the allowed list.
         If allowed_args is None, any argument is allowed.
 
         :param allowed_args: List of allowed arguments
-        :type allowed_args: List[str]
+        :type allowed_args: list[str]
         :param args: Argument or list of arguments to check
-        :type args: Union[str, List[str]]
+        :type args: str | list[str]
         :param allow_default: Whether to allow 'default' as a valid argument
         :type allow_default: bool
         :return: Tuple of (list of wrong arguments, is valid)
-        :rtype: Tuple[List[str], bool]
+        :rtype: tuple[list[str], bool]
         """
 
         def _check_single_allowed(arg: str) -> bool:
@@ -170,7 +170,7 @@ class TaskProcessor:
             Check if a single argument is allowed, supporting wildcard '*'
 
             :param allowed_args: List of allowed arguments
-            :type allowed_args: List[str]
+            :type allowed_args: list[str]
             :param arg: Argument to check
             :type arg: str
             :return: Whether the argument is allowed
@@ -189,7 +189,7 @@ class TaskProcessor:
             is_allowed = _check_single_allowed(args)
             wrong_args = [] if is_allowed else [args]
             return wrong_args, is_allowed
-        else:  # List[str]
+        else:  # list[str]
             wrong_args = [
                 arg for arg in args if not _check_single_allowed(arg)
             ]
@@ -203,14 +203,14 @@ class TaskProcessor:
         :rtype: TaskDictCollection
         """
 
-        def fatal(msg: str, task_name: Optional[str] = None) -> None:
+        def fatal(msg: str, task_name: str | None = None) -> None:
             """
             Helper to log fatal errors
 
             :param msg: Error message
             :type msg: str
             :param task_name: Name of the task where the error occurred
-            :type task_name: Optional[str]
+            :type task_name: str | None
             """
             self.logger.fatal(
                 f"Error in default config file {self._default_cfg_path}: {f'{task_name}:' if task_name else ''} {msg}"
@@ -356,7 +356,7 @@ class TaskProcessor:
         self.logger.debug("Default config file is valid")
         return default_config
 
-    def check_config(self, config: Dict[str, Any] = {}) -> TaskDictCollection:
+    def check_config(self, config: dict[str, Any] = {}) -> TaskDictCollection:
         """
         Check that the given config is valid.
 

@@ -1,5 +1,4 @@
 import subprocess
-from typing import Optional
 
 import commentjson
 import pytest
@@ -40,7 +39,7 @@ def test_package_configs(monkeypatch: pytest.MonkeyPatch) -> None:
             # Skip helpers
             continue
 
-        config_file: Optional[str] = task["config_file"]
+        config_file: str | None = task["config_file"]
         if config_file:
             full_path = get_config_path(config_file, task_name.split("-")[0])
             if not full_path.is_file():

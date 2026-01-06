@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, TypedDict, TypeVar
+from typing import TypeAlias, TypedDict, TypeVar
 
 from rich.progress import TaskID
 
@@ -87,8 +87,8 @@ class TaskInfo(TypedDict):
     name:      str
     total:     int
     completed: int
-    logfile:   Optional[Path]
+    logfile:   Path | None
     # fmt: on
 
 
-TaskInfos = Dict[TaskID, TaskInfo]
+TaskInfos: TypeAlias = dict[TaskID, TaskInfo]
