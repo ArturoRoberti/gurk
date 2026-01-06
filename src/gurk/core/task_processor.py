@@ -1,8 +1,8 @@
-import textwrap
 from copy import deepcopy
 from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
 from pathlib import Path
+from textwrap import dedent
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
@@ -241,7 +241,7 @@ class TaskProcessor:
             default_config, True
         )
         if invalid_tasks:
-            fatal_msg = textwrap.dedent(
+            fatal_msg = dedent(
                 f"""\
                 Some tasks have extra or missing fields, or use incorrect types: {invalid_tasks}
                 [cyan]Required structure for tasks in the default config[/cyan]:
@@ -421,7 +421,7 @@ class TaskProcessor:
             filled_tasks, False
         )
         if invalid_tasks:
-            warning_msg = textwrap.dedent(
+            warning_msg = dedent(
                 f"""\
                 Some tasks that have extra fields or are trying to override default fields are disabled: {invalid_tasks}
                 [cyan]Required structure for tasks in the custom config[/cyan] (all fields optional):

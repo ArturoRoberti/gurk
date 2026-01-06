@@ -8,16 +8,15 @@ import termios
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Queue
-from re import sub
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import Event, Lock, Thread
 from typing import Dict, List, Optional, Set, TextIO, Tuple
 
 from gurk.core.logger import Logger
-from gurk.utils.common import CommandKind
+from gurk.utils.common import CommandKind, generate_random_path
 from gurk.utils.interface import run_script_function
 from gurk.utils.logger import TaskTerminationType
-from gurk.utils.patterns import ANSI_RE, PatternCollection
+from gurk.utils.patterns import PatternCollection
 from gurk.utils.scripts import (
     Command,
     ScriptBlock,
@@ -58,9 +57,9 @@ class Scheduler:
         """
         # Create temporary file to run later
         original_path = Path(command.script)
-        tmp = NamedTemporaryFile(delete=False, suffix=f"_{original_path.name}")
-        tmp_path = Path(tmp.name)
-        tmp.close()
+        tmp_path = generate_random_path(
+            suffix=f"_{original_path.name}", prefix="modified_"
+        )
 
         # Analyze script blocks
         script_blocks = get_block_spans(original_path)
@@ -148,7 +147,7 @@ class Scheduler:
         :return: Task termination type (SUCCESS, FAILURE, PARTIAL)
         :rtype: TaskTerminationType
         """
-        # 1. Initialize Event for PARTIAL status tracking
+        # 1. Initialize Event for PARTIAL status tracking and log output
         warning_event = Event()
 
         # 2. Create the PTY master and slave file descriptors
@@ -161,6 +160,10 @@ class Scheduler:
             # Use os.fdopen in a 'with' block to guarantee closing the master_fd upon exit.
             with os.fdopen(master_fd, "rb", 0) as master_file:
                 try:
+                    # Save partial lines (not yet terminated with newline) for clean logging
+                    _partial_line = ""
+
+                    # Main reading loop
                     while True:
                         # Read data and check end of file (EOF)
                         try:
@@ -180,12 +183,23 @@ class Scheduler:
                         data = raw_data.decode(
                             encoding="utf-8", errors="replace"
                         )
-                        data = ANSI_RE.sub("", data)  # Remove mangled ANSI
-                        data = sub(r"\r+\n|\r{2,}", "\n", data)
-                        data = data.replace("\r", "")
+                        data = PatternCollection.ANSI.patterns.sub("", data)
 
-                        for line_raw in data.splitlines():
-                            line = line_raw.rstrip("\n")
+                        # Split data into lines, handling partial lines
+                        buffer = _partial_line + data.rstrip("\n")
+                        lines = buffer.split("\n")
+                        _partial_line = (
+                            "" if data.endswith("\n") else lines.pop()
+                        )
+
+                        # Process each line for STEP statements
+                        for line_raw in lines:
+                            # Handle carriage return - only keep last part
+                            if "\r" in line_raw.rstrip("\r"):
+                                parts = line_raw.rstrip("\r").split("\r")
+                                line = parts[-1]
+                            else:
+                                line = line_raw
 
                             # Write to logfile
                             flog.write(line + "\n")
@@ -221,6 +235,11 @@ class Scheduler:
                                     match.group(1).strip(),
                                     advance=False,
                                 )
+
+                    # Log any remaining partial line
+                    if _partial_line:
+                        flog.write(_partial_line + "\n")
+                        flog.flush()
 
                 except Exception as e:
                     self.logger.debug(f"PTY reader encountered an error: {e}")
@@ -395,9 +414,9 @@ class Scheduler:
         # Run and stream
         try:
             success = self._spawn_and_stream(proc_cmd, flog, task_id)
-        except Exception:
+        except Exception as e:
             self.logger.debug(
-                f"Task '{task.name}' failed, as an exception occurred during '_spawn_and_stream'."
+                f"Task '{task.name}' failed, as an exception occurred during '_spawn_and_stream': {e}"
             )
             success = TaskTerminationType.FAILURE
         finally:
@@ -416,9 +435,9 @@ class Scheduler:
         task_id = self.logger.add_task(task.name, total=1)
         try:
             success = self.run_task(task, task_id)
-        except Exception:
+        except Exception as e:
             self.logger.debug(
-                f"Task '{task.name}' failed, as an exception occurred during 'run_task'."
+                f"Task '{task.name}' failed, as an exception occurred during 'run_task': {e}"
             )
             success = TaskTerminationType.FAILURE
         finally:

@@ -133,11 +133,10 @@ class PatternCollection(Enum):
         "package":    re.compile(r"package://([^/]+)/(.*?)"),
         "url":        re.compile(r"^https?://[^\s]+$"),
     }
+    ANSI:           EnumValue[re.Pattern] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+    TRACEBACK_FILE: EnumValue[re.Pattern] = re.compile(r'^\s*File\s+"([^"]+)",\s+line\s+(\d+)')
     # fmt: on
 
     @property
     def patterns(self) -> T:
         return self.value
-
-
-ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
