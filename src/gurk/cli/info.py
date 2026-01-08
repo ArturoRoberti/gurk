@@ -13,6 +13,8 @@ from gurk.utils.common import (
 from gurk.utils.system_info import get_system_info
 from gurk.utils.yaml import load_yaml
 
+# TODO: Use pytest helper for getting proper '====' lines.
+
 
 def print_box_contents(filename: str) -> None:
     """
@@ -223,7 +225,7 @@ def main(argv, prog, description):
         if args.system_info:
             # Get system info without internal fields
             system_info = get_system_info()
-            system_info.pop("simulate_hardware")
+            del system_info["simulate_hardware"]
 
             Logger.richprint("=== System information ===", color="cyan")
             print_dict_aligned(system_info)

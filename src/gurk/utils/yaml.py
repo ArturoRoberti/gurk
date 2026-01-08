@@ -128,7 +128,10 @@ def overlay_dicts(dicts: list[dict], allow_default: bool = False) -> dict:
 
     # Check input
     if not all(isinstance(d, dict) for d in dicts):
-        raise ValueError("Input 'dicts' must be a list of dictionaries.")
+        raise ValueError(
+            "Input 'dicts' must be a list of dictionaries, "
+            f"got: {[type(d) for d in dicts]}"
+        )
 
     # Overlay all dictionaries in order
     overlayed_dict = deepcopy(dicts[0])

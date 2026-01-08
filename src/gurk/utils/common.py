@@ -17,8 +17,12 @@ DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"
 ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
-SETUP_DONE_FILE = Path.home() / ".gurk" / "setup.done"
+PACKAGE_HOME_PATH = Path.home() / ".gurk"
 PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
+SETUP_DONE_FILE = PACKAGE_HOME_PATH / "setup.done"
+
+
+PACKAGE_HOME_PATH.mkdir(parents=True, exist_ok=True)
 PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
 
 

@@ -1,0 +1,19 @@
+# No plugin imports
+
+define:
+  name: "ros"
+  description: "Plugin to install ROS (Robot Operating System)."
+  tasks:
+    install-ros:
+      description: Install ROS (Robot Operating System)
+      script: scripts/ros.bash
+      function: null
+      args:
+        allowed: [latest, --include-future, ardent, bouncy, crystal, dashing,
+            eloquent, foxy, galactic, humble, iron, jazzy, kilted, lyrical]
+        default: [latest]
+
+run:
+  default:
+    install-ros:
+      enabled: true

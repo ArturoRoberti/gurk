@@ -55,9 +55,10 @@ def get_block_spans(path: FilePath) -> list[ScriptBlock]:
     kind = CommandKind.from_script(path)
     source = Path(path).read_text(encoding="utf-8", errors="replace")
 
-    # Find imports (python only)
+    # Find imports
     imports = []
     if kind == CommandKind.PYTHON:
+        ## Python imports via AST
         tree = ast.parse(source, filename=str(path))
         for node in tree.body:
             if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -69,6 +70,19 @@ def get_block_spans(path: FilePath) -> list[ScriptBlock]:
                             lines=(node.lineno, node.end_lineno),
                         )
                     )
+    elif kind == CommandKind.BASH:
+        ## Bash imports via regex
+        import_re = PatternCollection.BASH.patterns["IMPORT"]
+        for idx, line in enumerate(source.splitlines(), 1):
+            m_import = import_re.match(line)
+            if m_import:
+                imports.append(
+                    ScriptBlock(
+                        type=ScriptBlockTypes.IMPORT,
+                        name=m_import.group(1),
+                        lines=(idx, idx),
+                    )
+                )
 
     # Collect regex patterns for block detection
     func_re = PatternCollection[kind.name].patterns["FUNCTION"]
@@ -152,6 +166,15 @@ def get_block_spans(path: FilePath) -> list[ScriptBlock]:
             positions[-1]["lines"][0],
             len(source.splitlines()),
         )
+
+    # Set IMPORT blocks that appear after non-import as OTHER (bash only)
+    non_import_found = False
+    if kind == CommandKind.BASH:
+        for block in positions:
+            if block["type"] != ScriptBlockTypes.IMPORT:
+                non_import_found = True
+            elif non_import_found and block["type"] == ScriptBlockTypes.IMPORT:
+                block["type"] = ScriptBlockTypes.OTHER
 
     # Merge adjacent IMPORT and OTHER blocks
     merged_positions = []
@@ -276,3 +299,100 @@ def iter_configs() -> Iterator[Path]:
     :rtype: Iterator[Path]
     """
     yield from _iter_command_files(PACKAGE_CONFIG_PATH)
+
+
+def check_script_blocks(path: Path) -> list[str]:
+    """
+    Check that a script only contains allowed top-level code:
+    - Only functions and an entrypoint (and imports for Python)
+    - At most one entrypoint, which must be at the end of the script
+
+    NOTE: Any block start with an added comment after will be considered invalid/OTHER.
+
+    :param path: Path to the script file
+    :type path: Path
+    :return: List of error messages if the script does not meet the criteria, empty list otherwise
+    :rtype: list[str]
+    """
+    # Use get_block_spans to find all blocks
+    blocks = get_block_spans(path)
+
+    # Error tracking
+    errors = []
+
+    # Check there are no CLASS or OTHER blocks
+    disallowed_blocks = [
+        b
+        for b in blocks
+        if b["type"] in {ScriptBlockTypes.CLASS, ScriptBlockTypes.OTHER}
+    ]
+    if disallowed_blocks:
+        disallowed_lines = ", ".join(
+            str(b["lines"]) for b in disallowed_blocks
+        )
+        errors.append(
+            f"'{path}:{disallowed_blocks[0]['lines'][0]}' contains disallowed top-level "
+            f"blocks (not FUNCTION, ENTRYPOINT, or IMPORT) at lines: {disallowed_lines}"
+        )
+
+    # Check that each function name is unique
+    function_names = [
+        b["name"] for b in blocks if b["type"] == ScriptBlockTypes.FUNCTION
+    ]
+    duplicates_names = [
+        name for name in function_names if function_names.count(name) > 1
+    ]
+    if duplicates_names:
+        errors.append(
+            f"'{path}' contains duplicate function names: {', '.join(duplicates_names)}"
+        )
+
+    # Check that python functions only capture '*args'
+    if CommandKind.from_script(path.name) == CommandKind.PYTHON:
+        pattern = PatternCollection.PYTHON.patterns["FUNCTION"]
+        matches = [
+            match
+            for line in path.read_text().splitlines()
+            if (match := pattern.search(line.strip()))
+        ]
+        for match in matches:
+            # Extract top-level function names and args
+            function_name, args = match.groups()
+            if function_name not in function_names:
+                # Skip nested functions
+                continue
+
+            # Check args
+            arg_list = [arg.strip() for arg in args.split(",") if arg.strip()]
+            if not (
+                len(arg_list) == 1 and arg_list[0].split(":")[0] == "*args"
+            ):
+                captured = ", ".join(
+                    [repr(arg.split(":")[0]) for arg in arg_list]
+                )
+                errors.append(
+                    f"'{function_name}' function in '{path}' does not only "
+                    f"capture '*args' as an argument, but: {captured}"
+                )
+
+    # Check that there is at most one ENTRYPOINT block and it is at the end
+    entrypoints = [
+        b for b in blocks if b["type"] == ScriptBlockTypes.ENTRYPOINT
+    ]
+    if len(entrypoints) > 1:
+        entrypoint_lines = ", ".join(str(b["lines"]) for b in entrypoints)
+        errors.append(
+            f"'{path}:{entrypoints[0]['lines'][0]}' contains more "
+            f"than one ENTRYPOINT block at lines: {entrypoint_lines}"
+        )
+
+    # Check that ENTRYPOINT is at the end
+    if entrypoints and blocks[-1]["type"] != ScriptBlockTypes.ENTRYPOINT:
+        entrypoint_lines = ", ".join(str(b["lines"]) for b in entrypoints)
+        errors.append(
+            f"'{path}:{entrypoints[0]['lines'][0]}' ENTRYPOINT block in {path} "
+            f"is not at the end of the script, but at lines: {entrypoint_lines}"
+        )
+
+    # Return errors if any
+    return errors

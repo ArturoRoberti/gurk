@@ -1,5 +1,4 @@
 import subprocess
-from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
 
@@ -14,7 +13,7 @@ from gurk.utils.common import (
 from gurk.utils.scripts import Command
 
 PACKAGE_BASH_HELPERS_PATH = (
-    PACKAGE_SRC_PATH / "scripts" / "bash" / "helpers" / "helpers.bash"
+    PACKAGE_SRC_PATH / "lib" / "helpers" / "bash" / "helpers.bash"
 )
 
 
@@ -47,17 +46,26 @@ def run_script_function(
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
     """
-    # Check existence of script & function fields
-    command = Command(script, function, check)
+    try:
+        # Check existence of script & function fields
+        command = Command(script, function, check)
 
-    # Run respective command
-    if command.kind == CommandKind.PYTHON:
-        return _run_python_script_function(
-            script, function, args, run, capture_output, sudo
-        )
-    else:
-        return _run_bash_script_function(
-            script, function, args, run, capture_output
+        # Run respective command
+        if command.kind == CommandKind.PYTHON:
+            return _run_python_script_function(
+                script, function, args, run, capture_output, sudo
+            )
+        else:
+            return _run_bash_script_function(
+                script, function, args, run, capture_output
+            )
+    except Exception as e:
+        # Return a failed CompletedProcess instead of None
+        return subprocess.CompletedProcess(
+            args=[str(script)].extend(function if function else []),
+            returncode=1,
+            stdout=b"",
+            stderr=str(e).encode(),
         )
 
 
@@ -203,44 +211,6 @@ def _run_python_script_function(
         )
 
     return wrapper_src
-
-
-def bash_check(check_name: str) -> subprocess.CompletedProcess[str]:
-    """
-    Run a (helper) check function
-
-    :param check_name: Name of the check function to run
-    :type check_name: str
-    :return: CompletedProcess result of the check
-    :rtype: CompletedProcess
-    """
-    # Create a mock bash file (used only as a placeholder)
-    with NamedTemporaryFile(
-        mode="w", suffix=".bash", delete=False
-    ) as tmp_file:
-        tmp_file.write("#!/usr/bin/env bash\n")
-        tmp_file_path = Path(tmp_file.name)
-
-    try:
-        # Try running the helper function
-        return run_script_function(
-            script=tmp_file_path,
-            function=check_name,
-            run=True,
-            capture_output=True,
-            check=False,
-        )
-    except Exception as e:
-        # Return a failed CompletedProcess instead of None
-        return subprocess.CompletedProcess(
-            args=[str(tmp_file_path), check_name],
-            returncode=1,
-            stdout=b"",
-            stderr=str(e).encode(),
-        )
-    finally:
-        # Always clean up
-        tmp_file_path.unlink(missing_ok=True)
 
 
 def revert_sudo_permissions(path: FilePath) -> None:

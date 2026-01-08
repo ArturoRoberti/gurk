@@ -2,10 +2,35 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, TypeAlias, TypedDict, Union
 
 from gurk.utils.scripts import Command
+from gurk.utils.yaml import overlay_dicts
 
 FieldTypeDict: TypeAlias = Mapping[
     str, Union[list[type | None], "FieldTypeDict"]
 ]
+
+
+def filled_properties(properties: FieldTypeDict) -> dict[str, Any]:
+    """
+    Given a FieldTypeDict, return a dict of default values for each property.
+
+    :param properties: The FieldTypeDict to fill
+    :type properties: FieldTypeDict
+    :return: A dict with default values for each property
+    :rtype: dict[str, Any]
+    """
+    result = {}
+    for key, val in properties.items():
+        if isinstance(val, dict):
+            # Recurse into nested dict
+            result[key] = filled_properties(val)
+        else:
+            # Use the first item as default, call it if callable
+            default_value = val[0]
+            result[key] = (
+                default_value() if callable(default_value) else default_value
+            )
+    return result
+
 
 # Required in default config
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
@@ -21,17 +46,15 @@ TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
         "default": [list],
     },
 }
+TASK_PROPERTIES_DEFAULT_FILLED = filled_properties(TASK_PROPERTIES_DEFAULT)
 
 # Optional in custom config
 TASK_PROPERTIES_CUSTOM: FieldTypeDict = {
     "enabled": [bool],
-    "config_file": [None, str],
+    "config_file": [None, str],  # TODO: Remove
     "args": [list],
 }
-DEFAULT_CUSTOM_CONFIG = {
-    key: val[0]() if callable(val[0]) else val[0]
-    for key, val in TASK_PROPERTIES_CUSTOM.items()
-}
+TASK_PROPERTIES_CUSTOM_FILLED = filled_properties(TASK_PROPERTIES_CUSTOM)
 
 
 # Explanations:
@@ -150,11 +173,10 @@ def check_dict_structure(
     return True
 
 
-class TaskDict(TypedDict):
-    """Dictionary representing a task configuration."""
+class DefaultTaskDict(TypedDict):
+    """Dictionary representing a default task configuration."""
 
     # fmt: off
-    enabled:        bool
     description:    str
     script:         str
     function:       str | None
@@ -162,11 +184,57 @@ class TaskDict(TypedDict):
     depends_on:     list[str]
     privileged:     bool
     supercedes:     list[str] | None
-    args:           dict[str, list[str]] | list[str]
+    args:           dict[str, list[str]]
     # fmt: on
 
 
+class CustomTaskDict(TypedDict):
+    """Dictionary representing a custom task configuration."""
+
+    # fmt: off
+    enabled:     bool
+    config_file: str | None
+    args:        list[str]
+    # fmt: on
+
+
+class TaskDict(DefaultTaskDict, CustomTaskDict):
+    """Dictionary representing a full task configuration."""
+
+    pass
+
+
+DefaultTaskDictCollection: TypeAlias = dict[str, DefaultTaskDict]
+CustomTaskDictCollection: TypeAlias = dict[str, CustomTaskDict]
 TaskDictCollection: TypeAlias = dict[str, TaskDict]
+
+CustomConfig: TypeAlias = dict[str, bool | CustomTaskDict]
+DefaultConfig: TypeAlias = DefaultTaskDictCollection
+
+
+def fill_missing_properties(
+    tasks: dict[str, Any],
+    default: bool,
+) -> dict[str, Any]:
+    """
+    Given a task dictionary, fill in any missing properties with default values.
+
+    :param task_dict: The task dictionary to fill
+    :type task_dict: dict[str, Any]
+    :param default: Whether to fill default task fields (True) or custom task fields (False)
+    :type default: bool
+    :return: The filled task dictionary
+    :rtype: dict[str, Any]
+    """
+    if default:
+        defaults_dict = TASK_PROPERTIES_DEFAULT_FILLED
+    else:
+        defaults_dict = TASK_PROPERTIES_CUSTOM_FILLED
+
+    return {
+        task_name: overlay_dicts([defaults_dict, task])
+        for task_name, task in tasks.items()
+    }
 
 
 def get_invalid_tasks_from_task_dict_collection(
@@ -179,7 +247,7 @@ def get_invalid_tasks_from_task_dict_collection(
 
     :param obj: The object to check
     :type obj: dict[Any, Any]
-    :param default: Whether to use default task fields (True) or custom task fields (False)
+    :param default: Whether to check for default task fields (True) or custom task fields (False)
     :type default: bool
     :return: List of invalid task names, or None if the object is not a dict
     :rtype: list[str] | None

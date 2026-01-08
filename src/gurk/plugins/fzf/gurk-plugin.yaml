@@ -1,0 +1,37 @@
+imports: [docker]
+
+define:
+  name: "fzf"
+  description: "Plugin to install fzf and loki-shell for fuzzy searching capabilities."
+  tasks:
+    install-fzf:
+      description: Install fzf (allows fuzzy searching in terminal)
+      script: scripts/installations.bash
+      function: install_fzf
+      depends_on: [install-docker]
+    install-loki-shell:
+      description: Install Loki shell (allows shared fuzzy searching over SSH, Docker, ...)
+      script: scripts/installations.bash
+      function: install_loki_shell
+      depends_on: [install-fzf]
+    uninstall-loki-shell:
+      description: Uninstall loki-shell
+      script: scripts/uninstallations.bash
+      function: uninstall_loki_shell
+    uninstall-fzf:
+      description: Uninstall fzf
+      script: scripts/uninstallations.bash
+      function: uninstall_fzf
+      depends_on: [uninstall-loki-shell]
+
+run:
+  options:
+    install: &install_option
+      enable_dependencies: true
+      install-loki-shell:
+        enabled: true
+    uninstall:
+      enable_dependencies: false
+      uninstall-fzf:
+        enabled: true
+  default: *install_option

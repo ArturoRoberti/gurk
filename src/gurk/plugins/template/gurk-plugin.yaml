@@ -1,0 +1,47 @@
+# Helper to define gurk task defaults. Not required, but inserted here for documentation's sake.
+_defaults: &defaults
+  config_file: null
+  depends_on: []
+  privileged: false
+  supercedes: []
+  args:
+    allowed: []
+    default: []
+
+# (Optional) Define external plugins to import first. Same functionality as `gurk plugin import`
+imports: []
+
+# Define this plugin
+define:
+  name: "template plugin"
+  description: "A template plugin for Gurk demonstrating the gurk-plugin.yaml structure."
+# Optionally, define new tasks here, with at least mandatory fields ('description', 'script' and 'function')
+  tasks:
+    install-some-task:
+      description: "A sample task"
+      script: scripts/some_script.bash
+      function: some_function
+    configure-another-task:
+      description: "Another sample task"
+      script: scripts/another_script.py
+      function: null
+      depends_on: [install-some-task]
+      config_file: config/another_task_config.yaml
+
+# Define how to run this plugin
+# - This can either use existing tasks (in other plugins) or use your defined tasks.
+# - The 'default' option will be used when running `gurk plugin run <plugin-name>`.
+# - Other options can be used by running `gurk plugin run <plugin-name>=<option-name>`
+# - The first command prefix (before the first '-') of the tasks in the selected option
+#     will be used as the gurk core command to run (e.g., 'install' for 'install-some-task').
+#     Multiple commands can be indirectly run by enabling dependencies, but in no other way (by design).
+run:
+  options:
+    some-option: &some_option
+      install-some-task:
+        enabled: true
+    another-option:
+      enable_dependencies: true
+      configure-another-task:
+        enabled: true
+  default: *some_option

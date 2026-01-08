@@ -13,9 +13,9 @@ from gurk.utils.common import (
     generate_random_path,
     resolve_package_path,
 )
-from gurk.utils.git_repos import clone_git_files, is_git_repo
 from gurk.utils.interface import prompt_bool
 from gurk.utils.logger import TaskTerminationType
+from gurk.utils.remotes import clone_git_files, is_git_repo
 from gurk.utils.system_info import get_system_info
 from gurk.utils.yaml import load_yaml
 

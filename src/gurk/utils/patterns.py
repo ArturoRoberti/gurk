@@ -73,6 +73,7 @@ class ScriptPatterns(TypedDict):
     FOR:        re.Pattern
     WHILE:      re.Pattern
     UNTIL:      re.Pattern | None
+    IMPORT:     re.Pattern | None
     # fmt: on
 
 
@@ -115,6 +116,7 @@ class PatternCollection(Enum):
         "FOR":        re.compile(r"^\s*for\s+(.*);\s*do\s*$"),
         "WHILE":      re.compile(r"^\s*while\s+(.*);\s*do\s*$"),
         "UNTIL":      re.compile(r"^\s*until\s+(.*);\s*do\s*$"),
+        "IMPORT":     re.compile(r"^\s*source\s+([^\s#;]+)"),
     }
     PYTHON: EnumValue[ScriptPatterns] = {
         "ENTRYPOINT": re.compile(r'if __name__\s*==\s*[\'"]__main__[\'"]\s*:'),
@@ -127,11 +129,11 @@ class PatternCollection(Enum):
         "FOR":        re.compile(r"^\s*for\s+(.*):\s*$"),
         "WHILE":      re.compile(r"^\s*while\s+(.*):\s*$"),
         "UNTIL":      None,  # Python has no "until"
+        "IMPORT":     None,  # Handled via ast module
     }
     PATH: EnumValue[PathPatterns] = {
         "symlink":    re.compile(r"^symlink://(.*)$"),
         "package":    re.compile(r"package://([^/]+)/(.*?)"),
-        "url":        re.compile(r"^https?://[^\s]+$"),
     }
     ANSI:           EnumValue[re.Pattern] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
     TRACEBACK_FILE: EnumValue[re.Pattern] = re.compile(r'^\s*File\s+"([^"]+)",\s+line\s+(\d+)')

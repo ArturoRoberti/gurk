@@ -2,6 +2,7 @@ import sys
 from collections import OrderedDict
 from importlib.metadata import version
 from pathlib import Path
+from textwrap import dedent
 
 from click import Group
 
@@ -33,6 +34,7 @@ class OrderedGroup(Group):
         :param formatter: Click formatter
         :type formatter: click.HelpFormatter
         """
+        # Build sections based on command categories
         sections = OrderedDict()
         for name in self.list_commands(ctx):
             # Get the command object
@@ -42,13 +44,19 @@ class OrderedGroup(Group):
             section = getattr(cmd, "category", "Other")
 
             # Clean up help text
-            help_text = cmd.help or ""
-            help_text = " ".join(
-                line.strip() for line in help_text.splitlines() if line.strip()
-            )
+            help_text = dedent(cmd.help) or ""
 
+            # Add to the appropriate section
             sections.setdefault(section, []).append((name, help_text))
 
+        # Ensure "Core Commands" appears first if present
+        if "Core Commands" in sections:
+            core_rows = sections.pop("Core Commands")
+            sections = OrderedDict(
+                [("Core Commands", core_rows), *sections.items()]
+            )
+
+        # Write sections
         for section_name, rows in sections.items():
             with formatter.section(section_name):
                 formatter.write_dl(rows)

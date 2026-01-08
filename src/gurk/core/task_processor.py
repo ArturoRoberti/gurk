@@ -9,15 +9,20 @@ import networkx as nx
 
 from gurk.cli.utils import CORE_COMMANDS
 from gurk.core.logger import Logger
+from gurk.plugin.utils import (
+    combine_plugin_configs,
+    get_combined_plugin_registry,
+)
 from gurk.utils.cli import CoreCliArgs
 from gurk.utils.common import DEFAULT_CONFIG_FILE, get_script_path
 from gurk.utils.scripts import Command
 from gurk.utils.tasks import (
-    DEFAULT_CUSTOM_CONFIG,
     TASK_PROPERTIES_CUSTOM,
+    TASK_PROPERTIES_CUSTOM_FILLED,
     TASK_PROPERTIES_DEFAULT,
     ResolvedTask,
     TaskDictCollection,
+    fill_missing_properties,
     get_invalid_tasks_from_task_dict_collection,
     print_expected_task_fields,
 )
@@ -90,10 +95,7 @@ class TaskProcessor:
                 task["enabled"] = False
 
         # Fill all missing custom fields in other tasks
-        tasks = {
-            task_name: overlay_dicts([DEFAULT_CUSTOM_CONFIG, task])
-            for task_name, task in tasks.items()
-        }
+        tasks = fill_missing_properties(tasks, default=False)
 
         # Resolve and check config file paths for all tasks
         tasks = self.resolve_config_directory(tasks)
@@ -215,6 +217,10 @@ class TaskProcessor:
             self.logger.fatal(
                 f"Error in default config file {self._default_cfg_path}: {f'{task_name}:' if task_name else ''} {msg}"
             )
+
+        # Create default config from plugins
+        combined_registry = get_combined_plugin_registry()
+        default_config = combine_plugin_configs(list(combined_registry.keys()))
 
         # Check file exists and is not empty
         default_config = load_yaml(self._default_cfg_path)
@@ -398,7 +404,7 @@ class TaskProcessor:
         check_option("enable_dependencies")
 
         # Add defaults for missing optional fields. Used to check structure of custom config tasks
-        default_dict = deepcopy(DEFAULT_CUSTOM_CONFIG)
+        default_dict = deepcopy(TASK_PROPERTIES_CUSTOM_FILLED)
         for common_key in (
             TASK_PROPERTIES_DEFAULT.keys() & TASK_PROPERTIES_CUSTOM.keys()
         ):
@@ -439,7 +445,7 @@ class TaskProcessor:
                     f"Task '{task_name}' is removed because "
                     f"it is not defined in the default config"
                 )
-                final_tasks.pop(task_name)
+                del final_tasks[task_name]
 
         # Check args
         for task_name, task in final_tasks.items():
