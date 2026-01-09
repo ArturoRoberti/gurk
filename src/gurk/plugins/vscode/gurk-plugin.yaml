@@ -4,27 +4,26 @@ define:
   name: "vscode"
   description: "Plugin to install Visual Studio Code."
   tasks:
-    install-vscode:
+    vscode/install-vscode:
       description: Install Visual Studio Code
       script: scripts/installations.bash
       function: install_vscode
-    install-vscode-extensions:
+    vscode/install-vscode-extensions:
       description: Install a list of Visual Studio Code extensions
       script: scripts/installations.py
       function: install_vscode_extensions
       config_file: config/install_vscode_extensions.txt
-      depends_on: [install-vscode]
-    configure-vscode-keybindings:
+      depends_on: [vscode/install-vscode]
+    vscode/configure-vscode-keybindings:
       description: Configure Visual Studio Code keybindings
       script: scripts/configurations.py
       function: configure_vscode_keybindings
       config_file: config/configure_vscode_keybindings.jsonc
-      depends_on: [install-vscode]
+      depends_on: [vscode/install-vscode]
 
 run:
   default:
-    enable_dependencies: true
-    install-vscode-extensions:
+    vscode/install-vscode-extensions:
       enabled: true
-    configure-vscode-keybindings:
+    vscode/configure-vscode-keybindings:
       enabled: true

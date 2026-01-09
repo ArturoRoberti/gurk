@@ -4,26 +4,26 @@ define:
   name: "conda"
   description: "Plugin to install Conda (Miniconda/Anaconda) and manage Conda/Mamba environments."
   tasks:
-    install-conda:
+    conda/install-conda:
       description: Install Conda (Miniconda/Anaconda)
       script: scripts/conda.bash
       function: install_conda
       args:
         allowed: [miniconda, anaconda]
         default: [miniconda]
-    install-conda-environments:
+    conda/install-conda-environments:
       description: Install Conda/Mamba environments
       script: scripts/conda_environments.py
       function: install_conda_environments
       config_file: config/install_conda_environments.jsonc
       args:
         allowed: [--update]
-    install-mamba:
+    conda/install-mamba:
 # NOTE: "mamba" requires conda, "micromamba" does not (is standalone)
       description: Install (Micro)Mamba
       script: scripts/conda.bash
       function: install_mamba
-      depends_on: [install-conda]
+      depends_on: [conda/install-conda]
       args:
         allowed: [micromamba, mamba]
         default: [micromamba]
@@ -31,13 +31,13 @@ define:
 run:
   options:
     conda:
-      install-conda:
+      conda/install-conda:
         enabled: true
-      install-conda-environments:
+      conda/install-conda-environments:
         enabled: true
     mamba: &mamba_option
-      install-mamba:
+      conda/install-mamba:
         enabled: true
-      install-conda-environments:
+      conda/install-conda-environments:
         enabled: true
   default: *mamba_option

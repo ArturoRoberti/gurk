@@ -4,28 +4,28 @@ define:
   name: "nvidia"
   description: "Plugin to install NVIDIA CUDA Toolkit, drivers, and IsaacSim/Lab."
   tasks:
-    install-cuda:  # TODO: Allow version specification, and then adapt driver version to that (default: "latest" as is right now)
+    nvidia/install-cuda:  # TODO: Allow version specification, and then adapt driver version to that (default: "latest" as is right now)
       description: Install NVIDIA CUDA Toolkit (and compatible driver). WARNING -
         Removes driver prime-selection!
       script: scripts/nvidia.bash
       function: install_cuda
-      supercedes: [install-nvidia-driver]
-    install-isaaclab:
+      supercedes: [nvidia/install-nvidia-driver]
+    nvidia/install-isaaclab:
       description: Install NVIDIA IsaacLab
       script: scripts/isaac.bash
       function: install_isaaclab
-      depends_on: [install-isaacsim, install-conda]
+      depends_on: [nvidia/install-isaacsim, conda/install-conda]
       args:
         allowed: [recommended, latest, v2.*]
         default: [recommended]
-    install-isaacsim:
+    nvidia/install-isaacsim:
       description: Install NVIDIA IsaacSim
       script: scripts/isaac.bash
       function: install_isaacsim
       args:
         allowed: [latest, 4.*, 5.*]
         default: [latest]
-    install-nvidia-driver:
+    nvidia/install-nvidia-driver:
       description: Install NVIDIA driver (standalone). WARNING - Removes CUDA
         compatibility!
       script: scripts/nvidia.bash
@@ -37,10 +37,9 @@ define:
 
 run:
   default:
-    enable_dependencies: true
-    install-cuda:
+    nvidia/install-cuda:
       enabled: true
-    install-nvidia-driver:
+    nvidia/install-nvidia-driver:
       enabled: false
-    install-isaaclab:
+    nvidia/install-isaaclab:
       enabled: true

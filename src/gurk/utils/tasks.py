@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Mapping, TypeAlias, TypedDict, Union
+from typing import Any, Mapping, NotRequired, TypeAlias, TypedDict, Union
 
 from gurk.utils.scripts import Command
 from gurk.utils.yaml import overlay_dicts
@@ -180,11 +180,11 @@ class DefaultTaskDict(TypedDict):
     description:    str
     script:         str
     function:       str | None
-    config_file:    str | None
-    depends_on:     list[str]
-    privileged:     bool
-    supercedes:     list[str] | None
-    args:           dict[str, list[str]]
+    config_file:    NotRequired[str | None]
+    depends_on:     NotRequired[list[str]]
+    privileged:     NotRequired[bool]
+    supercedes:     NotRequired[list[str] | None]
+    args:           NotRequired[dict[str, list[str]]]
     # fmt: on
 
 
@@ -193,8 +193,8 @@ class CustomTaskDict(TypedDict):
 
     # fmt: off
     enabled:     bool
-    config_file: str | None
-    args:        list[str]
+    config_file: NotRequired[str | None]
+    args:        NotRequired[list[str]]
     # fmt: on
 
 
@@ -207,9 +207,6 @@ class TaskDict(DefaultTaskDict, CustomTaskDict):
 DefaultTaskDictCollection: TypeAlias = dict[str, DefaultTaskDict]
 CustomTaskDictCollection: TypeAlias = dict[str, CustomTaskDict]
 TaskDictCollection: TypeAlias = dict[str, TaskDict]
-
-CustomConfig: TypeAlias = dict[str, bool | CustomTaskDict]
-DefaultConfig: TypeAlias = DefaultTaskDictCollection
 
 
 def fill_missing_properties(

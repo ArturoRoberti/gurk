@@ -2,9 +2,17 @@ import getpass
 import os
 import subprocess
 import sys
+from argparse import (
+    SUPPRESS,
+    ArgumentDefaultsHelpFormatter,
+    ArgumentParser,
+    Namespace,
+    _ArgumentGroup,
+)
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Iterable
 
 from gurk.core.logger import Logger
 from gurk.utils.common import (
@@ -307,3 +315,66 @@ class CoreCliProcessor:
 
         self.logger.debug("System preparation completed successfully")
         return success
+
+
+class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
+    """
+    Custom formatter that:
+      - hides default=None and default=False for boolean flags
+      - annotates mutually exclusive args automatically
+      - respects max_help_position
+    """
+
+    def __init__(self, prog):
+        super().__init__(prog, max_help_position=60)
+
+    def _get_help_string(self, action):
+        if action.default not in (None, SUPPRESS):
+            # A default is specified and is not purposefully suppressed
+            # NOTE: Inludes boolean flags ("store_true"/"store_false")
+            default_suffix = f"(default: {action.default!s})"
+            if not action.help:
+                return default_suffix
+            else:
+                return action.help + " " + default_suffix
+        else:
+            # No default specified or default is purposefully suppressed
+            return action.help or ""
+
+
+class CleanArgumentParser(ArgumentParser):
+    """
+    Custom ArgumentParser that uses CleanHelpFormatter.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.required_group_title = "required arguments"
+        kwargs["formatter_class"] = lambda prog: CleanHelpFormatter(prog)
+        super().__init__(*args, **kwargs)
+
+    def add_required_group(self) -> _ArgumentGroup:
+        """
+        Add a 'required arguments' group to the parser.
+
+        :return: The created argument group
+        :rtype: _ArgumentGroup
+        """
+        return self.add_argument_group(self.required_group_title)
+
+    def parse_args(
+        self,
+        args: Iterable[str] | None = None,
+        namespace: object | None = None,
+    ) -> Namespace:
+        # Reorder action groups to have 'required arguments' first
+        requireed_group = None
+        for g in self._action_groups:
+            if g.title == self.required_group_title:
+                requireed_group = g
+                break
+        if requireed_group:
+            self._action_groups.remove(requireed_group)
+            self._action_groups.insert(0, requireed_group)
+
+        # Call the original parse_args
+        return super().parse_args(args, namespace)

@@ -17,7 +17,7 @@ SUBCOMMAND_CONTEXT_SETTINGS = {
 }
 VERSION = version("gurk")
 
-CORE_COMMANDS = ["install", "uninstall", "configure"]
+CORE_COMMANDS = ["install", "uninstall", "configure"]  # TODO: Remove
 
 
 class OrderedGroup(Group):
@@ -36,30 +36,39 @@ class OrderedGroup(Group):
         """
         # Build sections based on command categories
         sections = OrderedDict()
-        for name in self.list_commands(ctx):
+        commands = []
+        for command in self.list_commands(ctx):
             # Get the command object
-            cmd = self.get_command(ctx, name)
+            cmd = self.get_command(ctx, command)
             if cmd is None:
                 continue
-            section = getattr(cmd, "category", "Other")
+            section = getattr(cmd, "category", "Other Commands")
 
             # Clean up help text
-            help_text = dedent(cmd.help) or ""
+            help_text = dedent(cmd.help or "")
 
             # Add to the appropriate section
-            sections.setdefault(section, []).append((name, help_text))
+            sections.setdefault(section, []).append((command, help_text))
 
-        # Ensure "Core Commands" appears first if present
-        if "Core Commands" in sections:
-            core_rows = sections.pop("Core Commands")
-            sections = OrderedDict(
-                [("Core Commands", core_rows), *sections.items()]
-            )
+            # Keep track of all commands for width calculation
+            commands.append(command)
+
+        # Don't print anything if there are no commands
+        if not commands:
+            return
+
+        # Compute a single indent to use across all sections
+        # Indent counts from start of command name to start of help text
+        indent_min = 10
+        indent = max(indent_min, max(len(n) for n in commands))
 
         # Write sections
         for section_name, rows in sections.items():
             with formatter.section(section_name):
-                formatter.write_dl(rows)
+                padded_rows = [
+                    (command.ljust(indent), help) for command, help in rows
+                ]
+                formatter.write_dl(padded_rows)
 
     def list_commands(self, ctx) -> list[str]:
         """

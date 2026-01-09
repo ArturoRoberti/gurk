@@ -11,12 +11,11 @@ from argparse import (
 )
 from dataclasses import MISSING, fields, is_dataclass
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict, get_args, get_origin
+from typing import NotRequired, TypedDict, get_args, get_origin
 
 import networkx as nx
 from ruamel.yaml import YAML
 
-from gurk.cli.utils import CORE_COMMANDS
 from gurk.utils.common import (
     PACKAGE_HOME_PATH,
     PACKAGE_SRC_PATH,
@@ -30,13 +29,14 @@ from gurk.utils.scripts import (
     get_block_spans,
 )
 from gurk.utils.tasks import (
-    CustomConfig,
     CustomTaskDict,
-    DefaultConfig,
+    CustomTaskDictCollection,
+    DefaultTaskDict,
+    DefaultTaskDictCollection,
     TaskDictCollection,
     fill_missing_properties,
 )
-from gurk.utils.validate import validate_typed_dict, validate_typed_dict_keys
+from gurk.utils.validate import validate_typed_dict
 from gurk.utils.yaml import load_yaml
 
 #########################################################################################
@@ -48,14 +48,14 @@ class PluginDefine(TypedDict):
     # fmt: off
     name:        str
     description: str
-    tasks:       NotRequired[DefaultConfig]
+    tasks:       NotRequired[DefaultTaskDictCollection]
     # TODO: Add version field? Maybe also author etc.?
     # fmt: on
 
 
 class PluginRun(TypedDict):
-    options: NotRequired[dict[str, CustomConfig]]
-    default: CustomConfig
+    options: NotRequired[dict[str, CustomTaskDictCollection]]
+    default: CustomTaskDictCollection
 
 
 class GurkPlugin(TypedDict):
@@ -72,7 +72,7 @@ class PluginRegistryEntry(TypedDict):
     # version: str # Keep? How to read remote repo versions?
 
 
-def get_plugin_dirs() -> tuple[Path, Path]:
+def _get_plugin_dirs() -> tuple[Path, Path]:
     """
     Get a tuple of plugin directories.
 
@@ -88,7 +88,7 @@ def get_plugin_dirs() -> tuple[Path, Path]:
     return tuple(possible_plugin_paths)
 
 
-def get_plugin_registries() -> tuple[Path, Path]:
+def _get_plugin_registries() -> tuple[Path, Path]:
     """
     Get a tuple of plugin registries.
 
@@ -96,7 +96,7 @@ def get_plugin_registries() -> tuple[Path, Path]:
     :rtype: tuple[Path, Path]
     """
     possible_plugin_registries = [
-        p / "registry.yaml" for p in get_plugin_dirs()
+        p / "registry.yaml" for p in _get_plugin_dirs()
     ]
     for p in possible_plugin_registries:
         p.touch(exist_ok=True)
@@ -111,7 +111,7 @@ def get_combined_plugin_registry() -> dict[str, PluginRegistryEntry]:
     :return: Combined plugin registry
     :rtype: dict[str, PluginRegistryEntry]
     """
-    home_registry_file, package_registry_file = get_plugin_registries()
+    home_registry_file, package_registry_file = _get_plugin_registries()
     home_registry = load_yaml(home_registry_file) or {}
     package_registry = load_yaml(package_registry_file) or {}
 
@@ -122,11 +122,12 @@ def get_combined_plugin_registry() -> dict[str, PluginRegistryEntry]:
     return combined_registry
 
 
-def get_possible_plugin_data(
+def _get_possible_plugin_data(
     plugin: GitRef | str,
 ) -> tuple[PluginRegistryEntry | None, PluginRegistryEntry | None]:
     """
     Get possible plugin paths for a given plugin name.
+        NOTE: This does not check the validity of the plugin yaml file.
 
     :param plugin: Name or GitRef of the plugin
     :type plugin: GitRef | str
@@ -179,7 +180,7 @@ def get_possible_plugin_data(
     return tuple(
         _load_plugin(plugin_dir, registry_file)
         for plugin_dir, registry_file in zip(
-            get_plugin_dirs(), get_plugin_registries()
+            _get_plugin_dirs(), _get_plugin_registries()
         )
     )
 
@@ -193,7 +194,7 @@ def get_plugin_data(plugin: GitRef | str) -> PluginRegistryEntry | None:
     :return: Plugin data if the plugin exists locally, None otherwise
     :rtype: PluginRegistryEntry | None
     """
-    possible_plugin_data = get_possible_plugin_data(plugin)
+    possible_plugin_data = _get_possible_plugin_data(plugin)
     plugin_data = tuple(p for p in possible_plugin_data if p is not None)
     return plugin_data[0] if plugin_data else None
 
@@ -234,7 +235,7 @@ def plugin_exists(plugin: GitRef | str) -> bool:
     return plugin_exists_locally(plugin) or plugin_exists_remotely(plugin)
 
 
-def get_plugin_config(plugin: GitRef | str) -> GurkPlugin | None:
+def load_plugin_yaml(plugin: GitRef | str) -> GurkPlugin | None:
     """
     Get the gurk-plugin.yaml configuration of a plugin if it exists locally.
 
@@ -253,26 +254,32 @@ def get_plugin_config(plugin: GitRef | str) -> GurkPlugin | None:
     return load_yaml(Path(plugin_data["local"]) / "gurk-plugin.yaml")
 
 
-def combine_plugin_configs(
-    plugins: list[GitRef | str],
-) -> dict[str, GurkPlugin]:
+def get_available_plugin_names() -> list[str]:
     """
-    Combine the gurk-plugin.yaml configurations of multiple plugins.
+    Get the names of all available local plugins.
 
-    :param plugins: List of plugin names or GitRefs
-    :type plugins: list[GitRef | str]
-    :return: Dictionary of plugin names to GurkPlugin configurations
-    :rtype: dict[str, GurkPlugin]
+    :return: List of available local plugin names
+    :rtype: list[str]
     """
-    combined_configs: TaskDictCollection = {}
-    for plugin in plugins:
-        plugin_config = get_plugin_config(plugin)
-        if plugin_config:
-            # Get tasks
-            tasks = plugin_config["define"]["tasks"]
+    combined_registry = get_combined_plugin_registry()
+    return list(combined_registry.keys())
 
-            # Fill missing properties
-            plugin_tasks = fill_missing_properties(tasks, default=True)
+
+# TODO: Test new name prefix
+def get_combined_plugin_tasks() -> dict[str, DefaultTaskDict]:
+    """
+    Get the combined task definitions of all local plugins.
+
+    :return: Dictionary of tasks from all local plugins
+    :rtype: dict[str, DefaultTaskDict]
+    """
+    combined_tasks: TaskDictCollection = {}
+    for plugin in get_available_plugin_names():
+        plugin_yaml = load_plugin_yaml(plugin)
+        if plugin_yaml:
+            # Get tasks and fill missing properties
+            tasks = plugin_yaml["define"]["tasks"]
+            tasks = fill_missing_properties(tasks, default=True)
 
             # Expand paths
             plugin_path = get_plugin_data(plugin)["local"]
@@ -286,9 +293,9 @@ def combine_plugin_configs(
                         Path(plugin_path) / task["config_file"]
                     )
 
-            combined_configs.update(plugin_tasks)
+            combined_tasks.update(tasks)
 
-    return combined_configs
+    return combined_tasks
 
 
 def add_plugin_entry(
@@ -305,7 +312,7 @@ def add_plugin_entry(
     :rtype: bool
     """
     # Load home plugin registry
-    registry_file = get_plugin_registries()[0]  # Home registry
+    registry_file = _get_plugin_registries()[0]  # Home registry
     registry: dict[str, PluginRegistryEntry] = load_yaml(registry_file) or {}
 
     # Check if plugin already exists
@@ -331,7 +338,7 @@ def remove_plugin_entry(plugin_name: str) -> None:
     :type plugin_name: str
     """
     # Load home plugin registry
-    registry_file = get_plugin_registries()[0]  # Home registry
+    registry_file = _get_plugin_registries()[0]  # Home registry
     registry: dict[str, PluginRegistryEntry] = load_yaml(registry_file) or {}
 
     # Check if plugin exists
@@ -349,6 +356,7 @@ def remove_plugin_entry(plugin_name: str) -> None:
 #########################################################################################
 
 
+# TODO: Remove
 def create_subparser(subparsers: _SubParsersAction, module_name: str) -> None:
     """
     Create a subparser for the given module name.
@@ -447,28 +455,31 @@ def create_subparser(subparsers: _SubParsersAction, module_name: str) -> None:
             parser_cmd.set_defaults(func=func)
 
 
-def check_local_plugin(
-    plugin_path: FilePath,
-    check_imports: bool = False,
-    require_local: bool = False,
-) -> bool:
+# TODO: Remaining checks from TaskProcessor:
+#       - Check dependency and supercedes graphs ('define' section)
+#       - Check that args passed are valid ('run' section)
+# TODO: Improve error messages
+#       - The plugin path should be prefixed in all messages
+#       - Use logger instead of print
+#       - Be more informative in general (e.g., which fields are missing/invalid, and how they are invalid / to fix them)
+#       - Maybe collect all errors and print them at the end instead of exiting at the first error
+def check_local_plugin(plugin_path: FilePath) -> bool:
     """
     Check if a local plugin is valid.
+        NOTE: All imported plugins (recursively) must also be local and valid.
 
     :param plugin_path: Path to the local plugin
     :type plugin_path: FilePath
-    :param check_imports: Whether to check imported plugins as well, if locally available (default: False)
-    :type check_imports: bool, optional
-    :param require_local: Whether to require imported plugins to be available locally (default: False)
-    :type require_local: bool, optional
     :return: True if the plugin is valid, False otherwise
     :rtype: bool
     """
+    # Persistent data
     plugin_graph = nx.DiGraph()
+    available_task_names: set[str] = set()
 
-    def _check_local_plugin(_plugin_path: str) -> bool:
+    def _check_local_plugin(_plugin_path: Path) -> bool:
         # Load gurk-plugin.yaml
-        plugin = load_yaml(Path(_plugin_path) / "gurk-plugin.yaml")
+        plugin: GurkPlugin = load_yaml(_plugin_path / "gurk-plugin.yaml")
         if not plugin:
             print(
                 f"Plugin source '{_plugin_path}' has no 'gurk-plugin.yaml' file or it is invalid YAML."
@@ -478,51 +489,58 @@ def check_local_plugin(
         # Add plugin node to graph
         plugin_graph.add_node(_plugin_path)
 
-        # Validate top-level structure
-        plugin_without_helpers = {
+        # Validate structure
+        plugin_without_helpers: GurkPlugin = {
             k: v
             for k, v in plugin.items()
             if isinstance(k, str) and not k.startswith("_")
         }
-        if not validate_typed_dict_keys(plugin_without_helpers, GurkPlugin):
-            print("Plugin has invalid top-level keys.")
+        if not validate_typed_dict(plugin_without_helpers, GurkPlugin):
+            print(f"Plugin '{_plugin_path}' has invalid structure.")
+            # TODO: Find a way to be more informative. Maybe print required structure, similar to before?
             # TODO: Use logger (error)
             return False
 
-        # Check that the 'define' section is valid
-        plugin_definition: PluginDefine = plugin.get("define")
-        if not plugin_definition:
-            # TODO: Use logger (error)
-            print("Plugin has no 'define' section.")
-            return False
-
-        ## Fill missing task properties and validate structure
-        plugin_definition["tasks"] = fill_missing_properties(
-            plugin_definition["tasks"], default=True
-        )
-        if not validate_typed_dict(plugin_definition, PluginDefine):
-            print("Plugin 'define' section has invalid structure.")
+        ## Check that the plugin name is unique
+        plugin_definition: PluginDefine = plugin["define"]
+        plugin_name = plugin_definition["name"]
+        existing_plugin = get_plugin_data(plugin_name)
+        if existing_plugin and Path(existing_plugin["local"]) != _plugin_path:
+            print(
+                f"Plugin name '{plugin_name}' is already used by another plugin at '{existing_plugin['local']}'."
+            )
             # TODO: Use logger (error)
             return False
 
-        ## Check that 'script', 'function, and 'config_file' exist where applicable
+        ## Check plugin description
+        min_description_length = 10
+        if len(plugin_definition["description"]) < min_description_length:
+            print(
+                f"Plugin '{plugin_name}' description is too short. Please provide a more "
+                f"detailed description (at least {min_description_length} characters)."
+            )
+
+        ## Check each task field
         for task_name, task in plugin_definition["tasks"].items():
             # Check task name
-            command, remaining = (task_name.split("-", 1) + [None])[:2]
-            if not remaining:
+            plugin_prefix, remaining = (task_name.split("/", 1) + [None])[:2]
+            if plugin_prefix != plugin_definition["name"] or not remaining:
                 print(
-                    f"Task '{task_name}' has no command prefix (expected: '<command>-<taskname>', with <command> in {CORE_COMMANDS})."
+                    f"Task '{task_name}' has an invalid name. Its name should be '{plugin_definition['name']}/<task_name>'"
                 )
                 # TODO: Use logger (error)
                 return False
-            elif command not in CORE_COMMANDS:
+
+            # Check task description
+            if len(task["description"]) < min_description_length:
                 print(
-                    f"Task '{task_name}' has invalid command prefix '{command}'. Valid commands are: {CORE_COMMANDS}."
+                    f"Task '{task_name}' description is too short. Please provide a more "
+                    f"detailed description (at least {min_description_length} characters)."
                 )
 
             # Check 'script' field
             ## Existence
-            script = Path(_plugin_path) / task["script"]
+            script = _plugin_path / task["script"]
             if not script.is_file():
                 print(
                     f"Task '{task_name}' script file '{script}' does not exist."
@@ -557,8 +575,8 @@ def check_local_plugin(
                 return False
 
             # Check 'config_file' field
-            if task["config_file"] is not None:
-                config_file = Path(_plugin_path) / task["config_file"]
+            if task.get("config_file") is not None:
+                config_file = _plugin_path / task["config_file"]
                 if not config_file.is_file():
                     print(
                         f"Task '{task_name}' config file '{config_file}' does not exist."
@@ -566,85 +584,7 @@ def check_local_plugin(
                     # TODO: Use logger (error)
                     return False
 
-        # Check that the 'run' section is valid
-        plugin_run: PluginRun = plugin.get("run")
-        if not plugin_run:
-            print("Plugin has no 'run' section.")
-            # TODO: Use logger (error)
-            return False
-
-        def fill_tasks_only(
-            incomplete_tasks: dict[str, Any]
-        ) -> dict[str, Any]:
-            # Filter out flags
-            flags = {
-                k: v
-                for k, v in incomplete_tasks.items()
-                if isinstance(v, bool)
-            }
-
-            # Fill only tasks
-            tasks_only = {
-                k: v
-                for k, v in incomplete_tasks.items()
-                if isinstance(v, dict)
-            }
-            remaining_keys = [
-                k
-                for k in incomplete_tasks.keys()
-                if k not in flags and k not in tasks_only
-            ]
-            if any(remaining_keys):
-                print(
-                    f"Default 'run' section has invalid entries that are neither tasks nor flags: {remaining_keys}"
-                )
-                # TODO: Use logger (fatal)
-            incomplete_tasks = fill_missing_properties(
-                tasks_only, default=False
-            )
-
-            # Add flags back
-            incomplete_tasks.update(flags)
-            return incomplete_tasks
-
-        ## Fill missing properties in tasks in 'default' option
-        plugin_run_default = plugin_run.get("default")
-        if not plugin_run_default or not isinstance(plugin_run_default, dict):
-            print(
-                "Plugin 'run' section 'default' field is missing or invalid."
-            )
-            # TODO: Use logger (error)
-            return False
-        plugin_run["default"] = fill_tasks_only(plugin_run_default)
-
-        ## Fill missing properties in tasks in other options
-        options = plugin_run.get("options", {})
-        if not isinstance(options, dict):
-            print("Plugin 'run' section 'options' field is not a dictionary.")
-        elif options:
-            for option_name, option in options.items():
-                options[option_name] = fill_tasks_only(option)
-
-        ## Validate structure after filling in missing task properties
-        if not validate_typed_dict(plugin_run, PluginRun):
-            print("Plugin 'run' section has invalid structure.")
-            # TODO: Use logger (error)
-            return False
-
-        ## Test that any tasks are being run in each option/default
-        for option in [
-            plugin_run["default"],
-            *plugin_run.get("options", {}).values(),
-        ]:
-            if not option.get("enable_all") and not any(
-                validate_typed_dict(v, CustomTaskDict) and v["enabled"]
-                for k, v in option.items()
-            ):
-                print(
-                    "Plugin 'run' section has an option with no tasks being run."
-                )
-                # TODO: Use logger (error)
-                return False
+            # TODO: Check that default args are allowed. This can be removed if the new args structure is implemented
 
         # Check that the 'imports' section is valid
         imports = plugin.get("imports", [])
@@ -660,49 +600,74 @@ def check_local_plugin(
         ## Check that imported plugins exist and if so, add to dependency graph
         for imp in imports:
             # Check that imported plugins exist in the desired location
-            if not plugin_exists(imp):
-                print(
-                    f"Imported plugin '{imp}' does not exist locally or remotely."
-                )
+            if not plugin_exists_locally(imp):
+                msg = f"Imported plugin '{imp}' does not exist locally."
+                if plugin_exists_remotely(imp):
+                    msg += f" You can pull it via 'gurk pull {imp}'."
+                print(msg)
                 # TODO: Use logger (fatal)
                 return False
 
-            if require_local and not plugin_exists_locally(imp):
-                print(f"Imported plugin '{imp}' is not available locally.")
-                # TODO: Use logger (fatal)
-                return False
+            # Add node and edge
+            plugin_graph.add_node(imp)
+            plugin_graph.add_edge(_plugin_path, imp)
+
+            # Avoid circular imports
+            try:
+                cycle = nx.find_cycle(plugin_graph, orientation="original")
+                if cycle:
+                    raise ValueError(
+                        f"Circular plugin dependency detected: {cycle}"
+                    )
+            except nx.NetworkXNoCycle:
+                # No cycle detected
+                pass
 
             # Check imported plugin
-            if check_imports:
-                plugin_data = get_plugin_data(imp)
-                if plugin_data:
-                    # Add node and edge
-                    plugin_graph.add_node(imp)
-                    plugin_graph.add_edge(_plugin_path, imp)
+            return _check_local_plugin(Path(get_plugin_data(imp)["local"]))
 
-                    # Avoid circular imports
-                    try:
-                        cycle = nx.find_cycle(
-                            plugin_graph, orientation="original"
-                        )
-                        if cycle:
-                            raise ValueError(
-                                f"Circular plugin dependency detected: {cycle}"
-                            )
-                    except nx.NetworkXNoCycle:
-                        # No cycle detected
-                        pass
+        # Add defined tasks to available tasks
+        available_task_names.update(plugin_definition["tasks"].keys())
 
-                    # Check imported plugin
-                    return _check_local_plugin(plugin_data["local"])
+        # Check 'run' section
+        plugin_run: PluginRun = plugin["run"]
+        for option in [
+            plugin_run["default"],
+            *plugin_run.get("options", {}).values(),
+        ]:
+            # Check that all tasks in the option are defined
+            for task_name in option.keys():
+                if task_name not in available_task_names:
+                    print(
+                        f"Task '{task_name}' in 'run' section is not defined in this or any imported plugins."
+                    )
+                    return False
+
+            # Check that at least one task is being run.
+            # If any tasks are defined in the plugin, that at least one of them must be enabled
+            if not any(
+                validate_typed_dict(v, CustomTaskDict)
+                and v["enabled"]
+                and (
+                    not plugin_definition.get("tasks")
+                    or k.split("/", 1)[0] == plugin_definition["name"]
+                )
+                for k, v in option.items()
+            ):
+                print(
+                    "Plugin 'run' section has an option with no tasks (or none from this plugin, if defined) being run."
+                )
+                # TODO: Use logger (error)
+                return False
 
         # All checks passed
         return True
 
     # Check plugin
-    return _check_local_plugin(str(plugin_path))
+    return _check_local_plugin(Path(plugin_path))
 
 
+# TODO: Make 'update' default to True?
 def import_plugin(plugin: GitRef | str, update: bool = False) -> bool:
     """
     Import a plugin from a remote Git repository.
@@ -786,7 +751,6 @@ def import_plugin(plugin: GitRef | str, update: bool = False) -> bool:
     )
 
 
-# TODO: Cache it before deleting it. How to specify version tough?
 def remove_plugin(plugin_name: str) -> None:
     """
     Remove plugins from local installation.

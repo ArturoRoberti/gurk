@@ -13,19 +13,19 @@ imports: []
 
 # Define this plugin
 define:
-  name: "template plugin"
+  name: "template-gurk-plugin"
   description: "A template plugin for Gurk demonstrating the gurk-plugin.yaml structure."
 # Optionally, define new tasks here, with at least mandatory fields ('description', 'script' and 'function')
   tasks:
-    install-some-task:
+    template-gurk-plugin/install-some-task:
       description: "A sample task"
       script: scripts/some_script.bash
       function: some_function
-    configure-another-task:
+    template-gurk-plugin/configure-another-task:
       description: "Another sample task"
       script: scripts/another_script.py
       function: null
-      depends_on: [install-some-task]
+      depends_on: [template-gurk-plugin/install-some-task]
       config_file: config/another_task_config.yaml
 
 # Define how to run this plugin
@@ -38,10 +38,9 @@ define:
 run:
   options:
     some-option: &some_option
-      install-some-task:
+      template-gurk-plugin/install-some-task:
         enabled: true
     another-option:
-      enable_dependencies: true
-      configure-another-task:
+      template-gurk-plugin/configure-another-task:
         enabled: true
   default: *some_option

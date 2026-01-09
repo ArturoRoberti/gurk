@@ -9,10 +9,7 @@ import networkx as nx
 
 from gurk.cli.utils import CORE_COMMANDS
 from gurk.core.logger import Logger
-from gurk.plugin.utils import (
-    combine_plugin_configs,
-    get_combined_plugin_registry,
-)
+from gurk.plugin.utils import get_combined_plugin_tasks
 from gurk.utils.cli import CoreCliArgs
 from gurk.utils.common import DEFAULT_CONFIG_FILE, get_script_path
 from gurk.utils.scripts import Command
@@ -197,6 +194,7 @@ class TaskProcessor:
             ]
             return wrong_args, not wrong_args
 
+    # TODO: Remove (will be handled by plugin loader). Only keep e.g. dependency graph creation
     def check_default_config(self) -> TaskDictCollection:
         """
         Check that the default config file is valid.
@@ -219,8 +217,7 @@ class TaskProcessor:
             )
 
         # Create default config from plugins
-        combined_registry = get_combined_plugin_registry()
-        default_config = combine_plugin_configs(list(combined_registry.keys()))
+        default_config = get_combined_plugin_tasks()
 
         # Check file exists and is not empty
         default_config = load_yaml(self._default_cfg_path)
@@ -258,7 +255,7 @@ class TaskProcessor:
         # Check everything else
         existing_scripts = set()
         for task_name, task in default_config.items():
-            # Check task name
+            # Check task name # TODO: Remove
             task_command = task_name.split("-")[0]
             if task_command not in CORE_COMMANDS:
                 fatal(
@@ -362,6 +359,7 @@ class TaskProcessor:
         self.logger.debug("Default config file is valid")
         return default_config
 
+    # TODO: Remove (will be handled by plugin loader)
     def check_config(self, config: dict[str, Any] = {}) -> TaskDictCollection:
         """
         Check that the given config is valid.

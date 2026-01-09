@@ -12,9 +12,9 @@ from gurk.cli.utils import CORE_COMMANDS
 from gurk.utils.patterns import PatternCollection
 
 PACKAGE_SRC_PATH = Path(resources.files("gurk")).expanduser().resolve()
-PACKAGE_CONFIG_PATH = PACKAGE_SRC_PATH / "config"
-DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"
-ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"
+PACKAGE_CONFIG_PATH = PACKAGE_SRC_PATH / "config"  # TODO: Remove
+DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"  # TODO: Remove
+ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"  # TODO: Remove
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
 PACKAGE_HOME_PATH = Path.home() / ".gurk"
@@ -169,6 +169,7 @@ class CommandKind(Enum):
 SCRIPT_LANGUAGES = [kind.name for kind in CommandKind]
 
 
+# TODO: Remove, as plugin loading already expands paths
 def get_script_path(script: FilePath, command: str) -> Path:
     """
     Create a full path to a script inside the package's scripts directory.
@@ -190,6 +191,7 @@ def get_script_path(script: FilePath, command: str) -> Path:
     return PACKAGE_SRC_PATH / "scripts" / language / command / script
 
 
+# TODO: Remove, as plugin loading already expands paths
 def get_config_path(config_file: FilePath, command: str) -> Path:
     """
     Create a full path to a config file inside the package's config directory.

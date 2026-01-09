@@ -1,41 +1,78 @@
-from dataclasses import dataclass, field
+from argparse import ArgumentTypeError
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 from gurk.cli import core
-from gurk.cli.utils import CORE_COMMANDS
 from gurk.plugin.utils import (
     GurkPlugin,
     check_local_plugin,
     get_plugin_data,
     import_plugin,
 )
+from gurk.utils.cli import CleanArgumentParser
 from gurk.utils.common import generate_random_path
 from gurk.utils.yaml import load_yaml
 
 
+def parse_task(value: str) -> tuple[str, str]:
+    """
+    Parse --task argument in the form 'plugin_name/task_name'.
+
+    :param value: The input string to parse.
+    :type value: str
+    :return: A tuple (plugin_name, task_name).
+    :rtype: tuple[str, str]
+    :raises ArgumentTypeError: If the input format is invalid. # TODO: Add 'raises' to all funcs which raise smth
+    """
+    parts = value.split("/", 1)
+    if len(parts) != 2 or not all(parts):
+        raise ArgumentTypeError(
+            f"Invalid task format: {value!r}. Expected 'plugin_name/task_name'"
+        )
+    return tuple(parts)  # (plugin_name, task_name)
+
+
 # TODO: Is it possible to get flags from core here dynamically?
-@dataclass
-class RunArgs:
-    # fmt: off
-    plugin:              str  = field(metadata={"help": "Name or git URL of the plugin to run. Specify option via '=<option>' suffix to select non-default task set."})
-    update:              bool = field(metadata={"help": "Update the plugin if it is already installed"}, default=False)
-    enable_dependencies: bool = field(metadata={"help": "Same flag as '--enable-dependencies' in 'gurk <core command>'"}, default=False)
-    enable_all:          bool = field(metadata={"help": "Same flag as '--enable-all' in 'gurk <core command>'"}, default=False)
-    verbose:             bool = field(metadata={"help": "Same flag as '-v/--verbose' in 'gurk <core command>'"}, default=False)
-    disable_preparation: bool = field(metadata={"help": "Same flag as '--disable-preparation' in 'gurk <core command>'"}, default=False)
-    yes:                 bool = field(metadata={"help": "Same flag as '-y/--yes' in 'gurk <core command>'"}, default=False)
-    # fmt: on
+def main(argv, prog, description):
+    parser = CleanArgumentParser(prog=prog, description=description)
 
+    # Add required arguments
+    required = parser.add_required_group()
+    group = required.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--plugin",
+        type=str,
+        help="Name of the plugin to run",
+    )
+    group.add_argument(
+        "--task",
+        type=parse_task,
+        help="Specify a task to run as 'plugin_name/task_name'",
+    )
 
-def run_cmd(args: RunArgs) -> None:
-    """
-    Docstring for run_cmd
+    # Add options
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Update the plugin if it is already installed",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        "--non-interactive",
+        dest="non_interactive",
+        action="store_true",
+        help="IAutomatically answer 'yes' to or ignore all prompts",
+    )
+    args = parser.parse_args(argv)
 
-    :param args: Description
-    :type args: RunArgs
-    """
     plugin_name, option_spec = (args.plugin.split("=", 1) + [None])[:2]
 
     # Get plugin data
@@ -91,17 +128,10 @@ def run_cmd(args: RunArgs) -> None:
     with open(tmp_yaml, "w") as f:
         YAML().dump(option, f)
 
-    # Infer command from first defined task
-    command = next(iter(option)).split("-", 1)[0]
-    if command not in CORE_COMMANDS:
-        print(
-            f"Plugin '{plugin_name}' has an invalid command '{command}' in its run option '{option_spec or 'default'}'. Supported commands are: {CORE_COMMANDS}."
-        )
-
     # Run task(s)
     core.main(
         argv=["-f", str(tmp_yaml)],
         prog="",
         description="",
-        cmd="install",  # TODO: !!! Allow other commands? How to specify them? Maybe take it from the first task?
+        cmd="install",  # TODO: Remove
     )

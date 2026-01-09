@@ -1,19 +1,20 @@
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from gurk.plugin.utils import GurkPlugin, check_local_plugin, get_plugin_data
+from gurk.utils.cli import CleanArgumentParser
 from gurk.utils.yaml import load_yaml
 
 
-@dataclass(frozen=True)
-class HelpArgs:
-    plugins: list[str] = field(
-        metadata={"help": "Names of the plugins to get help for"}
+def main(argv, prog, description):
+    parser = CleanArgumentParser(prog=prog, description=description)
+    parser.add_argument(
+        "plugins",
+        type=str,
+        nargs="+",
+        help="Names of installed custom plugins to show help for",
     )
+    args = parser.parse_args(argv)
 
-
-def help_cmd(args: HelpArgs):
-    """'help' subcommand used as 'gurk plugin help'"""
     for plugin_name in args.plugins:
         # Get plugin data (if installed)
         plugin = get_plugin_data(plugin_name)

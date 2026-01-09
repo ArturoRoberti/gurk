@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import commentjson
 
@@ -29,9 +29,9 @@ def install_docker_images(*args: list[str]) -> None:
     # Typing helper classes
     class DockerImageInfo(TypedDict):
         # fmt: off
-        registry: str
         image:    str
-        tag:      str
+        registry: NotRequired[str]
+        tag:      NotRequired[str]
         # fmt: on
 
     # Load docker images - also expand environment variables

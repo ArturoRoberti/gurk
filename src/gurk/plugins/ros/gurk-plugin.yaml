@@ -4,7 +4,7 @@ define:
   name: "ros"
   description: "Plugin to install ROS (Robot Operating System)."
   tasks:
-    install-ros:
+    ros/install-ros:
       description: Install ROS (Robot Operating System)
       script: scripts/ros.bash
       function: null
@@ -15,5 +15,5 @@ define:
 
 run:
   default:
-    install-ros:
+    ros/install-ros:
       enabled: true

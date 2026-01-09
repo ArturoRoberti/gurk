@@ -83,7 +83,6 @@ class PathPatterns(TypedDict):
     # fmt: off
     symlink: re.Pattern
     package: re.Pattern
-    url:     re.Pattern
     # fmt: on
 
 

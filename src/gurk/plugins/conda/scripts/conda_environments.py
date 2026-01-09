@@ -2,7 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import commentjson
 from ruamel.yaml import YAML
@@ -33,7 +33,7 @@ def install_conda_environments(*args: list[str]) -> None:
         # fmt: off
         type:           str                   # "conda", "mamba"
         conda_packages: dict[str, list[str]]  # package-name -> [channels]
-        pip_packages:   list[str]
+        pip_packages:   NotRequired[list[str]]
         # fmt: on
 
     # Get conda environments info

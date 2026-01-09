@@ -242,6 +242,7 @@ class Command:
         return f"{Path(self.script).stem}{func_suffix}"
 
 
+# TODO: Replace (TBD how exactly)
 def _iter_command_files(
     base_path: Path, script_languages: set[str] | None = None
 ) -> Iterator[Path]:
@@ -280,6 +281,8 @@ def _iter_command_files(
                         yield file_path
 
 
+# TODO: Replace such that it iterates through plugin scripts instead.
+#      Allow specifying plugin directory (home, package)?
 def iter_scripts() -> Iterator[Path]:
     """
     Yields all script files under the package scripts directory.
@@ -291,6 +294,8 @@ def iter_scripts() -> Iterator[Path]:
     yield from _iter_command_files(scripts_path, SCRIPT_LANGUAGES)
 
 
+# TODO: Replace such that it iterates through plugin scripts instead.
+#      Allow specifying plugin directory (home, package)?
 def iter_configs() -> Iterator[Path]:
     """
     Yields all config files under the package config directory.
