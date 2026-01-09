@@ -16,19 +16,19 @@ from typing import NotRequired, TypedDict, get_args, get_origin
 import networkx as nx
 from ruamel.yaml import YAML
 
-from gurk.utils.common import (
+from gurk.lib.utils.common import (
     PACKAGE_HOME_PATH,
     PACKAGE_SRC_PATH,
     FilePath,
     generate_random_path,
 )
-from gurk.utils.remotes import GitRef, clone_git_repo, is_git_repo
-from gurk.utils.scripts import (
+from gurk.lib.utils.remotes import GitRef, clone_git_repo, is_git_repo
+from gurk.lib.utils.scripts import (
     ScriptBlockTypes,
     check_script_blocks,
     get_block_spans,
 )
-from gurk.utils.tasks import (
+from gurk.lib.utils.tasks import (
     CustomTaskDict,
     CustomTaskDictCollection,
     DefaultTaskDict,
@@ -36,8 +36,8 @@ from gurk.utils.tasks import (
     TaskDictCollection,
     fill_missing_properties,
 )
-from gurk.utils.validate import validate_typed_dict
-from gurk.utils.yaml import load_yaml
+from gurk.lib.utils.validate import validate_typed_dict
+from gurk.lib.utils.yaml import load_yaml
 
 #########################################################################################
 #################################### Minor utilities ####################################

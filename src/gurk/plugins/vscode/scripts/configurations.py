@@ -2,8 +2,7 @@ from pathlib import Path
 
 import commentjson
 
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.lib.helpers import get_config_args
+from gurk.lib.helpers import Logger, LoggerSeverity, get_config_args
 
 
 def configure_vscode_keybindings(*args: list[str]) -> None:

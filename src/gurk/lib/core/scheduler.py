@@ -12,19 +12,19 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import Event, Lock, Thread
 from typing import TextIO
 
-from gurk.core.logger import Logger
-from gurk.utils.common import CommandKind, generate_random_path
-from gurk.utils.interface import run_script_function
-from gurk.utils.logger import TaskTerminationType
-from gurk.utils.patterns import PatternCollection
-from gurk.utils.scripts import (
+from gurk.lib.logger import Logger
+from gurk.lib.logger.utils import TaskTerminationType
+from gurk.lib.utils.common import CommandKind, generate_random_path
+from gurk.lib.utils.interface import run_script_function
+from gurk.lib.utils.patterns import PatternCollection
+from gurk.lib.utils.scripts import (
     Command,
     ScriptBlock,
     ScriptBlockTypes,
     get_block_spans,
 )
-from gurk.utils.system_info import get_system_info
-from gurk.utils.tasks import ResolvedTask
+from gurk.lib.utils.system_info import get_system_info
+from gurk.lib.utils.tasks import ResolvedTask
 
 
 @dataclass

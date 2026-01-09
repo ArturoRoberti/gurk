@@ -9,7 +9,7 @@ from tempfile import mkdtemp, mkstemp
 from typing import TypeAlias
 
 from gurk.cli.utils import CORE_COMMANDS
-from gurk.utils.patterns import PatternCollection
+from gurk.lib.utils.patterns import PatternCollection
 
 PACKAGE_SRC_PATH = Path(resources.files("gurk")).expanduser().resolve()
 PACKAGE_CONFIG_PATH = PACKAGE_SRC_PATH / "config"  # TODO: Remove

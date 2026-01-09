@@ -1,6 +1,6 @@
 import pytest
 
-from gurk.cli import core
+from gurk.lib.core import core
 
 from .utils import _get_sudo_askpass, padded_print, print_task_outputs
 

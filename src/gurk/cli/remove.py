@@ -1,5 +1,5 @@
-from gurk.plugin.utils import remove_plugin
-from gurk.utils.cli import CleanArgumentParser
+from gurk.lib.core.plugin_utils import remove_plugin
+from gurk.lib.utils.cli import CleanArgumentParser
 
 
 def main(argv, prog, description):

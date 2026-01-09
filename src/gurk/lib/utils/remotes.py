@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import git
 import requests
 
-from gurk.utils.common import PACKAGE_CACHE_PATH, generate_random_path
+from gurk.lib.utils.common import PACKAGE_CACHE_PATH, generate_random_path
 
 
 def run_git_command(

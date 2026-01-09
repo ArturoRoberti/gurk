@@ -14,18 +14,18 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Iterable
 
-from gurk.core.logger import Logger
-from gurk.utils.common import (
+from gurk.lib.logger import Logger
+from gurk.lib.logger.utils import TaskTerminationType
+from gurk.lib.utils.common import (
     ENABLED_CONFIG_FILE,
     SETUP_DONE_FILE,
     generate_random_path,
     resolve_package_path,
 )
-from gurk.utils.interface import prompt_bool
-from gurk.utils.logger import TaskTerminationType
-from gurk.utils.remotes import clone_git_files, is_git_repo
-from gurk.utils.system_info import get_system_info
-from gurk.utils.yaml import load_yaml
+from gurk.lib.utils.interface import prompt_bool
+from gurk.lib.utils.remotes import clone_git_files, is_git_repo
+from gurk.lib.utils.system_info import get_system_info
+from gurk.lib.utils.yaml import load_yaml
 
 
 def get_sudo_askpass() -> Path:

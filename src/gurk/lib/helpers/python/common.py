@@ -2,8 +2,11 @@ import subprocess
 from enum import Enum
 from pathlib import Path
 
-from gurk.core.logger import Logger
-from gurk.utils.interface import PACKAGE_BASH_HELPERS_PATH, run_script_function
+from gurk.lib.logger import Logger
+from gurk.lib.utils.interface import (
+    PACKAGE_BASH_HELPERS_PATH,
+    run_script_function,
+)
 
 # TODO: Allow classes to inherit from InstallCommands for usage in these functions
 

@@ -1,6 +1,6 @@
-from gurk.plugin.utils import get_combined_plugin_registry
-from gurk.utils.cli import CleanArgumentParser
-from gurk.utils.common import PACKAGE_SRC_PATH
+from gurk.lib.core.plugin_utils import get_combined_plugin_registry
+from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.utils.common import PACKAGE_SRC_PATH
 
 
 def main(argv, prog, description):

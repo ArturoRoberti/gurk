@@ -8,12 +8,12 @@ from typing import Any
 import networkx as nx
 
 from gurk.cli.utils import CORE_COMMANDS
-from gurk.core.logger import Logger
-from gurk.plugin.utils import get_combined_plugin_tasks
-from gurk.utils.cli import CoreCliArgs
-from gurk.utils.common import DEFAULT_CONFIG_FILE, get_script_path
-from gurk.utils.scripts import Command
-from gurk.utils.tasks import (
+from gurk.lib.core.plugin_utils import get_combined_plugin_tasks
+from gurk.lib.logger import Logger
+from gurk.lib.utils.cli import CoreCliArgs
+from gurk.lib.utils.common import DEFAULT_CONFIG_FILE, get_script_path
+from gurk.lib.utils.scripts import Command
+from gurk.lib.utils.tasks import (
     TASK_PROPERTIES_CUSTOM,
     TASK_PROPERTIES_CUSTOM_FILLED,
     TASK_PROPERTIES_DEFAULT,
@@ -23,7 +23,7 @@ from gurk.utils.tasks import (
     get_invalid_tasks_from_task_dict_collection,
     print_expected_task_fields,
 )
-from gurk.utils.yaml import load_yaml, overlay_dicts
+from gurk.lib.utils.yaml import load_yaml, overlay_dicts
 
 
 @dataclass

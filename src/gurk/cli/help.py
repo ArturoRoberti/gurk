@@ -1,8 +1,12 @@
 from pathlib import Path
 
-from gurk.plugin.utils import GurkPlugin, check_local_plugin, get_plugin_data
-from gurk.utils.cli import CleanArgumentParser
-from gurk.utils.yaml import load_yaml
+from gurk.lib.core.plugin_utils import (
+    GurkPlugin,
+    check_local_plugin,
+    get_plugin_data,
+)
+from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.utils.yaml import load_yaml
 
 
 def main(argv, prog, description):

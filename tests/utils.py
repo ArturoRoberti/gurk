@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from gurk.utils.common import stream_print
+from gurk.lib.utils.common import stream_print
 
 
 def _get_sudo_askpass() -> str:

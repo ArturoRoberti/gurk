@@ -7,9 +7,7 @@ from typing import NotRequired, TypedDict
 import commentjson
 from ruamel.yaml import YAML
 
-from gurk.core.logger import Logger
-from gurk.lib.helpers import get_config_args
-from gurk.utils.interface import run_script_function
+from gurk.lib.helpers import Logger, get_config_args, run_script_function
 
 
 def install_conda_environments(*args: list[str]) -> None:

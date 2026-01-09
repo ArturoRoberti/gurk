@@ -1,5 +1,5 @@
-from gurk.plugin.utils import import_plugin
-from gurk.utils.cli import CleanArgumentParser
+from gurk.lib.core.plugin_utils import import_plugin
+from gurk.lib.utils.cli import CleanArgumentParser
 
 # TODO: Make so that any repo can be pulled, and then only the relevant paths defined in gurk-plugin.yaml are kept
 #       That way, larger repositories can include gurk plugins, instead of requiring each plugin to be in its own repo

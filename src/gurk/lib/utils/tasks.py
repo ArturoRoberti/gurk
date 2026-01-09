@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Mapping, NotRequired, TypeAlias, TypedDict, Union
 
-from gurk.utils.scripts import Command
-from gurk.utils.yaml import overlay_dicts
+from gurk.lib.utils.scripts import Command
+from gurk.lib.utils.yaml import overlay_dicts
 
 FieldTypeDict: TypeAlias = Mapping[
     str, Union[list[type | None], "FieldTypeDict"]

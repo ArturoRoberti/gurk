@@ -4,7 +4,7 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from gurk.utils.common import resolve_package_path
+from gurk.lib.utils.common import resolve_package_path
 
 
 def load_yaml(yaml_file: Path) -> dict[str, Any] | None:

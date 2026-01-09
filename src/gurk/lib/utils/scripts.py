@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator, TypedDict
 
 from gurk.cli.utils import CORE_COMMANDS
-from gurk.utils.common import (
+from gurk.lib.utils.common import (
     PACKAGE_CONFIG_PATH,
     PACKAGE_SRC_PATH,
     SCRIPT_LANGUAGES,
@@ -15,7 +15,7 @@ from gurk.utils.common import (
     FilePath,
     ScriptExtension,
 )
-from gurk.utils.patterns import PatternCollection
+from gurk.lib.utils.patterns import PatternCollection
 
 
 class ScriptBlockTypes(Enum):

@@ -4,13 +4,13 @@ from textwrap import dedent
 
 from rich.prompt import Confirm
 
-from gurk.utils.common import (
+from gurk.lib.utils.common import (
     PACKAGE_SRC_PATH,
     PIPX_PYTHON_PATH,
     CommandKind,
     FilePath,
 )
-from gurk.utils.scripts import Command
+from gurk.lib.utils.scripts import Command
 
 PACKAGE_BASH_HELPERS_PATH = (
     PACKAGE_SRC_PATH / "lib" / "helpers" / "bash" / "helpers.bash"

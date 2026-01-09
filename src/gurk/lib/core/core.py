@@ -5,14 +5,13 @@ import traceback
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from pathlib import Path
 
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.core.scheduler import Scheduler
-from gurk.core.task_processor import TaskProcessor
-from gurk.utils.cli import CoreCliProcessor, get_sudo_askpass, prompt_setup
-from gurk.utils.common import ENABLED_CONFIG_FILE, PACKAGE_CONFIG_PATH
+from gurk.lib.core.scheduler import Scheduler
+from gurk.lib.core.task_processor import TaskProcessor
+from gurk.lib.logger import Logger, LoggerSeverity
+from gurk.lib.utils.cli import CoreCliProcessor, get_sudo_askpass, prompt_setup
 
 
-def main(argv, prog, description, cmd, _captured=None):
+def main(argv, prog, description, _captured=None):
     parser = ArgumentParser(
         prog=prog,
         description=description,
@@ -20,35 +19,6 @@ def main(argv, prog, description, cmd, _captured=None):
             prog=prog,
             max_help_position=60,
         ),
-    )
-    parser.add_argument(
-        "-f",
-        "--config-file",
-        type=Path,
-        default=ENABLED_CONFIG_FILE,
-        help="Path to the main configuration file",
-    )
-    parser.add_argument(
-        "-d",
-        "--config-directory",
-        type=Path,
-        default=PACKAGE_CONFIG_PATH,
-        help="Path to the configuration directory",
-    )
-    parser.add_argument(
-        "--enable-all",
-        action="store_true",
-        help="Enable all tasks in the configuration file, unless explicitly disabled",
-    )
-    parser.add_argument(
-        "--enable-dependencies",
-        action="store_true",
-        help="Enable all dependencies of the specified tasks, even if they are disabled",
-    )
-    parser.add_argument(
-        "--disable-preparation",
-        action="store_true",
-        help="(Not recommended) Disable updating/upgrading apt beforehand",
     )
     parser.add_argument(
         "-v",
@@ -59,15 +29,23 @@ def main(argv, prog, description, cmd, _captured=None):
     parser.add_argument(
         "-y",
         "--yes",
+        "--non-interactive",
+        dest="non_interactive",
         action="store_true",
-        help="Automatically answer 'yes' to all prompts",
+        help="IAutomatically answer 'yes' to or ignore all prompts",
     )
-    args, tasks = parser.parse_known_args(argv)
+    args, remaining = parser.parse_known_args(argv)
 
     # Handle unknown options masquerading as tasks
-    invalid = [t for t in tasks if t.startswith("-")]
+    invalid = [t for t in remaining if t.startswith("-")]
     if invalid:
         parser.error(f"unrecognized arguments: {' '.join(invalid)}")
+
+    # Get 'NON_INTERACTIVE' from env if not specified
+    if not args.non_interactive:
+        args.non_interactive = os.getenv(
+            "NON_INTERACTIVE", "false"
+        ).lower() in ("true", "yes", "1")
 
     # Set default values in case of early exception
     logger, cloned_config_dir, askpass_path = None, None, None
@@ -80,6 +58,9 @@ def main(argv, prog, description, cmd, _captured=None):
         prompt_setup(args.yes)
 
         with Logger(args.verbose) as logger:
+            # TODO: Fix 'tasks' and 'cmd' not defined
+            tasks = None
+            cmd = None
             setup_processor = CoreCliProcessor(logger, args, argv, tasks, cmd)
 
             # Process args

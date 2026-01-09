@@ -5,9 +5,10 @@ from pathlib import Path
 
 import commentjson
 
-from gurk.core.logger import Logger, LoggerSeverity
 from gurk.lib.helpers import (
     InstallCommands,
+    Logger,
+    LoggerSeverity,
     get_config_args,
     install_packages_from_txt_file,
 )

@@ -15,12 +15,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from gurk.utils.logger import (
-    LoggerEnum,
-    LoggerSeverity,
-    TaskInfos,
-    TaskTerminationType,
-)
+from .utils import LoggerEnum, LoggerSeverity, TaskInfos, TaskTerminationType
 
 
 @dataclass

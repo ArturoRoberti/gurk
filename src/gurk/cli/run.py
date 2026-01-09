@@ -3,16 +3,16 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from gurk.cli import core
-from gurk.plugin.utils import (
+from gurk.lib.core import core
+from gurk.lib.core.plugin_utils import (
     GurkPlugin,
     check_local_plugin,
     get_plugin_data,
     import_plugin,
 )
-from gurk.utils.cli import CleanArgumentParser
-from gurk.utils.common import generate_random_path
-from gurk.utils.yaml import load_yaml
+from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.utils.common import generate_random_path
+from gurk.lib.utils.yaml import load_yaml
 
 
 def parse_task(value: str) -> tuple[str, str]:

@@ -6,19 +6,19 @@ from pathlib import Path
 import networkx as nx
 
 try:
-    from gurk.utils.common import (
+    from gurk.lib.utils.common import (
         DEFAULT_CONFIG_FILE,
         PACKAGE_SRC_PATH,
         get_script_path,
     )
-    from gurk.utils.scripts import (
+    from gurk.lib.utils.scripts import (
         ScriptBlockTypes,
         get_block_spans,
         iter_configs,
         iter_scripts,
     )
-    from gurk.utils.tasks import RUNNER_SPECIFIC_TASKS
-    from gurk.utils.yaml import load_yaml
+    from gurk.lib.utils.tasks import RUNNER_SPECIFIC_TASKS
+    from gurk.lib.utils.yaml import load_yaml
 except ImportError:
     raise ImportError(
         "The gurk package needs to be installed to run this script."

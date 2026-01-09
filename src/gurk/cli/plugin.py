@@ -4,8 +4,8 @@ import traceback
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
 from gurk import plugin
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.plugin.utils import create_subparser
+from gurk.lib.core.plugin_utils import create_subparser
+from gurk.lib.logger import Logger, LoggerSeverity
 
 
 def main(argv, prog, description):

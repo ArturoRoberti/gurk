@@ -5,13 +5,19 @@ from typing import Any
 
 import requests
 
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.lib.helpers import get_clean_lines, get_config_args
-from gurk.utils.common import resolve_package_path
-from gurk.utils.interface import revert_sudo_permissions
-from gurk.utils.patterns import PatternCollection
-from gurk.utils.remotes import clone_git_files, is_git_repo, is_url
-from gurk.utils.yaml import load_yaml
+from gurk.lib.helpers import (
+    Logger,
+    LoggerSeverity,
+    PatternCollection,
+    clone_git_files,
+    get_clean_lines,
+    get_config_args,
+    is_git_repo,
+    is_url,
+    load_yaml,
+    resolve_package_path,
+    revert_sudo_permissions,
+)
 
 
 def configure_pinned_apps(*args: list[str]) -> None:

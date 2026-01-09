@@ -5,15 +5,17 @@ from tempfile import TemporaryDirectory
 
 from packaging import version
 
-from gurk.core.logger import Logger
 from gurk.lib.helpers import (
     InstallCommands,
+    Logger,
     add_alias,
+    clone_git_files,
     get_clean_lines,
     get_config_args,
+    gitref_dict2str,
     install_packages_from_list,
+    parse_git_ref,
 )
-from gurk.utils.remotes import clone_git_files, gitref_dict2str, parse_git_ref
 
 
 def install_js_repositories(*args: list[str]) -> None:

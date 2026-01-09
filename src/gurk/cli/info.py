@@ -4,14 +4,14 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from pathlib import Path
 from typing import Any
 
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.utils.common import (
+from gurk.lib.logger import Logger, LoggerSeverity
+from gurk.lib.utils.common import (
     DEFAULT_CONFIG_FILE,
     ENABLED_CONFIG_FILE,
     get_config_path,
 )
-from gurk.utils.system_info import get_system_info
-from gurk.utils.yaml import load_yaml
+from gurk.lib.utils.system_info import get_system_info
+from gurk.lib.utils.yaml import load_yaml
 
 # TODO: Use pytest helper for getting proper '====' lines.
 

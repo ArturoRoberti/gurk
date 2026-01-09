@@ -3,8 +3,8 @@ import json
 import sys
 from pathlib import Path
 
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.utils.system_info import SystemInfo
+from gurk.lib.logger import Logger, LoggerSeverity
+from gurk.lib.utils.system_info import SystemInfo
 
 
 def get_config_args(

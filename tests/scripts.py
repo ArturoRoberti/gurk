@@ -1,7 +1,7 @@
 import pytest
 
-from gurk.utils.common import stream_print
-from gurk.utils.scripts import check_script_blocks, iter_scripts
+from gurk.lib.utils.common import stream_print
+from gurk.lib.utils.scripts import check_script_blocks, iter_scripts
 
 
 def test_package_scripts() -> None:

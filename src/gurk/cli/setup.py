@@ -6,10 +6,10 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from gurk.core.logger import Logger, LoggerSeverity
-from gurk.utils.cli import SETUP_DONE_FILE
-from gurk.utils.interface import prompt_bool
-from gurk.utils.system_info import get_manufacturer
+from gurk.lib.logger import Logger, LoggerSeverity
+from gurk.lib.utils.cli import SETUP_DONE_FILE
+from gurk.lib.utils.interface import prompt_bool
+from gurk.lib.utils.system_info import get_manufacturer
 
 
 @dataclass

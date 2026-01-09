@@ -2,9 +2,9 @@ from typing import NotRequired, TypedDict
 
 import commentjson
 
-from gurk.core.logger import Logger
 from gurk.lib.helpers import (
     InstallCommands,
+    Logger,
     get_config_args,
     install_packages_from_list,
 )
