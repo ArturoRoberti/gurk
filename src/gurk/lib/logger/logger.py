@@ -1,19 +1,23 @@
 import shutil
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
+from typing import IO
 
 from rich import print as richprint
 from rich.console import Console
 from rich.progress import (
     BarColumn,
+    Live,
     Progress,
     TaskID,
     TextColumn,
     TimeElapsedColumn,
 )
+from rich.prompt import Confirm
 
 from .utils import LoggerEnum, LoggerSeverity, TaskInfos, TaskTerminationType
 
@@ -24,6 +28,7 @@ class Logger:
 
     # fmt: off
     verbose:      bool      = field()
+    interactive:  bool      = field(default=True)
 
     logdir:       Path      = field(init=False)
     task_infos:   TaskInfos = field(init=False, repr=False, default_factory=dict)
@@ -310,7 +315,9 @@ class Logger:
         self._progress.update(task_id, completed=total, description=desc)
 
     @staticmethod
-    def richprint(message: str, color: str | None = None) -> None:
+    def richprint(
+        message: str, color: str | None = None, file: IO[str] | None = None
+    ) -> None:
         """
         Print a rich-formatted message with optional color.
 
@@ -318,29 +325,78 @@ class Logger:
         :type message: str
         :param color: Optional color for the message
         :type color: str | None
+        :param file: The output file (stdout/stderr). If None, defaults to stdout.
+        :type file: IO[str] | None
         """
         if color:
-            richprint(f"[{color}]{message}[/{color}]")
+            richprint(f"[{color}]{message}[/{color}]", file=file)
         else:
-            richprint(message)
+            richprint(message, file=file)
 
     @staticmethod
     def logrichprint(
-        severity: LoggerSeverity, message: str, newline: bool = False
+        severity: LoggerSeverity | None,
+        message: str,
+        newline: bool = False,
+        file: IO[str] | None = None,
     ) -> None:
         """
         Print a rich-formatted log message with the specified severity.
 
         :param severity: Severity level
-        :type severity: LoggerSeverity
+        :type severity: LoggerSeverity | None
         :param message: The message to print
         :type message: str
         :param newline: Whether to print a newline before the message
         :type newline: bool
+        :param file: The output file (stdout/stderr). If None, defaults to stdout.
+        :type file: IO[str] | None
         """
-        logstart = Logger.logstart(severity)
+        if severity is None:
+            richprint(f"{message}", file=file)
+        else:
+            logstart = Logger.logstart(severity)
         prefix = "\n" if newline else ""
-        richprint(f"{prefix}{logstart} {message}")
+        richprint(f"{prefix}{logstart} {message}", file=file)
+
+    @staticmethod
+    def padded_print(
+        text: str,
+        color: str = "white",
+        total_length: int = 128,
+        file: IO[str] | None = None,
+    ) -> None:
+        # TODO: Does using a different 'file' here work correctly with richprint? consoles
+        """
+        Print text padded with "=" signs to center it within a specified total length.
+
+        :param text: Text to be printed
+        :type text: str
+        :param color: Color of the text
+        :type color: str
+        :param total_length: Total length of the printed line including padding
+        :type total_length: int
+        :param file: The output file (stdout/stderr). If None, defaults to stdout.
+        :type file: IO[str] | None
+        """
+        # Top bar
+        Logger.richprint("=" * total_length, color=color, file=file)
+
+        # Calculate how many "=" signs are needed in the middle
+        #   Subtract 2 for extra spaces
+        remaining_length = total_length - len(text) - 2
+        if remaining_length < 0:
+            Logger.richprint(f"{text}", color=color, file=file)
+        else:
+            left_pad = remaining_length // 2
+            right_pad = remaining_length - left_pad
+            Logger.richprint(
+                f"{'=' * left_pad} {text} {'=' * right_pad}",
+                color=color,
+                file=file,
+            )
+        # Bottom bar
+        Logger.richprint("=" * total_length, color=color, file=file)
 
     @staticmethod
     def step(message: str, warning: bool = False) -> None:
@@ -358,3 +414,49 @@ class Logger:
         if warning:
             step_type += "_WARNING"
         print(f"\n__{step_type}__: {message}")
+
+    @property
+    def can_prompt(self) -> bool:
+        """
+        Check if the logger can prompt the user for input.
+
+        :return: True if interactive and console is a terminal, False otherwise
+        :rtype: bool
+        """
+        return self.interactive and self._console_out.is_terminal
+
+    @contextmanager
+    def _suspend_progress(self):
+        """Context manager to temporarily suspend the progress display."""
+        live: Live | None = getattr(self._progress, "live", None)
+        if live and live.is_started:
+            live.stop()
+            try:
+                yield
+            finally:
+                live.start()
+        else:
+            yield
+
+    # TODO: Use. If this works well, then enable logger in main.py by default already
+    def prompt_bool(self, message: str, answer: str | bool = None) -> bool:
+        """
+        Prompt the user for a yes/no response.
+
+        :param message: The prompt message.
+        :type message: str
+        :param answer: Predefined answer for non-interactive mode (True/False for 'y'/'n').
+        :type answer: bool | None
+        :return: True if the user responds with 'y', False for 'n'.
+        :rtype: bool
+        """
+        # Automatic answer handling
+        if answer is not None:
+            return answer
+        elif not self.can_prompt:
+            # Non-interactive mode without predefined answer defaults to 'no'
+            return False
+
+        # Interactive prompt
+        with self._suspend_progress():
+            return Confirm.ask(message)

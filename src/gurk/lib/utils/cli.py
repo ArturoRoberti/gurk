@@ -342,15 +342,38 @@ class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
             return action.help or ""
 
 
-class CleanArgumentParser(ArgumentParser):
+class GurkArgumentParser(ArgumentParser):
     """
-    Custom ArgumentParser that uses CleanHelpFormatter.
+    Custom ArgumentParser that uses CleanHelpFormatter and adds common gurk CLI options.
     """
 
     def __init__(self, *args, **kwargs):
+        # Some gurk internal variables
         self.required_group_title = "required arguments"
+        self.add_logger_options = kwargs.pop("add_logger_options", True)
+
+        # Use CleanHelpFormatter
         kwargs["formatter_class"] = lambda prog: CleanHelpFormatter(prog)
+
+        # Call super init
         super().__init__(*args, **kwargs)
+
+        # Add logger options
+        if self.add_logger_options:
+            self.add_argument(
+                "-v",
+                "--verbose",
+                action="store_true",
+                help="Enable verbose output",
+            )
+            self.add_argument(
+                "-y",
+                "--yes",
+                "--non-interactive",
+                dest="non_interactive",
+                action="store_true",
+                help="Automatically answer 'yes' to resp. ignore all prompts",
+            )
 
     def add_required_group(self) -> _ArgumentGroup:
         """
@@ -377,4 +400,12 @@ class CleanArgumentParser(ArgumentParser):
             self._action_groups.insert(0, requireed_group)
 
         # Call the original parse_args
-        return super().parse_args(args, namespace)
+        args = super().parse_args(args, namespace)
+
+        # Get non-interactive mode from env var if not specified
+        if self.add_logger_options and not args.non_interactive:
+            args.non_interactive = os.getenv(
+                "GURK_NON_INTERACTIVE", "false"
+            ).lower() in ("true", "yes", "1")
+
+        return args

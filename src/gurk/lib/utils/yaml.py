@@ -76,6 +76,7 @@ def load_yaml(yaml_file: Path) -> dict[str, Any] | None:
     return normalize_yaml(content)
 
 
+# TODO: Remove 'allow_default
 def overlay_dicts(dicts: list[dict], allow_default: bool = False) -> dict:
     """
     Overlay multiple dictionaries in order, with later dictionaries

@@ -1,12 +1,14 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.utils.cli import GurkArgumentParser
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
 
 
 def main(argv, prog, description):
-    parser = CleanArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(
+        prog=prog, description=description, add_logger_options=False
+    )
     parser.parse_args(argv)
 
     # Copy the template plugin to the current working directory

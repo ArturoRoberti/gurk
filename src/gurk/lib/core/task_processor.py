@@ -46,6 +46,16 @@ class TaskProcessor:
     _supercedes_graph: nx.DiGraph           = field(init=False, repr=False, default=None)
     # fmt: on
 
+    # TODO: How to handle overlaying config_file field (without using odd 'default' interim?
+    #       - Ideally, do it such that if the field is not defined in a 'run' task (NOTE: This is different from it being defined as 'None'), it uses the one from 'define' task
+    #       - Try to generalize to all overlapping fields
+    #       UPDATE: This should be exactly what overlay_dicts (without allow_default) does. This also works great for args automatically passed in 'run' tasks.
+    # TODO: What remains:
+    #       - Enable dependencies of enabled tasks
+    #       - Overlay all defined tasks and 'run' tasks
+    #       - Resolve 'define' task args to argparser and trigger it
+    #       - Create logging directory
+    #       - Create ResolvedTask list
     def __post_init__(self):
         # (Internal) Check default config file
         self._default_config = self.check_default_config()
@@ -91,7 +101,7 @@ class TaskProcessor:
                 )
                 task["enabled"] = False
 
-        # Fill all missing custom fields in other tasks
+        # Fill all missing custom fields in other tasks - TODO: Remove (will be handled by plugin loader)
         tasks = fill_missing_properties(tasks, default=False)
 
         # Resolve and check config file paths for all tasks

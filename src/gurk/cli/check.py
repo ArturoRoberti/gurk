@@ -1,9 +1,10 @@
 from gurk.lib.core.plugin_utils import check_local_plugin
-from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.logger import ActiveLogger, Logger
+from gurk.lib.utils.cli import GurkArgumentParser
 
 
 def main(argv, prog, description):
-    parser = CleanArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(prog=prog, description=description)
     parser.add_argument(
         "paths",
         type=str,
@@ -12,8 +13,13 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
-    for source in args.paths:
-        if not check_local_plugin(source):
-            print(f"Plugin source '{source}' is invalid.")
-        else:
-            print(f"Plugin source '{source}' is valid.")
+    # Execute with active logger
+    logger = Logger(args.verbose)
+    with ActiveLogger(logger):
+        for source in args.paths:
+            if not check_local_plugin(source):
+                logger.fatal(f"Plugin source '{source}' is invalid.")
+            else:
+                logger.info(f"Plugin source '{source}' is valid.")
+
+        logger.done("Plugin checks complete.")

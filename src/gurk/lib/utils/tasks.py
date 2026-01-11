@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Mapping, NotRequired, TypeAlias, TypedDict, Union
 
 from gurk.lib.utils.scripts import Command
@@ -32,6 +33,7 @@ def filled_properties(properties: FieldTypeDict) -> dict[str, Any]:
     return result
 
 
+# TODO: Can these be removed, thanks to the new 'print_typeddict_types' function?
 # Required in default config
 TASK_PROPERTIES_DEFAULT: FieldTypeDict = {
     "description": [str],
@@ -183,8 +185,8 @@ class DefaultTaskDict(TypedDict):
     config_file:    NotRequired[str | None]
     depends_on:     NotRequired[list[str]]
     privileged:     NotRequired[bool]
-    supercedes:     NotRequired[list[str] | None]
-    args:           NotRequired[dict[str, list[str]]]
+    supercedes:     NotRequired[list[str]]
+    args:           NotRequired[dict[str, list[str]]]  # TODO: Update to new structure (see below)
     # fmt: on
 
 
@@ -194,10 +196,11 @@ class CustomTaskDict(TypedDict):
     # fmt: off
     enabled:     bool
     config_file: NotRequired[str | None]
-    args:        NotRequired[list[str]]
+    args:        NotRequired[list[str]]  # TODO: Update to new structure (see below)
     # fmt: on
 
 
+# TODO: Does this combination work, even though args are different? Which args take precedence?
 class TaskDict(DefaultTaskDict, CustomTaskDict):
     """Dictionary representing a full task configuration."""
 
@@ -209,6 +212,46 @@ CustomTaskDictCollection: TypeAlias = dict[str, CustomTaskDict]
 TaskDictCollection: TypeAlias = dict[str, TaskDict]
 
 
+class ResolvedDefaultTaskDict(TypedDict):
+    """Dictionary representing a resolved default task configuration."""
+
+    # fmt: off
+    description:    str
+    script:         Path
+    function:       str | None
+    config_file:    Path | None
+    depends_on:     list[str]
+    privileged:     bool
+    supercedes:     list[str] | None
+    args:           dict[str, list[str]]  # TODO: Update to new structure (dict[str, dict[str, str]] -> Create TypedDict for this: dict[str, (Resolved)DefaultArgsDict]; similar resp. TypeAlias for (Resolved)CustomArgsDict)
+    # fmt: on
+
+
+class ResolvedCustomTaskDict(TypedDict):
+    """Dictionary representing a resolved custom task configuration."""
+
+    # fmt: off
+    enabled:     bool
+    config_file: Path | None
+    args:        list[str]  # TODO: Update to new structure (see above)
+    # fmt: on
+
+
+# TODO: Does this combination work, even though args are different? Which args take precedence?
+class ResolvedTaskDict(ResolvedDefaultTaskDict, ResolvedCustomTaskDict):
+    """Dictionary representing a full resolved task configuration."""
+
+    pass
+
+
+ResolvedDefaultTaskDictCollection: TypeAlias = dict[
+    str, ResolvedDefaultTaskDict
+]
+ResolvedCustomTaskDictCollection: TypeAlias = dict[str, ResolvedCustomTaskDict]
+ResolvedTaskDictCollection: TypeAlias = dict[str, ResolvedTaskDict]
+
+
+# TODO: Remove, as now handled by 'fill_typed_dict'
 def fill_missing_properties(
     tasks: dict[str, Any],
     default: bool,

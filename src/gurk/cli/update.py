@@ -1,31 +1,35 @@
 from gurk.lib.core.plugin_utils import get_combined_plugin_registry
-from gurk.lib.utils.cli import CleanArgumentParser
-from gurk.lib.utils.common import PACKAGE_SRC_PATH
+from gurk.lib.logger import ActiveLogger, Logger
+from gurk.lib.utils.cli import GurkArgumentParser
+from gurk.lib.utils.remotes import is_git_repo
 
 
 def main(argv, prog, description):
-    parser = CleanArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(prog=prog, description=description)
     parser.add_argument(
         "plugins",
         type=str,
         nargs="+",
-        help="Names of the plugins to update. If empty, update all local plugins",
+        help="PluginSpec of the plugins to update. If empty, update all local plugins. If GitRefs are given, update any plugins using those remotes to those commits / branches.",
     )
     args = parser.parse_args(argv)
 
-    if not args.plugins:
-        # Get all local plugins to update if none specified
-        combined_registry = get_combined_plugin_registry()
-        args.plugins = combined_registry.keys()  # All plugin names
+    # Execute with active logger
+    logger = Logger(args.verbose)
+    with ActiveLogger(logger):
+        if not args.plugins:
+            # Get all local plugins to update if none specified
+            combined_registry = get_combined_plugin_registry()
+            args.plugins = combined_registry.keys()  # All plugin names
 
-    # Update package plugins
-    # TODO
+        for plugin in args.plugins:
+            # Update plugin
+            if is_git_repo(plugin):
+                # TODO: If a git URL is given, clone/pull the plugin from that remote and remove existing version
+                pass
+            # TODO: If a plugin name or local path is given, update via git remote specified in gurk-plugin.yaml
+            #       If a remote is given, update plugin to that remote and pull. These allow specific commits to be targeted.
 
-    # Update local plugins
-    for plugin_path in (PACKAGE_SRC_PATH / "plugins").iterdir():
-        if not plugin_path.is_dir():
-            continue
-        # Check if plugin has a remote source
-        gurk_plugin_yaml_path = plugin_path / "gurk-plugin.yaml"
-        if not gurk_plugin_yaml_path.exists():
-            continue
+            # Update plugin registry
+            # TODO (use 'update_plugin_entry' from plugin_utils.py)
+            pass

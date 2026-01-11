@@ -1,16 +1,18 @@
-from pathlib import Path
+from pprint import pprint
+
+from rich import print as richprint
 
 from gurk.lib.core.plugin_utils import (
-    GurkPlugin,
-    check_local_plugin,
-    get_plugin_data,
+    ResolvedGurkPlugin,
+    get_plugin_entry,
+    load_resolved_plugin_yaml,
 )
-from gurk.lib.utils.cli import CleanArgumentParser
-from gurk.lib.utils.yaml import load_yaml
+from gurk.lib.logger import ActiveLogger, Logger
+from gurk.lib.utils.cli import GurkArgumentParser
 
 
 def main(argv, prog, description):
-    parser = CleanArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(prog=prog, description=description)
     parser.add_argument(
         "plugins",
         type=str,
@@ -19,81 +21,71 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
-    for plugin_name in args.plugins:
-        # Get plugin data (if installed)
-        plugin = get_plugin_data(plugin_name)
-        if not plugin:
-            print(f"Plugin '{plugin_name}' is not installed.")
-            # TODO: Use logger (error)
-            continue
+    # Execute with active logger
+    logger = Logger(args.verbose)
+    with ActiveLogger(logger):
+        for plugin_name in args.plugins:
+            # Get plugin entry (if installed)
+            plugin = get_plugin_entry(plugin_name)
+            if not plugin:
+                logger.error(f"Plugin '{plugin_name}' is not installed.")
+                continue
 
-        # Check that the plugin is valid
-        try:
-            check_local_plugin(plugin["local"])
-        except SystemExit:
-            print(
-                f"Plugin '{plugin_name}' at {plugin['local']} has an invalid 'gurk-plugin.yaml' file."
+            # Get plugin yaml
+            plugin_yaml: ResolvedGurkPlugin = load_resolved_plugin_yaml(
+                plugin_name
             )
-            # TODO: Use logger (error)
-            continue
+            if not plugin_yaml:
+                logger.error(
+                    f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+                )
+                continue
 
-        # Get info from gurk-plugin.yaml - TODO: Outsource to helper
-        plugin_yaml: GurkPlugin = load_yaml(
-            Path(plugin["local"]) / "gurk-plugin.yaml"
-        )
-        if not plugin_yaml:
-            print(
-                f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+            # Print general info
+            logger.padded_print(
+                f"Plugin '{plugin_name}' General Info", "green"
             )
-            # TODO: Use logger (error)
-            continue
+            richprint(f"[yellow]Name       :[/yellow] {plugin_name}")
+            richprint(
+                f"[yellow]Description:[/yellow] {plugin_yaml['define']['description']}"
+            )
+            source = plugin["remote"] if plugin["remote"] else plugin["local"]
+            richprint(f"[yellow]Source     :[/yellow] {source}\n")
 
-        # TODO: Indent the following properly
+            # Print tasks defined by the plugin
+            if plugin_yaml["define"].get("tasks"):
+                logger.padded_print("Defined Tasks", "cyan")
+                for task_name, task_info in plugin_yaml["define"][
+                    "tasks"
+                ].items():
+                    logger.richprint(f"- {task_name}:", "yellow")
+                    pprint(task_info)
+                    print()
 
-        # Print general info
-        # Logger.richprint("======= General =======", color="cyan")
-        print(
-            "======= General ======="
-        )  # TODO: Use logger.richprint instead. Also, use pytest helper for getting proper '====' lines.
-        print(f"Name: {plugin_name}")
-        print(f"Description: {plugin_yaml['define']['description']}")
-        # print(f"Version: {plugin_yaml['define'].get('version', 'N/A')}")
-        print(
-            f"Source: {plugin['remote'] if plugin['remote'] else plugin['local']}"
-        )
+            # Print imported plugins
+            if plugin_yaml.get("imports"):
+                logger.padded_print("Imported Plugins", "cyan")
+                for imported_plugin in plugin_yaml["imports"]:
+                    plugin_entry = get_plugin_entry(imported_plugin)
+                    print(
+                        f"- {imported_plugin}: {plugin_entry['remote'] if plugin_entry['remote'] else plugin_entry['local']}"
+                    )
+                print()
 
-        # Print tasks defined by the plugin
-        if "tasks" in plugin_yaml:
-            print("======== Tasks ========")
-            # TODO: Use common util with 'info' command for printing task fields
-            for task_name, task_info in plugin_yaml["tasks"].items():
-                print(f"- {task_name}: {task_info}")
-
-        # Print imported plugins
-        if "import" in plugin_yaml:
-            print("====== Imports ======")
-            for imported_plugin in plugin_yaml["import"]:
-                print(f"- {imported_plugin}")
-
-        # Print 'run' section
-        if "run" in plugin_yaml:
+            # Print 'run' section
             run_section = plugin_yaml["run"]
-
-            # Print default
-            print("======== Run ========")
-            default_key, default_value = next(
-                iter(run_section["default"].items())
-            )
-            print(
-                f"- {plugin_name}={default_key + ' (default)'}: {default_value}"
-            )
-
-            options = run_section.get("options", {})
-            options.pop(default_key, None)  # Remove default from options
-            # old_default = run_section["default"]
-            # old_default_name = next(iter(old_default))
-            # new_default = {old_default_name + " (default)": old_default[old_default_name]}
-            # options.update(new_default)
-            for run_option, run_info in options.items():
-                # TODO: Also use common task printing util for printing run tasks (these are custom tasks though)
-                print(f"- {plugin_name}={run_option}: {run_info}")
+            ## Print default
+            logger.padded_print("Run Options", "cyan")
+            default_value = next(iter(run_section["default"].values()))
+            logger.richprint(f"- {plugin_name} (default):", "green")
+            pprint(default_value)
+            print()
+            ## Print other options
+            if run_section.get("options"):
+                options = run_section.get("options", {})
+                for run_option, run_info in options.items():
+                    logger.richprint(
+                        f"- {plugin_name}={run_option}: ", "yellow"
+                    )
+                    pprint(run_info)
+                    print()

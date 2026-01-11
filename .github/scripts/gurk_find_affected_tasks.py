@@ -5,26 +5,23 @@ from pathlib import Path
 
 import networkx as nx
 
+from gurk.lib.core.plugin_utils import (
+    get_combined_plugin_tasks,
+    iter_configs,
+    iter_scripts,
+)
+
 try:
-    from gurk.lib.utils.common import (
-        DEFAULT_CONFIG_FILE,
-        PACKAGE_SRC_PATH,
-        get_script_path,
-    )
-    from gurk.lib.utils.scripts import (
-        ScriptBlockTypes,
-        get_block_spans,
-        iter_configs,
-        iter_scripts,
-    )
+    from gurk.lib.utils.common import PACKAGE_SRC_PATH
+    from gurk.lib.utils.scripts import ScriptBlockTypes, get_block_spans
     from gurk.lib.utils.tasks import RUNNER_SPECIFIC_TASKS
-    from gurk.lib.utils.yaml import load_yaml
 except ImportError:
     raise ImportError(
         "The gurk package needs to be installed to run this script."
     )
 
 
+# TODO: To make this work with new plugin structure, package plugins need to be imported in main and the PR branch, to be able to see the diff
 def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
     """
     Parse a unified diff text and return a mapping of file paths to changed line numbers.
@@ -113,13 +110,10 @@ def compute_affected_tasks(diff_text: str) -> list[str]:
             affected_config_files.add(file_path.name)
 
     # Determine affected tasks
-    default_config = load_yaml(DEFAULT_CONFIG_FILE)
-    tasks = {k: v for k, v in default_config.items() if not k.startswith("_")}
+    tasks = get_combined_plugin_tasks()
     affected_tasks: set[str] = set()
     for task_name, task in tasks.items():
-        # Affected script block
-        command = task_name.split("-", 1)[0]
-        script = get_script_path(task["script"], command)
+        script = task["script"]
         if script in affected_script_blocks:
             affected_blocks = affected_script_blocks[script]
             if task["function"] in affected_blocks:

@@ -1,9 +1,10 @@
 from gurk.lib.core.plugin_utils import remove_plugin
-from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.logger import ActiveLogger, Logger
+from gurk.lib.utils.cli import GurkArgumentParser
 
 
 def main(argv, prog, description):
-    parser = CleanArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(prog=prog, description=description)
     parser.add_argument(
         "plugins",
         type=str,
@@ -12,5 +13,8 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
-    for plugin_name in args.plugins:
-        remove_plugin(plugin_name)
+    # Execute with active logger
+    logger = Logger(args.verbose)
+    with ActiveLogger(logger):
+        for plugin_name in args.plugins:
+            remove_plugin(plugin_name)

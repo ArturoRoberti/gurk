@@ -1,18 +1,16 @@
 from argparse import ArgumentTypeError
-from pathlib import Path
 
 from ruamel.yaml import YAML
 
 from gurk.lib.core import core
 from gurk.lib.core.plugin_utils import (
-    GurkPlugin,
-    check_local_plugin,
-    get_plugin_data,
-    import_plugin,
+    get_plugin_entry,
+    load_resolved_plugin_yaml,
+    pull_plugin,
 )
-from gurk.lib.utils.cli import CleanArgumentParser
+from gurk.lib.logger import ActiveLogger, Logger
+from gurk.lib.utils.cli import GurkArgumentParser
 from gurk.lib.utils.common import generate_random_path
-from gurk.lib.utils.yaml import load_yaml
 
 
 def parse_task(value: str) -> tuple[str, str]:
@@ -35,7 +33,7 @@ def parse_task(value: str) -> tuple[str, str]:
 
 # TODO: Is it possible to get flags from core here dynamically?
 def main(argv, prog, description):
-    parser = CleanArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(prog=prog, description=description)
 
     # Add required arguments
     required = parser.add_required_group()
@@ -43,7 +41,7 @@ def main(argv, prog, description):
     group.add_argument(
         "--plugin",
         type=str,
-        help="Name of the plugin to run",
+        help="Name of the installed plugin to run",
     )
     group.add_argument(
         "--task",
@@ -51,87 +49,46 @@ def main(argv, prog, description):
         help="Specify a task to run as 'plugin_name/task_name'",
     )
 
-    # Add options
-    parser.add_argument(
-        "--update",
-        action="store_true",
-        help="Update the plugin if it is already installed",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable verbose output",
-    )
-    parser.add_argument(
-        "-y",
-        "--yes",
-        "--non-interactive",
-        dest="non_interactive",
-        action="store_true",
-        help="IAutomatically answer 'yes' to or ignore all prompts",
-    )
     args = parser.parse_args(argv)
 
-    plugin_name, option_spec = (args.plugin.split("=", 1) + [None])[:2]
+    # Execute with active logger
+    logger = Logger(args.verbose)
+    with ActiveLogger(logger):
+        plugin_name, option_spec = (args.plugin.split("=", 1) + [None])[:2]
 
-    # Get plugin data
-    plugin = get_plugin_data(plugin_name)
-    if not plugin or args.update:
-        # Import plugin
-        if not import_plugin(args.plugin, args.update):
-            print(f"Failed to import plugin '{args.plugin}'.")
-            # TODO: Use logger (fatal)
-            return
+        # Import plugin if not installed
+        plugin_entry = get_plugin_entry(plugin_name)
+        if not plugin_entry and not pull_plugin(args.plugin):
+            logger.fatal(f"Failed to import plugin '{args.plugin}'.")
 
-        plugin = get_plugin_data(plugin_name)
-        if not plugin:
-            # Safety check, should not happen
-            print(f"Plugin '{plugin_name}' is not installed after import.")
-            # TODO: Use logger (fatal)
-            return
+        # Get plugin yaml
+        plugin_yaml = load_resolved_plugin_yaml(plugin_name)
+        if not plugin_yaml:
+            logger.fatal(
+                f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+            )
 
-    # Check validity of plugin - TODO: require_local might not be necessary if import is recursive
-    if not check_local_plugin(plugin["local"], True, True):
-        print(
-            f"Plugin '{plugin_name}' at {plugin['local']} has a 'gurk-plugin.yaml' file that is either invalid or imports non-local plugins."
+        # Get option task(s)
+        option = (
+            plugin_yaml["run"]["default"]
+            if option_spec is None
+            else plugin_yaml["run"]["options"].get(option_spec)
         )
-        # TODO: Use logger (fatal)
-        return
+        if not option:
+            logger.fatal(
+                f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. "
+                f"Available options are: {list(plugin_yaml['run']['options'].keys())} (or default)."
+            )
 
-    # Get info from gurk-plugin.yaml
-    plugin_yaml: GurkPlugin = load_yaml(
-        Path(plugin["local"]) / "gurk-plugin.yaml"
-    )
-    if not plugin_yaml:
-        print(
-            f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+        # Generate mock custom config file
+        tmp_yaml = generate_random_path(suffix=".yaml")
+        with open(tmp_yaml, "w") as f:
+            YAML().dump(option, f)
+
+        # Run task(s)
+        core.main(
+            argv=["-f", str(tmp_yaml)],
+            prog="",
+            description="",
+            cmd="install",  # TODO: Remove
         )
-        # TODO: Use logger (error)
-        return
-
-    # Get option task(s)
-    option = (
-        plugin_yaml["run"].get("default")
-        if option_spec is None
-        else plugin_yaml["run"]["options"].get(option_spec)
-    )
-    if not option:
-        print(
-            f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. Available options are: {list(plugin_yaml['run']['options'].keys())} (or default)."
-        )
-        # TODO: Use logger (error)
-        return
-
-    # Generate mock custom config file
-    tmp_yaml = generate_random_path(suffix=".yaml")
-    with open(tmp_yaml, "w") as f:
-        YAML().dump(option, f)
-
-    # Run task(s)
-    core.main(
-        argv=["-f", str(tmp_yaml)],
-        prog="",
-        description="",
-        cmd="install",  # TODO: Remove
-    )

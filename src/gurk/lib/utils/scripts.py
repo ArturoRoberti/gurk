@@ -4,17 +4,9 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import Iterator, TypedDict
+from typing import TypedDict
 
-from gurk.cli.utils import CORE_COMMANDS
-from gurk.lib.utils.common import (
-    PACKAGE_CONFIG_PATH,
-    PACKAGE_SRC_PATH,
-    SCRIPT_LANGUAGES,
-    CommandKind,
-    FilePath,
-    ScriptExtension,
-)
+from gurk.lib.utils.common import CommandKind, FilePath, ScriptExtension
 from gurk.lib.utils.patterns import PatternCollection
 
 
@@ -240,70 +232,6 @@ class Command:
     def __str__(self) -> str:
         func_suffix = f"@{self.function}" if self.function else ""
         return f"{Path(self.script).stem}{func_suffix}"
-
-
-# TODO: Replace (TBD how exactly)
-def _iter_command_files(
-    base_path: Path, script_languages: set[str] | None = None
-) -> Iterator[Path]:
-    """
-    Yields all files under `<base_path>/scripts/<language>/<command>/`
-    if script_languages is provided, else `<base_path>/scripts/<command>/`.
-
-    :param base_path: Path to the base directory
-    :type base_path: Path
-    :param script_languages: Set of script languages to filter by
-    :type script_languages: set[str] | None
-    :return: Iterator of Paths to command files
-    :rtype: Iterator[Path]
-    """
-    if not base_path.exists():
-        return
-
-    # Determine starting points
-    if script_languages is None:
-        # Start directly from base_path
-        start_dirs = [base_path]
-    else:
-        # Start from language directories
-        start_dirs = [
-            d
-            for d in base_path.iterdir()
-            if d.is_dir() and d.name.upper() in script_languages
-        ]
-
-    # Loop through command directories under starting directories
-    for parent_dir in start_dirs:
-        for command_dir in parent_dir.iterdir():
-            if command_dir.is_dir() and command_dir.name in CORE_COMMANDS:
-                for file_path in command_dir.iterdir():
-                    if file_path.is_file():
-                        yield file_path
-
-
-# TODO: Replace such that it iterates through plugin scripts instead.
-#      Allow specifying plugin directory (home, package)?
-def iter_scripts() -> Iterator[Path]:
-    """
-    Yields all script files under the package scripts directory.
-
-    :return: Iterator of Paths to script files
-    :rtype: Iterator[Path]
-    """
-    scripts_path = PACKAGE_SRC_PATH / "scripts"
-    yield from _iter_command_files(scripts_path, SCRIPT_LANGUAGES)
-
-
-# TODO: Replace such that it iterates through plugin scripts instead.
-#      Allow specifying plugin directory (home, package)?
-def iter_configs() -> Iterator[Path]:
-    """
-    Yields all config files under the package config directory.
-
-    :return: Iterator of Paths to config files
-    :rtype: Iterator[Path]
-    """
-    yield from _iter_command_files(PACKAGE_CONFIG_PATH)
 
 
 def check_script_blocks(path: Path) -> list[str]:
