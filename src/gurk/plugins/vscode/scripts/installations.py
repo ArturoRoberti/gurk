@@ -1,4 +1,4 @@
-from gurk.lib.helpers import (
+from gurk import (
     InstallCommands,
     install_packages_from_txt_file,
     parse_task_args,

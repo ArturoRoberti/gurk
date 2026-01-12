@@ -3,12 +3,11 @@ from pprint import pprint
 from rich import print as richprint
 
 from gurk.lib.core.plugin_utils import (
-    ResolvedGurkPlugin,
+    GurkArgumentParser,
+    get_plugin_data,
     get_plugin_entry,
-    load_resolved_plugin_yaml,
 )
 from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.cli import GurkArgumentParser
 
 
 def main(argv, prog, description):
@@ -25,19 +24,11 @@ def main(argv, prog, description):
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         for plugin_name in args.plugins:
-            # Get plugin entry (if installed)
-            plugin = get_plugin_entry(plugin_name)
-            if not plugin:
-                logger.error(f"Plugin '{plugin_name}' is not installed.")
-                continue
-
-            # Get plugin yaml
-            plugin_yaml: ResolvedGurkPlugin = load_resolved_plugin_yaml(
-                plugin_name
-            )
-            if not plugin_yaml:
+            # Get plugin (if installed)
+            plugin_entry, plugin_yaml = get_plugin_data(plugin_name)
+            if not plugin_entry or not plugin_yaml:
                 logger.error(
-                    f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+                    f"Plugin '{plugin_name}' is not installed or has an invalid 'gurk-plugin.yaml' file."
                 )
                 continue
 
@@ -49,7 +40,11 @@ def main(argv, prog, description):
             richprint(
                 f"[yellow]Description:[/yellow] {plugin_yaml['define']['description']}"
             )
-            source = plugin["remote"] if plugin["remote"] else plugin["local"]
+            source = (
+                plugin_entry["remote"]
+                if plugin_entry["remote"]
+                else plugin_entry["local"]
+            )
             richprint(f"[yellow]Source     :[/yellow] {source}\n")
 
             # Print tasks defined by the plugin

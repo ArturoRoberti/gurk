@@ -1,6 +1,5 @@
-from gurk.lib.core.plugin_utils import remove_plugin
+from gurk.lib.core.plugin_utils import GurkArgumentParser, remove_plugin
 from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.cli import GurkArgumentParser
 
 
 def main(argv, prog, description):

@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from gurk.lib.helpers import (
+from gurk import (
     Logger,
     LoggerSeverity,
     PatternCollection,

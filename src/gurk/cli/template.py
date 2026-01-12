@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.utils.cli import GurkArgumentParser
+from gurk.lib.core.plugin_utils import GurkArgumentParser
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
 
 

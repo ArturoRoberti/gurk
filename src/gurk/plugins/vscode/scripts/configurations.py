@@ -2,7 +2,7 @@ from pathlib import Path
 
 import commentjson
 
-from gurk.lib.helpers import Logger, LoggerSeverity, parse_task_args
+from gurk import Logger, LoggerSeverity, parse_task_args
 
 
 def configure_vscode_keybindings(*args: list[str]) -> None:

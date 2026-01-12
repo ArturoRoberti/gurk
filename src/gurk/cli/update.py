@@ -1,6 +1,8 @@
-from gurk.lib.core.plugin_utils import get_combined_plugin_registry
+from gurk.lib.core.plugin_utils import (
+    GurkArgumentParser,
+    get_combined_plugin_registry,
+)
 from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.cli import GurkArgumentParser
 from gurk.lib.utils.remotes import is_git_repo
 
 

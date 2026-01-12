@@ -36,7 +36,7 @@ Each script can get access to the args passed by the scheduler via the `get_task
 
 ## Python
 ```python
-from gurk.lib.helpers import parse_task_args
+from gurk import parse_task_args
 ...
 def my_task_function(*args: list[str]) -> None:
     """Task function description."""

@@ -4,13 +4,13 @@ from ruamel.yaml import YAML
 
 from gurk.lib.core import core
 from gurk.lib.core.plugin_utils import (
+    GurkArgumentParser,
     get_plugin_entry,
     load_raw_plugin_yaml,
     load_resolved_plugin_yaml,
     pull_plugin,
 )
 from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.cli import GurkArgumentParser
 from gurk.lib.utils.common import generate_random_path
 from gurk.lib.utils.tasks import COMMON_RESOLVED_TASK_DICT_FIELDS
 

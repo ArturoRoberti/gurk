@@ -1,7 +1,7 @@
 import subprocess
 import time
 
-from gurk.lib.helpers import (
+from gurk import (
     InstallCommands,
     Logger,
     LoggerSeverity,

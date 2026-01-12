@@ -2,7 +2,7 @@ from typing import NotRequired, TypedDict
 
 import commentjson
 
-from gurk.lib.helpers import (
+from gurk import (
     InstallCommands,
     Logger,
     install_packages_from_list,

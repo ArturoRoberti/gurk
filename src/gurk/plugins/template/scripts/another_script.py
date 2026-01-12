@@ -1,4 +1,4 @@
-from gurk.lib.helpers import parse_task_args
+from gurk import parse_task_args
 
 
 def another_function(*args: list[str]) -> None:

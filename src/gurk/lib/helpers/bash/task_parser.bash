@@ -22,7 +22,7 @@ parse_task_args() {
 	local argparser=$(mktemp 2>/dev/null || mktemp -t argparser)
 	cat >>"$argparser" <<EOF
 from gurk.lib.logger import allow_missing_logger
-from gurk.lib.utils.cli import GurkArgumentParser
+from gurk.lib.core.plugin_utils import GurkArgumentParser
 
 parser = GurkArgumentParser(add_verbose_arg=False, add_non_interactive_arg=False, add_force_arg=True, add_task_args=True)
 with allow_missing_logger():

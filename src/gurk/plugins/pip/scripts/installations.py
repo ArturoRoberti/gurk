@@ -5,7 +5,7 @@ from pathlib import Path
 
 import commentjson
 
-from gurk.lib.helpers import (
+from gurk import (
     InstallCommands,
     Logger,
     LoggerSeverity,

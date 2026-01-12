@@ -1,8 +1,20 @@
-# TODO: Move to util/plugin.py instead of plugin/utils.py? Probably better if not, right? Then move other utils out too, and update docs accordingly.
+# TODO: Move much of this to utils/common.py. Can any of this be moved to utils/plugins.py? If so, update docs accordingly.
 
+import json
+import os
+import re
 import shutil
+from argparse import (
+    SUPPRESS,
+    ArgumentDefaultsHelpFormatter,
+    ArgumentParser,
+    ArgumentTypeError,
+    Namespace,
+    _ArgumentGroup,
+)
+from collections import defaultdict
 from pathlib import Path
-from typing import Iterator, NotRequired, TypeAlias, TypedDict
+from typing import Iterator, NotRequired, Sequence, TypeAlias, TypedDict
 
 import networkx as nx
 from ruamel.yaml import YAML
@@ -11,6 +23,7 @@ from gurk.lib.logger import get_logger
 from gurk.lib.utils.common import (
     PACKAGE_HOME_PATH,
     PACKAGE_SRC_PATH,
+    YES_ANSWERS,
     FilePath,
     generate_random_path,
 )
@@ -25,9 +38,11 @@ from gurk.lib.utils.scripts import (
     check_script_blocks,
     get_block_spans,
 )
+from gurk.lib.utils.system_info import SystemInfo
 from gurk.lib.utils.tasks import (
     CustomTaskDictCollection,
     DefaultTaskDictCollection,
+    ResolvedArgsDefinitionCollection,
     ResolvedCustomTaskDictCollection,
     ResolvedDefaultTaskDictCollection,
     TaskDictCollection,
@@ -168,7 +183,7 @@ def _get_possible_plugin_entries(
     package_registry: bool = True,
 ) -> tuple[PluginRegistryEntry | None, ...]:
     """
-    Get possible plugin paths for a given plugin name.
+    Get possible plugin registry entries for a given plugin name.
         NOTE: This does not check the validity of the plugin yaml file.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
@@ -252,7 +267,7 @@ def get_plugin_entry(
     package_registry: bool = True,
 ) -> PluginRegistryEntry | None:
     """
-    Get the data of a plugin (path, remote) if it exists locally.
+    Get the registry entry of a plugin (path, remote) if it exists locally.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
@@ -260,7 +275,7 @@ def get_plugin_entry(
     :type home_registry: bool
     :param package_registry: Whether to check the package plugin registry
     :type package_registry: bool
-    :return: Plugin data if the plugin exists locally, None otherwise
+    :return: Registry entry if the plugin exists locally, None otherwise
     :rtype: PluginRegistryEntry | None
     """
     possible_plugin_data = _get_possible_plugin_entries(
@@ -375,6 +390,29 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
             task["config_file"] = str(Path(plugin_path) / task["config_file"])
 
     return plugin_yaml
+
+
+def get_plugin_data(
+    plugin: PluginSpec,
+) -> tuple[PluginRegistryEntry | None, ResolvedGurkPlugin | None]:
+    """
+    Get the registry entry and gurk-plugin.yaml configuration of a local plugin.
+
+    :param plugin: Name, FilePath, or GitRef of the plugin
+    :type plugin: PluginSpec
+    :return: Tuple of PluginRegistryEntry and GurkPlugin configuration if the plugin exists locally, None each otherwise.
+             If an entry exists but the yaml is invalid, returns (entry, None).
+    :rtype: tuple[PluginRegistryEntry | None, ResolvedGurkPlugin | None]
+    """
+    plugin_entry = get_plugin_entry(plugin)
+    if not plugin_entry:
+        return None, None
+
+    plugin_yaml = load_resolved_plugin_yaml(plugin)
+    if not plugin_yaml:
+        return plugin_entry, None
+
+    return plugin_entry, plugin_yaml
 
 
 def get_available_plugin_names() -> list[str]:
@@ -545,6 +583,303 @@ def update_plugin_entry(
     return False
 
 
+class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
+    """
+    Custom formatter that:
+      - hides default=None and default=False for boolean flags
+      - annotates mutually exclusive args automatically
+      - respects max_help_position
+    """
+
+    def __init__(self, prog):
+        super().__init__(prog, max_help_position=60)
+
+    def _get_help_string(self, action):
+        if action.default not in (None, SUPPRESS):
+            # A default is specified and is not purposefully suppressed
+            # NOTE: Inludes boolean flags ("store_true"/"store_false")
+            default_suffix = f"(default: {action.default!s})"
+            if not action.help:
+                return default_suffix
+            else:
+                return action.help + " " + default_suffix
+        else:
+            # No default specified or default is purposefully suppressed
+            return action.help or ""
+
+
+class GurkArgumentParser(ArgumentParser):
+    """
+    Custom ArgumentParser that uses CleanHelpFormatter and adds common gurk CLI options.
+    """
+
+    def __init__(
+        self,
+        add_verbose_arg: bool = True,
+        add_non_interactive_arg: bool = True,
+        add_force_arg: bool = False,
+        add_task_args: bool = False,
+        allow_complex_types: bool = True,
+        *args,
+        **kwargs,
+    ):
+        # Some gurk internal variables
+        self.required_group_title = "required arguments"
+        self.add_non_interactive_arg = add_non_interactive_arg
+        self.allow_complex_types = allow_complex_types
+
+        # Use CleanHelpFormatter
+        kwargs["formatter_class"] = lambda prog: CleanHelpFormatter(prog)
+
+        # Call super init
+        super().__init__(*args, **kwargs)
+
+        # Add logger options
+        if add_verbose_arg:
+            self.add_argument(
+                "-v",
+                "--verbose",
+                action="store_true",
+                help="Enable verbose output",
+            )
+        if add_non_interactive_arg:
+            self.add_argument(
+                "--non-interactive",
+                action="store_true",
+                help="Run in non-interactive mode (disable prompts)",
+            )
+        if add_task_args:
+            self._add_task_args()
+        if add_force_arg:
+            self.add_argument(
+                "-f",
+                "--force",
+                action="store_true",
+                help="Force execution of task(s) even if they don't need to run",
+            )
+
+    def _add_task_args(self) -> None:
+        """
+        Add common task arguments to the parser.
+
+        :raises ArgumentTypeError: If argument validation fails
+        """
+
+        # Add system-info argument
+        def json_dict(value: str) -> SystemInfo:
+            """
+            Validate that the input is a JSON object (dictionary).
+
+            :param value: Input string
+            :type value: str
+            :return: Parsed JSON object
+            :rtype: dict
+            :raises ArgumentTypeError: If the input is not a valid JSON object
+            """
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as e:
+                raise ArgumentTypeError(f"Invalid JSON for --system-info: {e}")
+            if not isinstance(parsed, dict):
+                raise ArgumentTypeError(
+                    "--system-info must be a JSON object (dictionary)"
+                )
+            return parsed
+
+        self.add_argument(
+            "--system-info",
+            type=json_dict if self.allow_complex_types else str,
+            required=True,
+            help="JSON object with system information",
+        )
+
+        # Add config-file argument
+        def existing_path(value: str) -> Path:
+            """
+            Validate that the input path exists.
+
+            :param value: Input path string
+            :type value: str
+            :return: Path object
+            :rtype: Path
+            :raises ArgumentTypeError: If the path does not exist
+            """
+            path = Path(value)
+            if not path.exists():
+                raise ArgumentTypeError(f"Config file not found: {path}")
+            return path
+
+        self.add_argument(
+            "--config-file",
+            type=existing_path if self.allow_complex_types else str,
+            default=None,
+            help="Path to an existing config file",
+        )
+
+    def add_required_group(self) -> _ArgumentGroup:
+        """
+        Add a 'required arguments' group to the parser.
+
+        :return: The created argument group
+        :rtype: _ArgumentGroup
+        """
+        return self.add_argument_group(self.required_group_title)
+
+    # TODO: Clean this up
+    def extend_arguments(
+        self, args_dict: ResolvedArgsDefinitionCollection
+    ) -> None:
+        """
+        Extend the parser with arguments defined in a plugin.
+
+        :param args_dict: Dictionary of argument definitions
+        :type args_dict: ResolvedArgsDefinitionCollection
+        """
+
+        def make_wildcard_validator(patterns: list[str]):
+            """
+            Create:
+            - an argparse type() validator supporting '*' wildcards
+            - a matching metavar string
+            """
+
+            regexes = [
+                re.compile("^" + re.escape(p).replace(r"\*", ".*") + "$")
+                for p in patterns
+            ]
+
+            quoted = ", ".join(f"'{p}'" for p in patterns)
+            metavar = "{" + ",".join(patterns) + "}"
+
+            def validate(value: str) -> str:
+                if any(rx.match(value) for rx in regexes):
+                    return value
+                raise ArgumentTypeError(
+                    f"invalid choice: {value!r} (choose from {quoted})"
+                )
+
+            return validate, metavar
+
+        # Collect mutually exclusive groups
+        mutex_groups = defaultdict(list)
+        for name, spec in args_dict.items():
+            mutex = spec.get("mutex")
+            if mutex:
+                mutex_groups[mutex].append(name)
+
+        argparse_mutex_groups = {
+            name: self.add_mutually_exclusive_group() for name in mutex_groups
+        }
+
+        for name, spec in args_dict.items():
+            help_text = spec.get("help")
+            default = spec.get("default")
+            nargs = spec.get("nargs")
+            choices = spec.get("choices")
+
+            kwargs = {}
+
+            if help_text is not None:
+                kwargs["help"] = help_text
+
+            if choices is not None:
+                validator, metavar = make_wildcard_validator(choices)
+                kwargs["type"] = validator
+                kwargs["metavar"] = metavar
+
+            # --- Boolean flags ---
+            if isinstance(default, bool):
+                if nargs is not None:
+                    raise ValueError(
+                        f"Boolean flag '{name}' must not define nargs"
+                    )
+
+                kwargs["action"] = (
+                    "store_true" if default is False else "store_false"
+                )
+                kwargs["default"] = default
+
+            # --- Non-boolean arguments ---
+            else:
+                # if has_default:
+                if default is not None:
+                    # optional argument
+                    kwargs["default"] = default
+                elif nargs not in ("?", "*"):
+                    # required argument
+                    kwargs["required"] = True
+
+                if nargs is not None:
+                    kwargs["nargs"] = nargs
+
+            # Choose correct target (parser or mutex group)
+            mutex = spec.get("mutex")
+            target = argparse_mutex_groups[mutex] if mutex else self
+
+            target.add_argument(name, **kwargs)
+
+    def extend_task_arguments(self, task_name: str) -> None:
+        """
+        Extend the parser with task-specific arguments defined in a plugin, if any.
+
+        :param plugin: Plugin specification
+        :type plugin: PluginSpec
+        :raises ValueError: If the plugin YAML could not be loaded
+        """
+        plugin = task_name.split("/", 1)[0]
+        plugin_yaml: ResolvedGurkPlugin = load_resolved_plugin_yaml(plugin)
+        if not plugin_yaml:
+            raise ValueError(f"Plugin '{plugin}' could not be loaded")
+
+        try:
+            task_args = plugin_yaml["define"]["tasks"][task_name]["args"]
+            self.extend_arguments(task_args)
+        except KeyError as e:
+            self.error(
+                f"Key 'define'/'tasks'/'{task_name}'/'args' not "
+                f"found in plugin '{plugin}' YAML. Broken link: {e}"
+            )
+
+    def _reorder_actions(self):
+        """
+        Reorder actions to have required ones first.
+        """
+        # Reorder action groups to have 'required arguments' first
+        required_group = None
+        for g in self._action_groups:
+            if g.title == self.required_group_title:
+                required_group = g
+                break
+        if required_group:
+            self._action_groups.remove(required_group)
+            self._action_groups.insert(0, required_group)
+
+    def print_help(self, file=None) -> None:
+        # Reorder action groups to have 'required arguments' first
+        self._reorder_actions()
+
+        # Call the original print_help
+        return super().print_help(file)
+
+    def parse_args(
+        self, args: Sequence[str] | None = None, namespace: None = None
+    ) -> Namespace:
+        # Reorder action groups to have 'required arguments' first
+        self._reorder_actions()
+
+        # Call the original parse_args
+        args = super().parse_args(args, namespace)
+
+        # Get non-interactive mode from env var if not specified
+        if self.add_non_interactive_arg and not args.non_interactive:
+            args.non_interactive = (
+                os.getenv("GURK_NON_INTERACTIVE", "false").lower()
+                in YES_ANSWERS
+            )
+
+        return args
+
+
 #########################################################################################
 ################################### Command utilities ###################################
 #########################################################################################
@@ -568,8 +903,8 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
     task_dependency_graph = nx.DiGraph()
     task_supercedes_graph = nx.DiGraph()
 
-    # NOTE: Useless thanks to task graphs, but helps readability
-    available_task_names: set[str] = set()
+    # Save available tasks
+    available_tasks: DefaultTaskDictCollection = dict()
 
     def _check_local_plugin(_plugin_path: Path) -> bool:
         def error(message: str) -> bool:
@@ -754,7 +1089,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
 
         # Add defined tasks to available tasks
         task_names = list(plugin_definition["tasks"].keys())
-        available_task_names.update(task_names)
+        available_tasks.update(plugin_definition["tasks"])
 
         def expand_graph(graph: nx.DiGraph, field: str) -> bool:
             """
@@ -771,7 +1106,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             graph.add_nodes_from(task_names)
             for task_name, task in plugin_definition["tasks"].items():
                 for dep in task.get(field, []):
-                    if dep not in available_task_names:
+                    if dep not in available_tasks:
                         error(
                             f"Task '{task_name}' uses unknown task '{dep}' in '{field}' field."
                         )
@@ -802,14 +1137,35 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
         ]:
             # Check that all tasks in the option are defined
             for task_name in option.keys():
-                if task_name not in available_task_names:
+                if task_name not in available_tasks:
                     error(
                         f"Task '{task_name}' in 'run' section is not defined in this or any imported plugins."
                     )
                     return False
 
             # Check that all args in the option are defined
-            # TODO: For this, instead of 'available_task_names', we need to save all available tasks fully
+            for task_name, option_spec in option.items():
+                # Create a temporary parser to validate args
+                parser = GurkArgumentParser(
+                    add_verbose_arg=False,
+                    add_non_interactive_arg=False,
+                    add_force_arg=True,
+                )
+                allowed_args = available_tasks[task_name].get("args", {})
+                parser.extend_arguments(allowed_args)
+
+                # Override parser.error to raise exception instead of exiting
+                def raise_error(message):
+                    raise ValueError(message)
+
+                parser.error = raise_error
+
+                # Validate args
+                try:
+                    parser.parse_args(option_spec.get("args", []))
+                except ValueError as e:
+                    error(e)
+                    return False
 
             # Check that at least one task is being run.
             # If any tasks are defined in the plugin, that at least one of them must be enabled
@@ -943,6 +1299,3 @@ def remove_plugin(plugin: PluginSpec) -> None:
 
     # Remove plugin registry entry
     remove_plugin_entry(plugin_name)
-
-
-# TODO: Create 'get_plugin_data' function that returns tuple(plugin_entry, resolved_plugin_yaml) (or both None if not found/invalid)

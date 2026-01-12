@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from packaging import version
 
-from gurk.lib.helpers import (
+from gurk import (
     InstallCommands,
     Logger,
     add_alias,
