@@ -11,10 +11,10 @@ from gurk.lib.helpers import (
     PatternCollection,
     clone_git_files,
     get_clean_lines,
-    get_config_args,
     is_git_repo,
     is_url,
     load_yaml,
+    parse_task_args,
     resolve_package_path,
     revert_sudo_permissions,
 )
@@ -26,21 +26,12 @@ def configure_pinned_apps(*args: list[str]) -> None:
 
     NOTE: Inexistent apps are stored as "pinned" but only actually pin after being installed.
           No error is raised by 'gsettings' if an app does not exist.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping configuration of pinned apps, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # Get apps to pin
-    apps = get_clean_lines(config_file)
+    apps = get_clean_lines(task_args.config_file)
     apps_str = "['" + "', '".join(apps) + "']"
 
     # (STEP) Pinning apps...
@@ -53,18 +44,9 @@ def configure_pinned_apps(*args: list[str]) -> None:
 def configure_filestructure(*args: list[str]) -> None:
     """
     Create a predefined file structure based on a YAML mapping.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, force, remaining_args = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping configuration of file structure, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     def recursive_create_structure(
         base_path: Path, structure: dict[str, Any], overwrite: bool, sudo: bool
@@ -170,11 +152,11 @@ def configure_filestructure(*args: list[str]) -> None:
                 revert_sudo_permissions(dest_path)
 
     # Check file structure
-    config_data = load_yaml(config_file)
+    config_data = load_yaml(task_args.config_file)
     if config_data is None:
         Logger.logrichprint(
             LoggerSeverity.FATAL,
-            f"Invalid YAML file provided for file structure configuration: {config_file}",
+            f"Invalid YAML file provided for file structure configuration: {task_args.config_file}",
         )
         raise ValueError
 
@@ -183,11 +165,11 @@ def configure_filestructure(*args: list[str]) -> None:
         recursive_create_structure(
             Path.home(),
             config_data["HOME"],
-            force,
+            task_args.force,
             False,
         )
     if config_data.get("ROOT"):
-        if "--root" not in remaining_args:
+        if not task_args.root:
             Logger.logrichprint(
                 LoggerSeverity.WARNING,
                 "Skipping root (/) file structure configuration, as '--root' flag is not provided.",

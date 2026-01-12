@@ -5,12 +5,30 @@ from ruamel.yaml import YAML
 from gurk.lib.core import core
 from gurk.lib.core.plugin_utils import (
     get_plugin_entry,
+    load_raw_plugin_yaml,
     load_resolved_plugin_yaml,
     pull_plugin,
 )
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.cli import GurkArgumentParser
 from gurk.lib.utils.common import generate_random_path
+from gurk.lib.utils.tasks import COMMON_RESOLVED_TASK_DICT_FIELDS
+
+
+def split_argv_at_plugin_task(argv: list[str]) -> tuple[list[str], list[str]]:
+    """
+    Split argv into base args and plugin/task specific args.
+
+    :param argv: The full argument list.
+    :type argv: list[str]
+    :return: A tuple (run_argv, remaining).
+    :rtype: tuple[list[str], list[str]]
+    """
+    for i, arg in enumerate(argv):
+        if arg in ("-p", "--plugin", "-t", "--task"):
+            # include the name following --plugin/--task in base argv
+            return argv[: i + 2], argv[i + 2 :]
+    return argv, []
 
 
 def parse_task(value: str) -> tuple[str, str]:
@@ -21,7 +39,7 @@ def parse_task(value: str) -> tuple[str, str]:
     :type value: str
     :return: A tuple (plugin_name, task_name).
     :rtype: tuple[str, str]
-    :raises ArgumentTypeError: If the input format is invalid. # TODO: Add 'raises' to all funcs which raise smth
+    :raises ArgumentTypeError: If the input format is invalid.
     """
     parts = value.split("/", 1)
     if len(parts) != 2 or not all(parts):
@@ -39,56 +57,122 @@ def main(argv, prog, description):
     required = parser.add_required_group()
     group = required.add_mutually_exclusive_group(required=True)
     group.add_argument(
+        "-p",
         "--plugin",
         type=str,
         help="Name of the installed plugin to run",
     )
     group.add_argument(
+        "-t",
         "--task",
         type=parse_task,
         help="Specify a task to run as 'plugin_name/task_name'",
     )
 
-    args = parser.parse_args(argv)
+    # Only parse 'run' specific args, keep the rest for later
+    run_argv, remaining = split_argv_at_plugin_task(argv)
+    args = parser.parse_args(run_argv)
+
+    # Determine if running a plugin or task
+    if args.plugin:
+        plugin = args.plugin
+        task_name = None
+    else:
+        plugin, task_name = args.task
 
     # Execute with active logger
-    logger = Logger(args.verbose)
+    logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
-        plugin_name, option_spec = (args.plugin.split("=", 1) + [None])[:2]
+        plugin_name, option_spec = (plugin.split("=", 1) + [None])[:2]
 
         # Import plugin if not installed
         plugin_entry = get_plugin_entry(plugin_name)
-        if not plugin_entry and not pull_plugin(args.plugin):
-            logger.fatal(f"Failed to import plugin '{args.plugin}'.")
+        if not plugin_entry:
+            logger.info(f"Plugin '{plugin_name}' is not installed. Pulling...")
+            if not pull_plugin(plugin):
+                logger.fatal(f"Failed to pull plugin '{plugin}'.")
+        logger.debug(f"Found plugin entry for '{plugin_name}'.")
 
-        # Get plugin yaml
-        plugin_yaml = load_resolved_plugin_yaml(plugin_name)
-        if not plugin_yaml:
-            logger.fatal(
-                f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
-            )
+        if task_name:
+            # Run a specific task
+            run_type = "task"
+            full_task_name = f"{plugin_name}/{task_name}"
 
-        # Get option task(s)
-        option = (
-            plugin_yaml["run"]["default"]
-            if option_spec is None
-            else plugin_yaml["run"]["options"].get(option_spec)
-        )
-        if not option:
-            logger.fatal(
-                f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. "
-                f"Available options are: {list(plugin_yaml['run']['options'].keys())} (or default)."
-            )
+            # Check that the task exists in the plugin
+            plugin_yaml = load_resolved_plugin_yaml(plugin_name)
+            if not plugin_yaml:
+                logger.fatal(
+                    f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+                )
+            if full_task_name not in plugin_yaml["define"]["tasks"]:
+                logger.fatal(
+                    f"Plugin '{plugin_name}' does not have a task named '{full_task_name}'. "
+                    f"Available tasks are: {list(plugin_yaml['define']['tasks'].keys())}."
+                )
 
-        # Generate mock custom config file
+            # Define mock option with the specific task enabled
+            option = {full_task_name: {"enabled": True}}
+        else:
+            # Run the plugin default or specified option
+            run_type = "plugin"
+
+            # Get plugin yaml
+            plugin_yaml = load_resolved_plugin_yaml(plugin_name)
+            if not plugin_yaml:
+                logger.fatal(
+                    f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
+                )
+            logger.debug(f"Successfully loaded plugin '{plugin}'.")
+
+            # Get option task(s)
+            if option_spec is None:
+                option = plugin_yaml["run"]["default"]
+            else:
+                option = plugin_yaml["run"]["options"].get(option_spec)
+                if not option:
+                    logger.fatal(
+                        f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. "
+                        f"Available options are: {list(plugin_yaml['run']['options'].keys())} (or default)."
+                    )
+
+            # For any common fields, if they are missing in the raw option, remove them (to be filled later) to use defaults
+            raw_plugin_yaml = load_raw_plugin_yaml(plugin_name)
+            if option_spec is None:
+                raw_option = raw_plugin_yaml["run"]["default"]
+            else:
+                raw_option = raw_plugin_yaml["run"]["options"][option_spec]
+            for (_, task), raw_task in zip(
+                option.items(), raw_option.values()
+            ):
+                for field in COMMON_RESOLVED_TASK_DICT_FIELDS:
+                    if field not in raw_task and field in task:
+                        del task[field]
+
+        # Generate mock config file
         tmp_yaml = generate_random_path(suffix=".yaml")
         with open(tmp_yaml, "w") as f:
             YAML().dump(option, f)
 
+        # Generate task argparser base
+        task_parser_base = GurkArgumentParser(
+            prog=f"{prog} --{run_type} {task_name or plugin}",
+            description=f"Options to run {task_name or plugin}",
+            add_verbose_arg=False,
+            add_non_interactive_arg=False,
+            add_force_arg=True,
+            add_task_args=False,
+            allow_complex_types=False,
+        )
+
         # Run task(s)
         core.main(
-            argv=["-f", str(tmp_yaml)],
-            prog="",
-            description="",
-            cmd="install",  # TODO: Remove
+            cli_args=remaining,
+            option=option,
+            parser_base=task_parser_base,
+        )
+
+        # Final message
+        logger.done(
+            "All tasks completed - You may need to "
+            "reboot for some changes to take effect"
         )

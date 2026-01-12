@@ -1,79 +1,3 @@
-get_config_args() {
-	: '
-	Parses command-line arguments to extract system information and configuration directory.
-	Populates global variables:
-	  - SYSTEM_INFO:       Associative array of system information key-value pairs.
-	  - CONFIG_FILE:       Path to the task configuration file.
-	  - FORCE:             Boolean indicating if the --force flag was provided.
-	  - REMAINING_ARGS:    Array of any additional arguments not parsed.
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  (stderr) Error messages in case of issues
-	Returns:
-	  0 if args parsed successfully, 1 otherwise
-	'
-	declare -gA SYSTEM_INFO=()
-	declare -g CONFIG_FILE=""
-	declare -g FORCE=false
-	declare -g -a REMAINING_ARGS=()
-
-	local system_info_raw=""
-
-	# --- Parse arguments ---
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-			--system-info)
-				shift
-				if [[ -z "$1" || "$1" == --* ]]; then
-					echo "Error: --system-info requires a value" >&2
-					return 1
-				fi
-				system_info_raw="$1"
-				;;
-			--config-file)
-				shift
-				if [[ -z "$1" || "$1" == --* ]]; then
-					echo "Error: --config-file requires a value" >&2
-					return 1
-				fi
-				CONFIG_FILE="$1"
-				if [[ ! -f "$CONFIG_FILE" ]]; then
-					echo "Error: Config file not found: $CONFIG_FILE" >&2
-					return 1
-				fi
-				;;
-			--force)
-				FORCE=true
-				;;
-			*)
-				REMAINING_ARGS+=("$1")
-				;;
-		esac
-		shift
-	done
-
-	# --- Parse system-info string into associative array ---
-	if [[ -n "$system_info_raw" ]]; then
-		# Expect JSON-like input: '{"key": "value", "x": "y"}'
-		local cleaned="${system_info_raw#\{}"
-		cleaned="${cleaned%\}}"
-		cleaned="${cleaned//\"/}"
-
-		# Split into key:value pairs
-		local pair key val
-		IFS=',' read -ra pairs <<<"$cleaned"
-		for pair in "${pairs[@]}"; do
-			key="${pair%%:*}"
-			val="${pair#*:}"
-			key="$(echo "$key" | xargs)"
-			val="$(echo "$val" | xargs)"
-			SYSTEM_INFO["$key"]="$val"
-		done
-	fi
-}
-
 log_step() {
 	: '
 	Log a step message without advancing progress.
@@ -100,11 +24,13 @@ log_step() {
 run_script_function() {
 	: '
 	Runs a script (Bash or Python), optionally invoking a specific function within it.
+		NOTE: This mirrors the Python function of the same name in 'lib/utils/interface.py', with bash limitations considered.
 
 	Args:
 	  - script:   Path to the script file.
 	  - function: (Optional) Name of the function to invoke within the script. If omitted, the entire script is run.
-	  - ...:      Additional arguments to pass to the script or function.
+	  - sudo:     (Optional) Whether to run the script with sudo privileges (default: false).
+	  - ...:      (Optional) Additional arguments to pass to the script or function.
 	Outputs:
 	  Output from the script or function.
 	Returns:
@@ -112,13 +38,15 @@ run_script_function() {
 	'
 	local script="$1"
 	local function="${2:-}"
+	local sudo="${3:-false}"
+	local args=("${@:4}")
 	local ext="${script##*.}"
 	case "${ext,,}" in
 		bash)
-			run_bash_script_function "$script" "$function" "${@:3}"
+			run_bash_script_function "$script" "$function" "${args[@]}"
 			;;
 		py)
-			run_python_script_function "$script" "$function" "${@:3}"
+			run_python_script_function "$script" "$function" "$sudo" "${args[@]}"
 			;;
 		*)
 			echo "Unsupported script extension: $ext" >&2
@@ -134,7 +62,7 @@ run_bash_script_function() {
 	Args:
 	  - script:   Path to the script file.
 	  - function: (Optional) Name of the function to invoke within the script. If omitted, the entire script is run.
-	  - ...:      Additional arguments to pass to the script or function.
+	  - ...:      (Optional) Additional arguments to pass to the script or function.
 	Outputs:
 	  Output from the script or function.
 	Returns:
@@ -142,16 +70,14 @@ run_bash_script_function() {
 	'
 	local script="$1"
 	local function="${2:-}"
-
-	# ASSUME the helper scripts are already sourced
+	local args=("${@:3}")
 
 	if [[ -n "$function" ]]; then
 		# Source the script and call the function
-		source "$script"
-		"$function" "${@:3}"
+		source "$script" "$function" "${args[@]}"
 	else
 		# Run the script directly
-		bash "$script" "${@:2}"
+		bash "$script" "${args[@]}"
 	fi
 }
 
@@ -162,7 +88,8 @@ run_python_script_function() {
 	Args:
 	  - script:   Path to the script file.
 	  - function: (Optional) Name of the function to invoke within the script. If omitted, the entire script is run.
-	  - ...:      Additional arguments to pass to the script or function.
+	  - sudo:     (Optional) Whether to run the script with sudo privileges (default: false).
+	  - ...:      (Optional) Additional arguments to pass to the script or function.
 	Outputs:
 	  Output from the script or function.
 	Returns:
@@ -175,9 +102,17 @@ run_python_script_function() {
 
 	local script="$1"
 	local func="${2:-}"
-	shift
+	local sudo="${3:-false}"
+	local args=("${@:4}")
 
-	python3 - "$@" <<-'EOF'
+	local py_exe
+	if [[ "$sudo" == true ]]; then
+		py_exe="sudo python3"
+	else
+		py_exe="python3"
+	fi
+
+	$py_exe - "${args[@]}" <<-'EOF'
 		import ast, sys
 
 		script, func = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None

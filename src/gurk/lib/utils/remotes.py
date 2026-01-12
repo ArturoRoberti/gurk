@@ -214,7 +214,9 @@ def get_cached_repo(repo: GitRef) -> Path | None:
         else:
             # Checkout desired commit
             repo_obj.git.fetch("origin", parsed["commit"])
-            repo_obj.git.checkout(parsed["commit"])
+            repo_obj.git.checkout(
+                parsed["commit"]
+            )  # TODO: Try-except or similar? What if the commit is not found?
 
         # Repo matched, no need to check further
         break

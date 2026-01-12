@@ -3,16 +3,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 install_vscode() {
 	: '
 	Install VSCode from source
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if VSCode is already installed
 	if check_install_vscode && [[ "$FORCE" == false ]]; then

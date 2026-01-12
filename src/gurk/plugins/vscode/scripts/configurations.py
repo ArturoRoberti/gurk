@@ -2,24 +2,15 @@ from pathlib import Path
 
 import commentjson
 
-from gurk.lib.helpers import Logger, LoggerSeverity, get_config_args
+from gurk.lib.helpers import Logger, LoggerSeverity, parse_task_args
 
 
 def configure_vscode_keybindings(*args: list[str]) -> None:
     """
     Configure VSCode keybindings.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping configuration of VSCode keybindings, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # Ensure VSCode keybindings file exists
     vscode_keys = Path.home() / ".config/Code/User/keybindings.json"
@@ -33,7 +24,9 @@ def configure_vscode_keybindings(*args: list[str]) -> None:
 
     # Load both JSON files (supporting comments)
     existing = commentjson.load(vscode_keys.open("r", encoding="utf-8"))
-    new_keys = commentjson.load(config_file.open("r", encoding="utf-8"))
+    new_keys = commentjson.load(
+        task_args.config_file.open("r", encoding="utf-8")
+    )
 
     # Merge arrays like jq -s '.[0] + .[1]'
     merged = existing + new_keys

@@ -11,31 +11,22 @@ from gurk.lib.helpers import (
     add_alias,
     clone_git_files,
     get_clean_lines,
-    get_config_args,
     gitref_dict2str,
     install_packages_from_list,
     parse_git_ref,
+    parse_task_args,
 )
 
 
 def install_js_repositories(*args: list[str]) -> None:
     """
     Clone and install JS repositories from a list of git URLs.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, force, remaining_args = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping pulling of docker images, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # Get JS repositories info
-    repos = get_clean_lines(config_file)
+    repos = get_clean_lines(task_args.config_file)
     if not repos:
         Logger.step(
             "Skipping installation of JS repositories, as no repositories are specified",
@@ -138,7 +129,7 @@ def install_js_repositories(*args: list[str]) -> None:
             # Move to /opt/npm (overwrite if exists) - TODO: Either generalize or (if only necessary for npm) change to npm only
             target = npm_pkg_dir / pkg_name
             if target.exists():
-                if force:
+                if task_args.force:
                     subprocess.run(["sudo", "rm", "-rf", str(target)])
                 else:
                     Logger.step(
@@ -151,7 +142,7 @@ def install_js_repositories(*args: list[str]) -> None:
             )
 
             # Add alias
-            if "--create-aliases" in remaining_args:
+            if task_args.gurk_js_create_aliases:
                 add_alias(
                     f"{pkg_name}='(cd {target} && {package_manager} start > /dev/null &)'"
                 )

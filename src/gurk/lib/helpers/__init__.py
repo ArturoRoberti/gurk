@@ -21,12 +21,11 @@ from .python.common import (
     install_packages_from_list,
     install_packages_from_txt_file,
 )
-from .python.interface import get_config_args
+from .python.task_parser import parse_task_args
 
 __all__ = [
     "add_alias",
     "clone_git_files",
-    "get_config_args",
     "get_clean_lines",
     "gitref_dict2str",
     "InstallCommands",
@@ -38,6 +37,7 @@ __all__ = [
     "Logger",
     "LoggerSeverity",
     "parse_git_ref",
+    "parse_task_args",
     "PatternCollection",
     "resolve_package_path",
     "revert_sudo_permissions",

@@ -9,50 +9,32 @@ from gurk.lib.helpers import (
     InstallCommands,
     Logger,
     LoggerSeverity,
-    get_config_args,
     install_packages_from_txt_file,
+    parse_task_args,
 )
 
 
 def install_pipx_packages(*args: list[str]) -> None:
     """
     Install packages using pipx package manager.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of pipx packages, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # (STEP) Installing pipx packages
-    install_packages_from_txt_file(InstallCommands.PIPX, config_file)
+    install_packages_from_txt_file(InstallCommands.PIPX, task_args.config_file)
 
 
 def install_pip_environments(*args: list[str]) -> None:
     """
     Install packages into python environments using pip.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, force, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of pip packages, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # Get pip environments info
     pip_envs: dict[str, list[str]] = commentjson.load(
-        config_file.open("r", encoding="utf-8")
+        task_args.config_file.open("r", encoding="utf-8")
     )
     if not pip_envs:
         Logger.step(
@@ -73,7 +55,7 @@ def install_pip_environments(*args: list[str]) -> None:
         # Handle existing virtual environment
         venv_dir = base_venv_dir / venv_name
         if venv_dir.exists():
-            if not force:
+            if not task_args.force:
                 Logger.step(
                     f"Skipping creation of environment '{venv_name}', as it already exists",
                     warning=True,

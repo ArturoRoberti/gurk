@@ -20,8 +20,7 @@ _get_supported_ros_distros() {
 _get_latest_ros_distro() {
 	: '
 	Get the latest ROS distro codename from the official ROS releases page.
-	If --include-future is provided in REMAINING_ARGS, future distros will also be considered.
-	Returns the codename of the latest ROS distro.
+	If --ros-include-future is provided, future distros will also be considered.
 
 	Args:
 	  None
@@ -30,14 +29,8 @@ _get_latest_ros_distro() {
 	Returns:
 	  0 (unless an unexpected error occurs)
 	'
-	local include_future=false
 	local url="https://docs.ros.org/en/rolling/Releases.html"
 	local rows best_name best_ts ts eol name cls codename lc_eol
-
-	# Use your provided check for --include-future
-	if _contains REMAINING_ARGS "--include-future"; then
-		include_future=true
-	fi
 
 	# Fetch and extract table rows
 	rows=$(curl -fsSL "$url" |
@@ -79,7 +72,7 @@ _get_latest_ros_distro() {
 		esac
 
 		# skip future distros if not including them
-		if [[ "$include_future" == false && "$cls" == *future-distros* ]]; then
+		if [[ "$ROS_INCLUDE_FUTURE" == false && "$cls" == *future-distros* ]]; then
 			continue
 		fi
 
@@ -119,18 +112,9 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 		  If any other distros are needed, consider using ROS docker images.
 		  See 'install-docker-images' task for more details on ROS docker images.
 		  You can (usually) find more info about supported OSs at https://docs.ros.org/en/<distro>/Installation.html
-
-	Args:
-	  - Configuration Args
-	  - DISTRO...:   List of ROS distro codenames to install (e.g. "noetic", "foxy", "galactic").
-					 Use "latest" to install the latest supported ROS distro.
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if ROS is already installed
 	if check_install_ros && [[ "$FORCE" == false ]]; then
@@ -156,25 +140,18 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
 	# (STEP) Preparing distros to install
 	supported_ros_distros=($(_get_supported_ros_distros | tr '\n' ' '))
-	DISTROS=()
-	for distro in "${REMAINING_ARGS[@]}"; do
-		if [[ "$distro" == "latest" ]]; then
-			DISTROS+=($(_get_latest_ros_distro))
-			log_step "Detected latest supported ROS distro: ${DISTROS[-1]}"
-		elif ! _contains supported_ros_distros "$distro"; then
-			log_step "Skipping unsupported ROS distro: $distro"
-			continue
-		else
-			# Include normal distro
-			DISTROS+=("$distro")
-		fi
-	done
+	if [[ "$ROS_DISTRO" == "latest" ]]; then
+		distro=$(_get_latest_ros_distro)
+		log_step "Detected latest supported ROS distro: $distro"
+	elif ! _contains supported_ros_distros "$ROS_DISTRO"; then
+		log_step "Your system does not support the specified ROS distro: $ROS_DISTRO" true
+		exit 1
+	else
+		distro="$ROS_DISTRO"
+	fi
 
-	# (STEP) Installing ROS distro(s)
-	for distro in "${DISTROS[@]}"; do
-		log_step "Installing ROS distro: $distro"
-		apt_install "ros-${distro}-desktop-full"
-	done
+	# (STEP) Installing ROS distro '$distro'
+	apt_install "ros-${distro}-desktop-full"
 
 	# (STEP) Installing ROS development tools
 	apt_install ros-dev-tools

@@ -14,7 +14,7 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose)
+    logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         for source in args.paths:
             if not check_local_plugin(source):

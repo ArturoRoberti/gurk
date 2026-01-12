@@ -20,6 +20,7 @@ PIPX_PYTHON_PATH = Path(sys.executable)
 PACKAGE_HOME_PATH = Path.home() / ".gurk"
 PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
 SETUP_DONE_FILE = PACKAGE_HOME_PATH / "setup.done"
+IS_GITHUB_RUNNER = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 PACKAGE_HOME_PATH.mkdir(parents=True, exist_ok=True)
@@ -210,3 +211,7 @@ def get_config_path(config_file: FilePath, command: str) -> Path:
         raise ValueError(f"Unknown command: {command}")
 
     return PACKAGE_CONFIG_PATH / command / config_file
+
+
+YES_ANSWERS = ["y", "yes", "true", "1"]
+NO_ANSWERS = ["n", "no", "false", "0"]

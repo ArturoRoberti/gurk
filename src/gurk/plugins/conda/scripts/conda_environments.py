@@ -7,24 +7,15 @@ from typing import NotRequired, TypedDict
 import commentjson
 from ruamel.yaml import YAML
 
-from gurk.lib.helpers import Logger, get_config_args, run_script_function
+from gurk.lib.helpers import Logger, parse_task_args, run_script_function
 
 
 def install_conda_environments(*args: list[str]) -> None:
     """
     Install packages into Conda environments (no custom env directory).
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, force, remaining_args = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of conda environments, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # Typing helper classes
     class CondaEnv(TypedDict):
@@ -36,7 +27,7 @@ def install_conda_environments(*args: list[str]) -> None:
 
     # Get conda environments info
     conda_envs: dict[str, CondaEnv] = commentjson.load(
-        config_file.open("r", encoding="utf-8")
+        task_args.config_file.open("r", encoding="utf-8")
     )
     if not conda_envs:
         Logger.step(
@@ -141,8 +132,8 @@ def install_conda_environments(*args: list[str]) -> None:
         )
         if (
             result.returncode == 0
-            and "--update" not in remaining_args
-            and not force
+            and not task_args.conda_update_environments
+            and not task_args.force
         ):
             Logger.step(
                 f"Environment '{env_name}' already exists - Skipping creation",
@@ -151,10 +142,10 @@ def install_conda_environments(*args: list[str]) -> None:
             continue
 
         # Handle --update flag
-        if "--update" in remaining_args:
+        if task_args.conda_update_environments:
             conda_cmd = ["update" if x == "create" else x for x in conda_cmd]
         else:
-            if force:
+            if task_args.force:
                 result = subprocess.run(
                     [conda_exe[env_type], "env", "remove", "-n", env_name],
                     capture_output=True,

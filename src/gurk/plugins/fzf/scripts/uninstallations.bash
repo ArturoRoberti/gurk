@@ -2,17 +2,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 uninstall_fzf() {
 	: '
-	Uninstall fzf
-
-	Args:
-	  None
-	Outputs:
-	  Log messages indicating the current progress and uninstallation outputs
-	Returns:
-	  0 if successful (or already uninstalled), 1 otherwise
+	Uninstall fzf (fuzzy finder)
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Test if fzf is installed
 	if ! check_install_fzf && [[ "$FORCE" == false ]]; then
@@ -34,17 +27,10 @@ uninstall_fzf() {
 
 uninstall_loki_shell() {
 	: '
-	Uninstall loki-shell
-
-	Args:
-	  None
-	Outputs:
-	  Log messages indicating the current progress and uninstallation outputs
-	Returns:
-	  0 if successful (or already uninstalled), 1 otherwise
+	Uninstall loki-shell (fzf support over docker containers)
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Test if loki-shell is installed
 	if ! check_install_loki_shell && [[ "$FORCE" == false ]]; then

@@ -17,7 +17,9 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
+
+from gurk.lib.utils.common import NO_ANSWERS, YES_ANSWERS
 
 from .utils import LoggerEnum, LoggerSeverity, TaskInfos, TaskTerminationType
 
@@ -27,16 +29,16 @@ class Logger:
     """Logger with progress tracking and rich-formatted output."""
 
     # fmt: off
-    verbose:      bool      = field()
-    interactive:  bool      = field(default=True)
+    verbose:         bool      = field()
+    non_interactive: bool      = field()
 
-    logdir:       Path      = field(init=False)
-    task_infos:   TaskInfos = field(init=False, repr=False, default_factory=dict)
+    logdir:          Path      = field(init=False)
+    task_infos:      TaskInfos = field(init=False, repr=False, default_factory=dict)
 
-    _tasks_lock:  Lock      = field(init=False, repr=False, default_factory=Lock)
-    _console_out: Console   = field(init=False, repr=False)
-    _console_err: Console   = field(init=False, repr=False)
-    _progress:    Progress  = field(init=False, repr=False)
+    _tasks_lock:     Lock      = field(init=False, repr=False, default_factory=Lock)
+    _console_out:    Console   = field(init=False, repr=False)
+    _console_err:    Console   = field(init=False, repr=False)
+    _progress:       Progress  = field(init=False, repr=False)
     # fmt: on
 
     def __post_init__(self):
@@ -87,8 +89,11 @@ class Logger:
             # Don't log scripts if not in verbose mode
             return
 
-        shutil.copy2(
-            script, self.logdir / "modified_scripts" / f"{task_name}.{ext}"
+        safe_name = task_name.replace("/", "_")
+        dest = self.logdir / "modified_scripts" / f"{safe_name}.{ext}"
+        shutil.copy2(script, dest)
+        self.debug(
+            f"Logged modified script for task '{task_name}' to '{dest.as_posix()}'"
         )
 
     def add_task(self, task_name: str, total: int = 1) -> TaskID:
@@ -131,7 +136,8 @@ class Logger:
                 return None
             task_info = self.task_infos[task_id]
 
-            logfile = self.logdir / f"{task_info['name']}.log"
+            safe_name = task_info["name"].replace("/", "_")
+            logfile = self.logdir / f"{safe_name}.log"
             task_info["logfile"] = logfile
 
         return logfile
@@ -366,7 +372,6 @@ class Logger:
         total_length: int = 128,
         file: IO[str] | None = None,
     ) -> None:
-        # TODO: Does using a different 'file' here work correctly with richprint? consoles
         """
         Print text padded with "=" signs to center it within a specified total length.
 
@@ -423,7 +428,7 @@ class Logger:
         :return: True if interactive and console is a terminal, False otherwise
         :rtype: bool
         """
-        return self.interactive and self._console_out.is_terminal
+        return not self.non_interactive and self._console_out.is_terminal
 
     @contextmanager
     def _suspend_progress(self):
@@ -438,7 +443,6 @@ class Logger:
         else:
             yield
 
-    # TODO: Use. If this works well, then enable logger in main.py by default already
     def prompt_bool(self, message: str, answer: str | bool = None) -> bool:
         """
         Prompt the user for a yes/no response.
@@ -450,9 +454,30 @@ class Logger:
         :return: True if the user responds with 'y', False for 'n'.
         :rtype: bool
         """
+        # Non-interactive mode
+        if not self.can_prompt and answer is None:
+            raise RuntimeError(
+                "Cannot prompt for input in non-interactive mode without a predefined answer."
+            )
+
         # Automatic answer handling
         if answer is not None:
-            return answer
+            if isinstance(answer, bool):
+                return answer
+            elif isinstance(answer, str):
+                answer = answer.strip().lower()
+                if answer in YES_ANSWERS:
+                    return True
+                elif answer in NO_ANSWERS:
+                    return False
+                else:
+                    raise ValueError(
+                        f"Invalid predefined answer string '{answer}'"
+                    )
+            else:
+                raise ValueError(
+                    f"Invalid predefined answer type '{type(answer)}'"
+                )
         elif not self.can_prompt:
             # Non-interactive mode without predefined answer defaults to 'no'
             return False
@@ -460,3 +485,24 @@ class Logger:
         # Interactive prompt
         with self._suspend_progress():
             return Confirm.ask(message)
+
+    def ask(self, message: str, password: bool = False) -> str:
+        """
+        Prompt the user for input.
+
+        :param message: The prompt message.
+        :type message: str
+        :param password: Whether to mask the input (for passwords).
+        :type password: bool
+        :return: The user's input.
+        :rtype: str
+        """
+        # Non-interactive mode
+        if not self.can_prompt:
+            raise RuntimeError(
+                "Cannot prompt for input in non-interactive mode."
+            )
+
+        # Interactive prompt
+        with self._suspend_progress():
+            return Prompt.ask(f"{message}", password=password)

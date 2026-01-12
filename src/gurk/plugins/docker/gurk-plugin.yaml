@@ -9,8 +9,18 @@ define:
       script: scripts/docker.bash
       function: null
       args:
-        allowed: [nvidia-container-toolkit, devcontainers-cli, distrobox]
-        default: [nvidia-container-toolkit, devcontainers-cli, distrobox]
+# TODO: Separate these choices into separate tasks
+        --docker-additional-packages:
+          help: Specify Docker-related packages to install
+          choices:
+            - nvidia-container-toolkit
+            - devcontainers-cli
+            - distrobox
+          nargs: '+'
+          default:
+            - nvidia-container-toolkit
+            - devcontainers-cli
+            - distrobox
     docker/install-docker-images:
       description: Pull a list of Docker images
       script: scripts/docker_images.py

@@ -115,7 +115,7 @@ class PatternCollection(Enum):
         "FOR":        re.compile(r"^\s*for\s+(.*);\s*do\s*$"),
         "WHILE":      re.compile(r"^\s*while\s+(.*);\s*do\s*$"),
         "UNTIL":      re.compile(r"^\s*until\s+(.*);\s*do\s*$"),
-        "IMPORT":     re.compile(r"^\s*source\s+([^\s#;]+)"),
+        "IMPORT":     re.compile(r'^\s*source\s+(.+?)(?:\s*(?:#|;|$))'),
     }
     PYTHON: EnumValue[ScriptPatterns] = {
         "ENTRYPOINT": re.compile(r'if __name__\s*==\s*[\'"]__main__[\'"]\s*:'),

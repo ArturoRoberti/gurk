@@ -3,16 +3,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 configure_bashrc() {
 	: '
 	Add custom lines to ~/.bashrc.
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress
-	Returns:
-	  0 if configured, 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if config file is provided
 	if [ -z "$CONFIG_FILE" ]; then

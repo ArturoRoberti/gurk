@@ -18,10 +18,13 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose)
+    logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         for source in args.sources:
             if not pull_plugin(source):
-                print(f"Failed to import plugin from source '{source}'.")
-                # TODO: Use logger (error)
+                logger.error(
+                    f"Failed to import plugin from source '{source}'."
+                )
                 continue
+
+        logger.done("Plugin pull operations complete.")

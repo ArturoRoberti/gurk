@@ -5,26 +5,17 @@ import commentjson
 from gurk.lib.helpers import (
     InstallCommands,
     Logger,
-    get_config_args,
     install_packages_from_list,
+    parse_task_args,
 )
 
 
 def install_docker_images(*args: list[str]) -> None:
     """
     Pull docker images from Docker Hub.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping pulling of docker images, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # Typing helper classes
     class DockerImageInfo(TypedDict):
@@ -36,7 +27,7 @@ def install_docker_images(*args: list[str]) -> None:
 
     # Load docker images - also expand environment variables
     docker_images_info: list[DockerImageInfo] = commentjson.load(
-        config_file.open("r", encoding="utf-8")
+        task_args.config_file.open("r", encoding="utf-8")
     )
     docker_images = [
         f"{item.get('registry', 'docker.io')}/{item['image']}:{item.get('tag', 'latest')}"

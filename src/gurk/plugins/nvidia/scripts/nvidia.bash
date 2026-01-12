@@ -274,16 +274,9 @@ install_nvidia_driver() {
 
 	WARNING: This will install the requested or recommended NVIDIA driver,
 			 replacing any existing (cuda-repository) driver installation.
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if NVIDIA Driver is already installed
 	if check_install_nvidia_driver && [[ "$FORCE" == false ]]; then
@@ -293,38 +286,29 @@ install_nvidia_driver() {
 		return 0
 	fi
 
-	# See if prime-select is requested
-	local prime_select=false
-	if _contains REMAINING_ARGS "--prime-select"; then
-		prime_select=true
-	fi
-	_add_graphics_drivers_ppa "$prime_select"
+	# (STEP) Adding graphics-drivers PPA
+	_add_graphics_drivers_ppa "$NVIDIA_PRIME_SELECT"
 
 	# (STEP) Determining requested NVIDIA driver
 	driver_version=""
-	if _contains REMAINING_ARGS "recommended"; then
+	if [[ "$NVIDIA_DRIVER_VERSION" == "recommended" ]]; then
 		# (1st Priority) Use recommended driver
 		driver_version=$(_detect_recommended_driver)
-	elif _contains REMAINING_ARGS "latest"; then
+	elif [[ "$NVIDIA_DRIVER_VERSION" == "latest" ]]; then
 		# (2nd Priority) Use latest available driver
 		search_results=$(apt-cache search '^nvidia-driver-[0-9]+')
-		if ! _contains REMAINING_ARGS "--include-server"; then
+		if [[ "$NVIDIA_INCLUDE_SERVER_DRIVERS" == false ]]; then
 			# Filter out server drivers if not requested
 			search_results=$(echo "$search_results" | grep -v 'server')
 		fi
-		if ! _contains REMAINING_ARGS "--include-open"; then
+		if [[ "$NVIDIA_INCLUDE_OPEN_DRIVERS" == false ]]; then
 			# Filter out open drivers if not requested
 			search_results=$(echo "$search_results" | grep -v 'open')
 		fi
 		driver_version=$(echo "$search_results" | awk '{print $1}' | sort -V | tail -n1)
 	else
 		# (Last Priority) Use specified driver
-		for driver in "${REMAINING_ARGS[@]}"; do
-			if [[ "$driver" == nvidia-driver-* ]]; then
-				driver_version="$driver"
-				break
-			fi
-		done
+		driver_version="$NVIDIA_DRIVER_VERSION"
 	fi
 	if [[ -z "$driver_version" ]]; then
 		log_step "No (valid) NVIDIA driver specified (recommended, latest, nvidia-driver-*)" true
@@ -332,7 +316,7 @@ install_nvidia_driver() {
 	fi
 
 	# (STEP) Installing Driver: $driver_version
-	_install_nvidia_driver "$driver_version" "$prime_select"
+	_install_nvidia_driver "$driver_version" "$NVIDIA_PRIME_SELECT"
 }
 
 _configure_apt_repositories_cuda() {
@@ -407,16 +391,9 @@ install_cuda() {
 	WARNING: This will install the recommended NVIDIA driver from the CUDA repository,
 			 replacing any existing driver installation and removing any prime-select
 			 configuration that may exist on systems with hybrid graphics (e.g. most laptops).
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if CUDA is already installed
 	if check_install_cuda && [[ "$FORCE" == false ]]; then

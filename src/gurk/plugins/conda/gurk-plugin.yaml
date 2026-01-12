@@ -8,25 +8,31 @@ define:
       description: Install Conda (Miniconda/Anaconda)
       script: scripts/conda.bash
       function: install_conda
+      config_file: config/install_conda_environments.jsonc
       args:
-        allowed: [miniconda, anaconda]
-        default: [miniconda]
+        --conda-conda-distribution:
+          help: Specify the Conda distribution to install
+          choices: [miniconda, anaconda]
+          default: miniconda
     conda/install-conda-environments:
       description: Install Conda/Mamba environments
       script: scripts/conda_environments.py
       function: install_conda_environments
       config_file: config/install_conda_environments.jsonc
       args:
-        allowed: [--update]
+        --conda-update-environments:
+          default: False
+          help: Update existing environments if they already exist. Otherwise, skip them.
     conda/install-mamba:
-# NOTE: "mamba" requires conda, "micromamba" does not (is standalone)
       description: Install (Micro)Mamba
       script: scripts/conda.bash
       function: install_mamba
-      depends_on: [conda/install-conda]
+      depends_on: [conda/install-conda]  # NOTE: "mamba" requires conda, "micromamba" does not (is standalone)
       args:
-        allowed: [micromamba, mamba]
-        default: [micromamba]
+        --conda-mamba-distribution:
+          help: Specify the Mamba distribution to install
+          choices: [micromamba, mamba]
+          default: micromamba
 
 run:
   options:

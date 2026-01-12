@@ -76,52 +76,38 @@ def load_yaml(yaml_file: Path) -> dict[str, Any] | None:
     return normalize_yaml(content)
 
 
-# TODO: Remove 'allow_default
-def overlay_dicts(dicts: list[dict], allow_default: bool = False) -> dict:
+def overlay_dicts(dicts: list[dict]) -> dict:
     """
-    Overlay multiple dictionaries in order, with later dictionaries
-    replacing or updating keys in earlier ones. If allow_default is True,
-    keys with the value "default" in overlaying dictionaries will keep
-    the value from the base dictionary.
+    Overlay multiple dictionaries in order, with later
+    dictionaries replacing or updating keys in earlier ones.
 
     :param dicts: List of dictionaries to overlay
     :type dicts: list[dict]
-    :param allow_default: Whether to allow "default" values to keep base values
-    :type allow_default: bool
     :return: The resulting overlaid dictionary
     :rtype: dict
     """
 
-    def _overlay_two_dicts(
-        base: dict, overlay: dict, allow_default: bool = False
-    ) -> dict:
+    def _overlay_two_dicts(base: dict, overlay: dict) -> dict:
         """
         Recursively overlay overlay-dict onto base-dict.
-        Keys in overlay replace or update those in base, unless the value is "default".
+        Keys in overlay replace or update those in base.
 
         :param base: The base dictionary to overlay onto
         :type base: dict
         :param overlay: The overlay dictionary with updates
         :type overlay: dict
-        :param allow_default: Whether to allow "default" values to keep base values
-        :type allow_default: bool
         :return: The resulting dictionary after overlay
         :rtype: dict
         """
         overlayed = deepcopy(base)
         for key, value in overlay.items():
-            if allow_default and key in overlayed and value == "default":
-                # Keep base value
-                continue
-            elif (
+            if (
                 key in overlayed
                 and isinstance(overlayed[key], dict)
                 and isinstance(value, dict)
             ):
                 # Recursively overlay nested dicts
-                overlayed[key] = _overlay_two_dicts(
-                    overlayed[key], value, allow_default
-                )
+                overlayed[key] = _overlay_two_dicts(overlayed[key], value)
             else:
                 # Directly set/replace value
                 overlayed[key] = value
@@ -137,8 +123,6 @@ def overlay_dicts(dicts: list[dict], allow_default: bool = False) -> dict:
     # Overlay all dictionaries in order
     overlayed_dict = deepcopy(dicts[0])
     for current_dict in dicts[1:]:
-        overlayed_dict = _overlay_two_dicts(
-            overlayed_dict, current_dict, allow_default
-        )
+        overlayed_dict = _overlay_two_dicts(overlayed_dict, current_dict)
 
     return overlayed_dict

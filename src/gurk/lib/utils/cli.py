@@ -1,31 +1,45 @@
+from __future__ import annotations
+
 import getpass
+import json
 import os
+import re
 import subprocess
 import sys
 from argparse import (
     SUPPRESS,
     ArgumentDefaultsHelpFormatter,
     ArgumentParser,
+    ArgumentTypeError,
     Namespace,
     _ArgumentGroup,
 )
+from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterable
+from typing import TYPE_CHECKING
 
-from gurk.lib.logger import Logger
-from gurk.lib.logger.utils import TaskTerminationType
+from gurk.lib.core.plugin_utils import (
+    ResolvedGurkPlugin,
+    load_resolved_plugin_yaml,
+)
+from gurk.lib.logger import Logger, TaskTerminationType, get_logger
 from gurk.lib.utils.common import (
     ENABLED_CONFIG_FILE,
     SETUP_DONE_FILE,
+    YES_ANSWERS,
     generate_random_path,
     resolve_package_path,
 )
 from gurk.lib.utils.interface import prompt_bool
 from gurk.lib.utils.remotes import clone_git_files, is_git_repo
-from gurk.lib.utils.system_info import get_system_info
+from gurk.lib.utils.system_info import SystemInfo, get_system_info
 from gurk.lib.utils.yaml import load_yaml
+
+if TYPE_CHECKING:
+    from gurk.lib.utils.tasks import ResolvedArgsDefinitionCollection
 
 
 def get_sudo_askpass() -> Path:
@@ -35,6 +49,9 @@ def get_sudo_askpass() -> Path:
     :return: Path to the temporary askpass script
     :rtype: Path
     """
+    # Get logger
+    logger = get_logger()
+
     # Reset sudo permissions
     subprocess.run(["sudo", "-k"])
 
@@ -42,8 +59,8 @@ def get_sudo_askpass() -> Path:
     with NamedTemporaryFile(mode="w", delete=False) as askpass_file:
         attempts = 3
         while attempts > 0:
-            response = getpass.getpass(
-                "[gurk] password for {}: ".format(getpass.getuser())
+            response = logger.ask(
+                f"\\[gurk] password for {getpass.getuser()}", True
             )
             test_response = subprocess.run(
                 ["sudo", "-S", "-v"],
@@ -69,22 +86,25 @@ def get_sudo_askpass() -> Path:
     return askpass_path
 
 
-def prompt_setup(yes: bool) -> None:
+def prompt_setup(answer: str | bool = None) -> None:
     """
     Prompt the user to run setup if it has never been run before.
 
-    :param yes: Whether to answer 'y' to all prompts
-    :type yes: bool
+    :param answer: Predefined answer for non-interactive mode (True/False for 'y'/'n').
+    :type answer: bool | None
     """
+    # Get logger
+    logger = get_logger()
+
     if not SETUP_DONE_FILE.is_file():
         print(
             "It seems that this is the first time you are running gurk. "
             "It is recommended to run the setup first to ensure all "
             "possible manual steps are taken care of."
         )
-        if prompt_bool(
+        if logger.prompt_bool(
             "Would you like to run the setup now?",
-            "y" if yes else None,
+            answer,
         ):
             from gurk.cli.setup import main as setup_main
 
@@ -347,10 +367,20 @@ class GurkArgumentParser(ArgumentParser):
     Custom ArgumentParser that uses CleanHelpFormatter and adds common gurk CLI options.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        add_verbose_arg: bool = True,
+        add_non_interactive_arg: bool = True,
+        add_force_arg: bool = False,
+        add_task_args: bool = False,
+        allow_complex_types: bool = True,
+        *args,
+        **kwargs,
+    ):
         # Some gurk internal variables
         self.required_group_title = "required arguments"
-        self.add_logger_options = kwargs.pop("add_logger_options", True)
+        self.add_non_interactive_arg = add_non_interactive_arg
+        self.allow_complex_types = allow_complex_types
 
         # Use CleanHelpFormatter
         kwargs["formatter_class"] = lambda prog: CleanHelpFormatter(prog)
@@ -359,21 +389,86 @@ class GurkArgumentParser(ArgumentParser):
         super().__init__(*args, **kwargs)
 
         # Add logger options
-        if self.add_logger_options:
+        if add_verbose_arg:
             self.add_argument(
                 "-v",
                 "--verbose",
                 action="store_true",
                 help="Enable verbose output",
             )
+        if add_non_interactive_arg:
             self.add_argument(
-                "-y",
-                "--yes",
                 "--non-interactive",
-                dest="non_interactive",
                 action="store_true",
-                help="Automatically answer 'yes' to resp. ignore all prompts",
+                help="Run in non-interactive mode (disable prompts)",
             )
+        if add_task_args:
+            self._add_task_args()
+        if add_force_arg:
+            self.add_argument(
+                "-f",
+                "--force",
+                action="store_true",
+                help="Force execution of task(s) even if they don't need to run",
+            )
+
+    def _add_task_args(self) -> None:
+        """
+        Add common task arguments to the parser.
+
+        :raises ArgumentTypeError: If argument validation fails
+        """
+
+        # Add system-info argument
+        def json_dict(value: str) -> SystemInfo:
+            """
+            Validate that the input is a JSON object (dictionary).
+
+            :param value: Input string
+            :type value: str
+            :return: Parsed JSON object
+            :rtype: dict
+            :raises ArgumentTypeError: If the input is not a valid JSON object
+            """
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as e:
+                raise ArgumentTypeError(f"Invalid JSON for --system-info: {e}")
+            if not isinstance(parsed, dict):
+                raise ArgumentTypeError(
+                    "--system-info must be a JSON object (dictionary)"
+                )
+            return parsed
+
+        self.add_argument(
+            "--system-info",
+            type=json_dict if self.allow_complex_types else str,
+            required=True,
+            help="JSON object with system information",
+        )
+
+        # Add config-file argument
+        def existing_path(value: str) -> Path:
+            """
+            Validate that the input path exists.
+
+            :param value: Input path string
+            :type value: str
+            :return: Path object
+            :rtype: Path
+            :raises ArgumentTypeError: If the path does not exist
+            """
+            path = Path(value)
+            if not path.exists():
+                raise ArgumentTypeError(f"Config file not found: {path}")
+            return path
+
+        self.add_argument(
+            "--config-file",
+            type=existing_path if self.allow_complex_types else str,
+            default=None,
+            help="Path to an existing config file",
+        )
 
     def add_required_group(self) -> _ArgumentGroup:
         """
@@ -384,28 +479,156 @@ class GurkArgumentParser(ArgumentParser):
         """
         return self.add_argument_group(self.required_group_title)
 
-    def parse_args(
-        self,
-        args: Iterable[str] | None = None,
-        namespace: object | None = None,
-    ) -> Namespace:
+    # TODO: Clean this up
+    def extend_arguments(
+        self, args_dict: ResolvedArgsDefinitionCollection
+    ) -> None:
+        """
+        Extend the parser with arguments defined in a plugin.
+
+        :param args_dict: Dictionary of argument definitions
+        :type args_dict: ResolvedArgsDefinitionCollection
+        """
+
+        def make_wildcard_validator(patterns: list[str]):
+            """
+            Create:
+            - an argparse type() validator supporting '*' wildcards
+            - a matching metavar string
+            """
+
+            regexes = [
+                re.compile("^" + re.escape(p).replace(r"\*", ".*") + "$")
+                for p in patterns
+            ]
+
+            quoted = ", ".join(f"'{p}'" for p in patterns)
+            metavar = "{" + ",".join(patterns) + "}"
+
+            def validate(value: str) -> str:
+                if any(rx.match(value) for rx in regexes):
+                    return value
+                raise ArgumentTypeError(
+                    f"invalid choice: {value!r} (choose from {quoted})"
+                )
+
+            return validate, metavar
+
+        # Collect mutually exclusive groups
+        mutex_groups = defaultdict(list)
+        for name, spec in args_dict.items():
+            mutex = spec.get("mutex")
+            if mutex:
+                mutex_groups[mutex].append(name)
+
+        argparse_mutex_groups = {
+            name: self.add_mutually_exclusive_group() for name in mutex_groups
+        }
+
+        for name, spec in args_dict.items():
+            help_text = spec.get("help")
+            default = spec.get("default")
+            nargs = spec.get("nargs")
+            choices = spec.get("choices")
+
+            kwargs = {}
+
+            if help_text is not None:
+                kwargs["help"] = help_text
+
+            if choices is not None:
+                validator, metavar = make_wildcard_validator(choices)
+                kwargs["type"] = validator
+                kwargs["metavar"] = metavar
+
+            # --- Boolean flags ---
+            if isinstance(default, bool):
+                if nargs is not None:
+                    raise ValueError(
+                        f"Boolean flag '{name}' must not define nargs"
+                    )
+
+                kwargs["action"] = (
+                    "store_true" if default is False else "store_false"
+                )
+                kwargs["default"] = default
+
+            # --- Non-boolean arguments ---
+            else:
+                # if has_default:
+                if default is not None:
+                    # optional argument
+                    kwargs["default"] = default
+                elif nargs not in ("?", "*"):
+                    # required argument
+                    kwargs["required"] = True
+
+                if nargs is not None:
+                    kwargs["nargs"] = nargs
+
+            # Choose correct target (parser or mutex group)
+            mutex = spec.get("mutex")
+            target = argparse_mutex_groups[mutex] if mutex else self
+
+            target.add_argument(name, **kwargs)
+
+    def extend_task_arguments(self, task_name: str) -> None:
+        """
+        Extend the parser with task-specific arguments defined in a plugin, if any.
+
+        :param plugin: Plugin specification
+        :type plugin: PluginSpec
+        :raises ValueError: If the plugin YAML could not be loaded
+        """
+        plugin = task_name.split("/", 1)[0]
+        plugin_yaml: ResolvedGurkPlugin = load_resolved_plugin_yaml(plugin)
+        if not plugin_yaml:
+            raise ValueError(f"Plugin '{plugin}' could not be loaded")
+
+        try:
+            task_args = plugin_yaml["define"]["tasks"][task_name]["args"]
+            self.extend_arguments(task_args)
+        except KeyError as e:
+            self.error(
+                f"Key 'define'/'tasks'/'{task_name}'/'args' not "
+                f"found in plugin '{plugin}' YAML. Broken link: {e}"
+            )
+
+    def _reorder_actions(self):
+        """
+        Reorder actions to have required ones first.
+        """
         # Reorder action groups to have 'required arguments' first
-        requireed_group = None
+        required_group = None
         for g in self._action_groups:
             if g.title == self.required_group_title:
-                requireed_group = g
+                required_group = g
                 break
-        if requireed_group:
-            self._action_groups.remove(requireed_group)
-            self._action_groups.insert(0, requireed_group)
+        if required_group:
+            self._action_groups.remove(required_group)
+            self._action_groups.insert(0, required_group)
+
+    def print_help(self, file=None) -> None:
+        # Reorder action groups to have 'required arguments' first
+        self._reorder_actions()
+
+        # Call the original print_help
+        return super().print_help(file)
+
+    def parse_args(
+        self, args: Sequence[str] | None = None, namespace: None = None
+    ) -> Namespace:
+        # Reorder action groups to have 'required arguments' first
+        self._reorder_actions()
 
         # Call the original parse_args
         args = super().parse_args(args, namespace)
 
         # Get non-interactive mode from env var if not specified
-        if self.add_logger_options and not args.non_interactive:
-            args.non_interactive = os.getenv(
-                "GURK_NON_INTERACTIVE", "false"
-            ).lower() in ("true", "yes", "1")
+        if self.add_non_interactive_arg and not args.non_interactive:
+            args.non_interactive = (
+                os.getenv("GURK_NON_INTERACTIVE", "false").lower()
+                in YES_ANSWERS
+            )
 
         return args

@@ -1,5 +1,3 @@
-# TODO: Clean up, and maybe get some util from tasks in here.
-
 import types
 from typing import (
     Any,
@@ -95,7 +93,7 @@ def _validate_typed_dict_keys(data: dict[str, Any], td_cls: dict) -> bool:
     :return: True if the keys match the TypedDict definition, False otherwise.
     :rtype: bool
     """
-    if not _is_typed_dict(td_cls):
+    if not _is_typed_dict(td_cls) or not isinstance(data, dict):
         return False
 
     # Check required keys
@@ -130,7 +128,7 @@ def validate_typed_dict(data: Any, td_cls: dict) -> bool:
     :return: True if the data matches the TypedDict definition, False otherwise.
     :rtype: bool
     """
-    if not _is_typed_dict(td_cls):
+    if not _is_typed_dict(td_cls) or not isinstance(data, dict):
         return False
 
     # Check required keys
@@ -219,7 +217,17 @@ def fill_typed_dict(data: dict, td_type: dict) -> dict:
     - Nested containers and TypedDicts are recursively materialized
     - Existing values are preserved
     """
-    if not _is_typed_dict(td_type):
+    origin = get_origin(td_type)
+    if origin is dict:
+        # If this is a dict[K, V] schema, recurse into values
+        _, val_type = get_args(td_type)
+        for k, v in data.items():
+            if v is None:
+                data[k] = _build_default(val_type)
+            fill_value(data[k], val_type)
+        return data
+    elif not _is_typed_dict(td_type):
+        # Not a TypedDict schema, return as is
         return data
 
     hints = get_type_hints(td_type, include_extras=True)

@@ -9,10 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Queue
 from tempfile import NamedTemporaryFile, TemporaryDirectory
+from textwrap import dedent
 from threading import Event, Lock, Thread
 from typing import TextIO
 
-from gurk.lib.logger import Logger
+from gurk.lib.logger import Logger, get_logger
 from gurk.lib.logger.utils import TaskTerminationType
 from gurk.lib.utils.common import CommandKind, generate_random_path
 from gurk.lib.utils.interface import run_script_function
@@ -32,10 +33,10 @@ class Scheduler:
     """Schedules and runs tasks with dependencies, handling logging and progress tracking."""
 
     # fmt: off
-    logger:       Logger             = field(repr=False)
     tasks:        list[ResolvedTask] = field(repr=False)
-    askpass_file: str                = field(repr=False)
+    askpass_file: Path               = field(repr=False)
 
+    logger:    Logger                                  = field(init=False, repr=False)
     results:   dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
     scheduled: set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
 
@@ -69,7 +70,7 @@ class Scheduler:
         with original_path.open(
             "r", encoding="utf-8", errors="replace"
         ) as src, tmp_path.open("w", encoding="utf-8") as dst:
-            for idx, line in enumerate(src):
+            for idx, line in enumerate(src, start=1):
                 # Detect current block
                 curr_block = [
                     block
@@ -82,6 +83,37 @@ class Scheduler:
                     )
                 else:
                     curr_block = curr_block[0]
+
+                # Resolve bash imports
+                if (
+                    command.kind == CommandKind.BASH
+                    and curr_block["type"] == ScriptBlockTypes.IMPORT
+                ):
+                    # Resolve source expression
+                    bash_script = dedent(
+                        f"""
+                    BASH_SOURCE[0]="{original_path.as_posix()}"
+                    echo {curr_block['name'].strip()}
+                    """
+                    )
+                    result = subprocess.run(
+                        ["bash", "-c", bash_script],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+
+                    # Write source statement with absolute path
+                    abs_path = Path(result.stdout.strip())
+                    if not abs_path.is_absolute():
+                        abs_path = (
+                            Path(original_path.as_posix()).parent / abs_path
+                        ).resolve()
+                    print(
+                        f"Resolved import '{curr_block['name']}' to '{abs_path.as_posix()}'"
+                    )
+                    dst.write(f"source {abs_path.as_posix()}\n")
+                    continue
 
                 # Look for STEP instances
                 step_patterns = PatternCollection.STEP.patterns
@@ -99,7 +131,9 @@ class Scheduler:
                     continue
 
                 # Handle STEP replacement/removal
-                indent = len(line) - len(line.lstrip())
+                indent = len(line.rstrip("\n")) - len(
+                    line.lstrip().rstrip("\n")
+                )
                 if (
                     (
                         command.function
@@ -112,12 +146,12 @@ class Scheduler:
                     )
                 ) and m_comment:
                     # Replace STEP comments with print statements
-                    step_msg = f"\n__STEP__: {step}"
+                    step_msg = f"__STEP__: {step}"
                     if command.kind == CommandKind.PYTHON:
+                        step_msg = "\n" + step_msg
                         msg = f"print({step_msg!r})"
                     else:
-                        step_msg += "\n"
-                        msg = f"printf %s {shlex.quote(step_msg)}"
+                        msg = f'printf "\\n%s\\n" {shlex.quote(step_msg)}'
 
                     # Write replaced STEP print statement
                     dst.write(f"{' ' * indent}{msg}\n")
@@ -282,7 +316,7 @@ class Scheduler:
             return wrapper_dir.as_posix()
 
         env = os.environ.copy()
-        env["SUDO_ASKPASS"] = self.askpass_file
+        env["SUDO_ASKPASS"] = str(self.askpass_file)
         env["PATH"] = f"{create_sudo_wrapper()}:{env.get('PATH', '')}"
 
         # 6. Set non-interactive environment variables
@@ -337,9 +371,6 @@ class Scheduler:
         """
         # Prepare script with modified step statements
         modified_script, n_steps = self._prepare_script(task.command)
-        self.logger.debug(
-            f"Prepared modified script for task '{task.name}' at {modified_script} with {n_steps} steps"
-        )
         self.logger.log_script(
             modified_script, task.name, ext=task.command.kind.ext
         )
@@ -364,6 +395,7 @@ class Scheduler:
         args = task.args + ("--system-info", json.dumps(get_system_info()))
         if task.config_file:
             args += ("--config-file", task.config_file)
+        args = (task.name,) + args
 
         # Create temporary file that will run script/call function
         try:
@@ -453,6 +485,9 @@ class Scheduler:
 
     def run(self) -> None:
         """Run all scheduled tasks, respecting dependencies."""
+        # Get logger
+        self.logger = get_logger()
+
         running = {}
         while True:
             with self.lock:
@@ -513,9 +548,12 @@ class Scheduler:
         :return: List of tasks in the format [task_name, task_logfile, successful]
         :rtype: list[tuple[str, str, bool]]
         """
+        # Get logger
+        logger = get_logger()
+
         all_tasks = []
         for task, result in self.results.items():
-            for _, task_info in self.logger.task_infos.items():
+            for _, task_info in logger.task_infos.items():
                 if task_info["name"] == task.name:
                     all_tasks.append(
                         (

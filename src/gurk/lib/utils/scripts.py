@@ -168,13 +168,12 @@ def get_block_spans(path: FilePath) -> list[ScriptBlock]:
             elif non_import_found and block["type"] == ScriptBlockTypes.IMPORT:
                 block["type"] = ScriptBlockTypes.OTHER
 
-    # Merge adjacent IMPORT and OTHER blocks
+    # Merge adjacent OTHER blocks for readability
     merged_positions = []
     for block in positions:
         if (
             merged_positions
-            and block["type"]
-            in {ScriptBlockTypes.IMPORT, ScriptBlockTypes.OTHER}
+            and block["type"] == ScriptBlockTypes.OTHER
             and merged_positions[-1]["type"] == block["type"]
         ):
             # Merge with previous block

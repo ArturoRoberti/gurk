@@ -3,16 +3,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 install_fzf() {
 	: '
 	Install fzf (fuzzy finder)
-
-	Args:
-	  None
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Test if fzf is already installed
 	if check_install_fzf && [[ "$FORCE" == false ]]; then
@@ -34,16 +27,9 @@ install_fzf() {
 install_loki_shell() {
 	: '
 	Install loki-shell (fzf support over docker containers)
-
-	Args:
-	  None
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Test if loki-shell is already installed
 	if check_install_loki_shell && [[ "$FORCE" == false ]]; then

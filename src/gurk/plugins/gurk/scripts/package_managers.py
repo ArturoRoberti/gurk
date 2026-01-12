@@ -7,47 +7,29 @@ from gurk.lib.helpers import (
     LoggerSeverity,
     add_alias,
     get_clean_lines,
-    get_config_args,
     install_packages_from_list,
     install_packages_from_txt_file,
+    parse_task_args,
 )
 
 
 def install_apt_packages(*args: list[str]) -> None:
     """
     Install packages using apt package manager.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of apt packages, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # (STEP) Installing apt packages
-    install_packages_from_txt_file(InstallCommands.APT, config_file)
+    install_packages_from_txt_file(InstallCommands.APT, task_args.config_file)
 
 
 def install_flatpak_packages(*args: list[str]) -> None:
     """
     Install packages using flatpak package manager.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, remaining_args = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of flatpak packages, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # (STEP) Installing Requirement(s)
     install_packages_from_list(InstallCommands.APT, ["flatpak"])
@@ -68,12 +50,14 @@ def install_flatpak_packages(*args: list[str]) -> None:
     )
 
     # (STEP) Installing flatpak packages
-    install_packages_from_txt_file(InstallCommands.FLATPAK, config_file)
+    install_packages_from_txt_file(
+        InstallCommands.FLATPAK, task_args.config_file
+    )
 
     # Add aliases for flatpak packages
-    if "--create-aliases" in remaining_args:
+    if task_args.gurk_flatpak_create_aliases:
         Logger.step("Adding aliases for flatpak packages...")
-        for pkg in get_clean_lines(config_file):
+        for pkg in get_clean_lines(task_args.config_file):
             # Use probable package name for alias
             pkg_name = pkg.split(".")[-1]
             add_alias(f"{pkg_name}='(flatpak run {pkg} > /dev/null &)'")
@@ -82,41 +66,23 @@ def install_flatpak_packages(*args: list[str]) -> None:
 def install_npm_packages(*args: list[str]) -> None:
     """
     Install packages using npm package manager.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of npm packages, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # (STEP) Installing Requirement(s)
     install_packages_from_list(InstallCommands.APT, ["npm", "nodejs"])
 
     # (STEP) Installing npm packages
-    install_packages_from_txt_file(InstallCommands.NPM, config_file)
+    install_packages_from_txt_file(InstallCommands.NPM, task_args.config_file)
 
 
 def install_snap_packages(*args: list[str]) -> None:
     """
     Install packages using snap package manager.
-
-    :param args: Configuration arguments
-    :type args: list[str]
     """
-    # Parse config args
-    _, config_file, _, _ = get_config_args(args)
-    if config_file is None:
-        Logger.step(
-            "Skipping installation of snap packages, as no task config file is provided",
-            warning=True,
-        )
-        return
+    # Parse task args
+    task_args = parse_task_args(args)
 
     # (STEP) Installing Requirement(s)
     install_packages_from_list(InstallCommands.APT, ["snapd"])
@@ -169,4 +135,4 @@ def install_snap_packages(*args: list[str]) -> None:
     start_snapd_service()
 
     # (STEP) Installing snap packages
-    install_packages_from_txt_file(InstallCommands.SNAP, config_file)
+    install_packages_from_txt_file(InstallCommands.SNAP, task_args.config_file)

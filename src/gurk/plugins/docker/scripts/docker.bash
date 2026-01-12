@@ -45,10 +45,10 @@ _install_container_toolkit() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 	: '
-	Install Docker Engine and related components.
+	Install Docker and related packages.
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if Docker is already installed
 	if check_install_docker && [[ "$FORCE" == false ]]; then
@@ -86,19 +86,19 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 	# Enable Docker BuildKit
 	write_marked "export DOCKER_BUILDKIT=1" "${HOME}/.bashrc"
 
-	if _contains REMAINING_ARGS nvidia-container-toolkit; then
+	if _contains DOCKER_ADDITIONAL_PACKAGES nvidia-container-toolkit; then
 		# (STEP) Installing NVIDIA Container Toolkit
 		_install_container_toolkit
 	fi
 
-	if _contains REMAINING_ARGS devcontainers-cli; then
+	if _contains DOCKER_ADDITIONAL_PACKAGES devcontainers-cli; then
 		# (STEP) Installing DevContainers CLI
 		apt_install npm nodejs
 		sudo npm install -g @devcontainers/cli
 	fi
 
 	# TODO: Check. Seems to fail on first time (not when done manually - maybe use "bash -ic" ?)
-	if _contains REMAINING_ARGS distrobox; then
+	if _contains DOCKER_ADDITIONAL_PACKAGES distrobox; then
 		# (STEP) Installing Distrobox
 		curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sudo sh
 	fi

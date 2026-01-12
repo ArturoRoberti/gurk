@@ -3,20 +3,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 install_conda() {
 	: '
 	Install Conda (Miniconda/Anaconda)
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if Conda is already installed
-	# TODO: Maybe allow switching between miniconda/anaconda; i.e. specify which one to check as well
-	#       Or maybe just allow "--reinstall" flag to force reinstallation (in general, not just here)
+	# TODO: Maybe allow switching between miniconda/anaconda;
+	# 		i.e. specify which one to check as well
 	if check_install_conda && [[ "$FORCE" == false ]]; then
 		log_step "Conda is already installed - Exiting"
 		return 0
@@ -24,19 +17,6 @@ install_conda() {
 
 	# (STEP) Installing Requirement(s)
 	apt_install wget
-
-	# Detect conda installation type - Prioritize Miniconda if both specified
-	local install_miniconda=false
-	local install_anaconda=false
-	if _contains REMAINING_ARGS "miniconda"; then
-		install_miniconda=true
-	elif _contains REMAINING_ARGS "anaconda"; then
-		install_anaconda=true
-	fi
-	if ! $install_miniconda && ! $install_anaconda; then
-		log_step "No conda installation type (miniconda/anaconda) specified - Exiting" true
-		return 1
-	fi
 
 	# Get OS type/name
 	local os_type="${SYSTEM_INFO[type]}"
@@ -60,16 +40,19 @@ install_conda() {
 	local conda_script_url=""
 	local conda_install_name=""
 	local base_url="https://repo.anaconda.com"
-	if $install_miniconda; then
+	if [[ $CONDA_CONDA_DISTRIBUTION == "miniconda" ]]; then
 		conda_script_url="${base_url}/miniconda/Miniconda3-latest-${os_name}-${SYSTEM_INFO[kernel]}.sh"
 		conda_install_name=".miniconda"
-	elif $install_anaconda; then
+	elif [[ $CONDA_CONDA_DISTRIBUTION == "anaconda" ]]; then
 		local latest=$(curl -s ${base_url}/archive/ |
 			grep -Eo "Anaconda3-[0-9]+\.[0-9]+(-[0-9]+)?-${os_name}-${SYSTEM_INFO[kernel]}\.sh" |
 			sort -V |
 			tail -n1)
 		conda_script_url="${base_url}/archive/$latest"
 		conda_install_name=".anaconda"
+	else
+		log_step "Unsupported conda distribution: ${CONDA_CONDA_DISTRIBUTION}" true
+		return 1
 	fi
 
 	# (STEP) Downloading conda installation script
@@ -160,29 +143,22 @@ _install_mamba() {
 install_mamba() {
 	: '
 	Install (Micro)Mamba - Micromamba prioritized over Mamba (if both specified)
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
 	'
 	# TODO: ToS acceptance for mamba required?
 
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
-	# TODO: Give warning that either mamba type may break the other one (if installed)
-	#       Maybe uninstall the other one? Do this via "--force" flag?
+	# TODO: Maybe allow switching between micromamba/mamba;
+	# 		i.e. specify which one to check as well
 
 	# (STEP) Installing (Micro)Mamba
-	if _contains REMAINING_ARGS "micromamba"; then
+	if [[ $CONDA_MAMBA_DISTRIBUTION == "micromamba" ]]; then
 		_install_micromamba "$@"
-	elif _contains REMAINING_ARGS "mamba"; then
+	elif [[ $CONDA_MAMBA_DISTRIBUTION == "mamba" ]]; then
 		_install_mamba "$@"
 	else
-		log_step "No (micro)mamba installation type specified - Exiting" true
+		log_step "Unsupported mamba distribution: ${CONDA_MAMBA_DISTRIBUTION}" true
 		return 1
 	fi
 }

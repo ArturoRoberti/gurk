@@ -1,18 +1,49 @@
 import sys
 import traceback
+from contextlib import contextmanager
 from contextvars import ContextVar
 
 from .logger import Logger, LoggerSeverity
 
+_allow_missing_logger = ContextVar("allow_missing_logger", default=False)
 _current_logger = ContextVar("current_logger", default=None)
+
+
+@contextmanager
+def allow_missing_logger():
+    token = _allow_missing_logger.set(True)
+    try:
+        yield
+    finally:
+        _allow_missing_logger.reset(token)
 
 
 def get_logger() -> Logger:
     """Get the currently active logger, if set."""
     logger = _current_logger.get()
     if logger is None:
-        raise RuntimeError("Logger not initialized")
+        if not _allow_missing_logger.get():
+            raise RuntimeError("Logger not initialized")
+        else:
+            return DummyLogger()
+
     return logger
+
+
+class DummyLogger:
+    """A dummy logger that replaces Logger functions when not initialized."""
+
+    def __getattr__(self, name):
+        return self
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+    def __bool__(self):
+        return False
+
+    def __repr__(self):
+        return "<Dummy Logger>"
 
 
 class ActiveLogger:

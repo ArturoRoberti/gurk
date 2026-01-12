@@ -16,24 +16,38 @@ define:
       function: install_isaaclab
       depends_on: [nvidia/install-isaacsim, conda/install-conda]
       args:
-        allowed: [recommended, latest, v2.*]
-        default: [recommended]
+        --nvidia-isaaclab-version:
+          help: Specify the IsaacLab version to install
+          choices: [recommended, latest, v2.*]
+          default: recommended
     nvidia/install-isaacsim:
       description: Install NVIDIA IsaacSim
       script: scripts/isaac.bash
       function: install_isaacsim
       args:
-        allowed: [latest, 4.*, 5.*]
-        default: [latest]
+        --nvidia-isaacsim-version:
+          help: Specify the IsaacSim version to install
+          choices: [latest, 4.*, 5.*]
+          default: latest
     nvidia/install-nvidia-driver:
       description: Install NVIDIA driver (standalone). WARNING - Removes CUDA
         compatibility!
       script: scripts/nvidia.bash
       function: install_nvidia_driver
       args:
-        allowed: [recommended, latest, nvidia-driver-*, --include-server,
-            --include-open, --prime-select]
-        default: [recommended, --prime-select]
+        --nvidia-driver-version:
+          help: Specify the NVIDIA driver version to install
+          choices: [recommended, latest, nvidia-driver-*]
+          default: recommended
+        --nvidia-include-server-drivers:
+          default: false
+          help: Include server drivers in the installation options
+        --nvidia-include-open-drivers:
+          default: false
+          help: Include open-source drivers in the installation options
+        --nvidia-prime-select:
+          default: true
+          help: Enable GPU prime-select after installation (if applicable)
 
 run:
   default:

@@ -21,17 +21,10 @@ _get_latest_isaacsim_version() {
 # TODO: Test (looks good, at least for newest version)
 install_isaacsim() {
 	: '
-	Function to install Isaac Sim (only officially supported versions)
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
+	Install Isaac Sim (only officially supported versions)
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if IsaacSim is already installed
 	if check_install_isaacsim && [[ "$FORCE" == false ]]; then
@@ -50,17 +43,12 @@ install_isaacsim() {
 
 	# (STEP) Determining requested IsaacSim version
 	local isaacsim_version=""
-	if _contains REMAINING_ARGS "latest"; then
+	if [[ "$NVIDIA_ISAACSIM_VERSION" == "latest" ]]; then
 		# (1st Priority) Use latest available version
 		isaacsim_version=$(_get_latest_isaacsim_version)
 	else
 		# (2nd Priority) Use specified version
-		for version in "${REMAINING_ARGS[@]}"; do
-			if [[ "$version" == 4.* || "$version" == 5.* ]]; then
-				isaacsim_version="$version"
-				break
-			fi
-		done
+		isaacsim_version="$NVIDIA_ISAACSIM_VERSION"
 	fi
 	if [ -z "$isaacsim_version" ]; then
 		log_step "No (valid) IsaacSim version specified (latest, 4.*, 5.*)" true
@@ -189,17 +177,10 @@ _get_latest_isaaclab_version() {
 # TODO: Test
 install_isaaclab() {
 	: '
-	Function to install Isaac Lab (only officially supported versions)
-
-	Args:
-	  - Configuration Args
-	Outputs:
-	  Log messages indicating the current progress and installation outputs
-	Returns:
-	  0 if successful (or already installed), 1 otherwise
+	Install Isaac Lab (only officially supported versions)
 	'
-	# Parse config args
-	get_config_args "$@"
+	# Parse task args
+	parse_task_args "$@"
 
 	# Check if IsaacLab is already installed
 	if check_install_isaaclab && [[ "$FORCE" == false ]]; then
@@ -217,7 +198,7 @@ install_isaaclab() {
 
 	# (STEP) Determining requested IsaacLab version
 	local isaaclab_version=""
-	if _contains REMAINING_ARGS "recommended"; then
+	if [[ "$NVIDIA_ISAACLAB_VERSION" == "recommended" ]]; then
 		# (1st Priority) Find best matching version for installed IsaacSim
 		local isaacsim_version=$(head -n1 "${isaacsim_path}/VERSION" || true)
 		if [[ -z "$isaacsim_version" ]]; then
@@ -231,19 +212,12 @@ install_isaaclab() {
 			return 1
 		fi
 		isaaclab_version=$(_find_best_isaaclab "$isaacsim_version")
+	elif [[ "$NVIDIA_ISAACLAB_VERSION" == "latest" ]]; then
+		# (2nd Priority) Use latest available version
+		isaaclab_version=$(_get_latest_isaaclab_version)
 	else
-		if _contains REMAINING_ARGS "latest"; then
-			# (2nd Priority) Use latest available version
-			isaaclab_version=$(_get_latest_isaaclab_version)
-		else
-			# (Last Priority) Use specified version
-			for version in "${REMAINING_ARGS[@]}"; do
-				if [[ "$version" == v2.* ]]; then
-					isaaclab_version="$version"
-					break
-				fi
-			done
-		fi
+		# (Last Priority) Use specified version
+		isaaclab_version="$NVIDIA_ISAACLAB_VERSION"
 		# TODO: Test if the version works with installed isaacsim version
 	fi
 	if [ -z "$isaaclab_version" ]; then

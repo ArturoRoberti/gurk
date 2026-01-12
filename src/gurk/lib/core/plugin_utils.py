@@ -208,12 +208,16 @@ def _get_possible_plugin_entries(
             # Access plugin by name
             entry = registry[plugin]
         else:
+            if plugin == "template-gurk-plugin":
+                logger.debug(
+                    f"Returning None, as entry is not found in {registry_file}"
+                )
             return None
 
         # Validate structure
         if not validate_typed_dict(entry, PluginRegistryEntry):
             logger.debug(
-                f"Invalid plugin registry entry for plugin '{plugin}' in registry '{registry_file}'."
+                f"Invalid plugin registry entry {entry} for plugin '{plugin}' in registry '{registry_file}'."
             )
             return None
 
@@ -267,7 +271,9 @@ def get_plugin_entry(
     # Logging
     logger = get_logger()
     if not plugin_data:
-        logger.debug(f"ERROR: Plugin '{plugin}' does not exist locally.")
+        logger.debug(
+            f"ERROR: Plugin '{plugin}' does not exist locally in a valid form."
+        )
     elif len(plugin_data) > 1:
         logger.debug(
             f"WARNING: Multiple entries found for plugin '{plugin}'. Using the first one."
@@ -331,6 +337,7 @@ def load_raw_plugin_yaml(plugin: PluginSpec) -> GurkPlugin | None:
     return load_yaml(Path(plugin_entry["local"]) / "gurk-plugin.yaml")
 
 
+# TODO: Remove all non-debug log messages in commands, as this should suffice
 def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
     """
     Get the gurk-plugin.yaml configuration of a local plugin with
@@ -342,9 +349,17 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
     :return: GurkPlugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
     :rtype: ResolvedGurkPlugin | None
     """
+    # Get logger
+    logger = get_logger()
+
     plugin_yaml = load_raw_plugin_yaml(plugin)
     if not plugin_yaml:
+        logger.warning(
+            f"Plugin '{plugin}' is missing a valid 'gurk-plugin.yaml' file - not loading it."
+        )
         return None
+    else:
+        logger.debug(f"Successfully loaded plugin '{plugin}'.")
 
     # Fill missing properties
     plugin_yaml: GurkPlugin = fill_typed_dict(plugin_yaml, GurkPlugin)
@@ -453,13 +468,12 @@ def add_plugin_entry(
     return True
 
 
-# TODO: Allow removal via general PluginSpec (?)
-def remove_plugin_entry(plugin_name: str) -> None:
+def remove_plugin_entry(plugin_name: PluginSpec) -> None:
     """
     Remove a plugin from the home plugin registry.
 
     :param plugin_name: Name of the plugin
-    :type plugin_name: str
+    :type plugin_name: PluginSpec
     """
     # Get logger
     logger = get_logger()
@@ -536,14 +550,6 @@ def update_plugin_entry(
 #########################################################################################
 
 
-# TODO: How to handle args passed in 'run' section together with eventual argparser?
-#       - Should all args still be allowed, or only those NOT passed in 'run'? I think maybe the latter
-# TODO: Remaining checks from TaskProcessor:
-#       - Check that args passed are valid ('run' section). 'default' args will not need to be checked, as that field will be removed
-# TODO: Improve error messages
-#       - The plugin path should be prefixed in all messages
-#       - Be more informative in general (e.g., which fields are missing/invalid, and how they are invalid / to fix them)
-#       - Maybe collect all errors and print them at the end instead of exiting at the first error
 def check_local_plugin(plugin_path: FilePath) -> bool:
     """
     Check if a local plugin is valid.
@@ -566,10 +572,13 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
     available_task_names: set[str] = set()
 
     def _check_local_plugin(_plugin_path: Path) -> bool:
+        def error(message: str) -> bool:
+            logger.error(f"'{_plugin_path}': {message}")
+
         # Load gurk-plugin.yaml
         plugin: GurkPlugin = load_yaml(_plugin_path / "gurk-plugin.yaml")
         if not plugin:
-            logger.error(
+            error(
                 f"Plugin source '{_plugin_path}' has no 'gurk-plugin.yaml' file or it is invalid YAML."
             )
             return False
@@ -581,9 +590,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             if isinstance(k, str) and not k.startswith("_")
         }
         if not validate_typed_dict(plugin_without_helpers, GurkPlugin):
-            # TODO: More info, especially here. Do general "print TypedDict" function,
-            #       which prints expected (and actual?) types/fields recursively
-            logger.error(
+            error(
                 f"Plugin at '{_plugin_path}' has invalid structure. Expected:"
             )
             print_typed_dict_types(GurkPlugin)
@@ -597,7 +604,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             existing_plugin
             and Path(existing_plugin["local"]) != _plugin_path.resolve()
         ):
-            logger.error(
+            error(
                 f"Plugin name '{plugin_name}' is already used by another plugin at '{existing_plugin['local']}'."
             )
             return False
@@ -605,7 +612,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
         ## Check plugin description
         min_description_length = 10
         if len(plugin_definition["description"]) < min_description_length:
-            logger.error(
+            error(
                 f"Plugin '{plugin_name}' description is too short. Please provide a more "
                 f"detailed description (at least {min_description_length} characters)."
             )
@@ -616,14 +623,14 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             # Check task name
             plugin_prefix, remaining = (task_name.split("/", 1) + [None])[:2]
             if plugin_prefix != plugin_name or not remaining:
-                logger.error(
+                error(
                     f"Task '{task_name}' has an invalid name. Its name should be '{plugin_name}/<task_name>'"
                 )
                 return False
 
             # Check task description
             if len(task["description"]) < min_description_length:
-                logger.error(
+                error(
                     f"Task '{task_name}' description is too short. Please provide a more "
                     f"detailed description (at least {min_description_length} characters)."
                 )
@@ -633,14 +640,14 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             ## Existence
             script = _plugin_path / task["script"]
             if not script.is_file():
-                logger.error(
+                error(
                     f"Task '{task_name}' script file '{script}' does not exist."
                 )
                 return False
             ## Validity
             errors = check_script_blocks(script)
             if errors:
-                logger.error(
+                error(
                     f"Task '{task_name}' script '{script}' has errors:\n"
                     + "\n".join(errors)
                 )
@@ -657,7 +664,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                 for b in blocks
                 if b["type"] == desired_block_type
             ):
-                logger.error(
+                error(
                     f"Task '{task_name}' {'function ' + task['function'] if task['function'] else 'entrypoint'} does not exist in script '{script}'."
                 )
                 return False
@@ -666,17 +673,37 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             if task.get("config_file") is not None:
                 config_file = _plugin_path / task["config_file"]
                 if not config_file.is_file():
-                    logger.error(
+                    error(
                         f"Task '{task_name}' config file '{config_file}' does not exist."
                     )
                     return False
+
+            # Check 'args' field
+            arg_start = f"--{plugin_name}-"
+            arg_names = [arg_name for arg_name in task.get("args", {}).keys()]
+            invalid_args = [
+                arg_name
+                for arg_name in arg_names
+                if not arg_name.startswith(arg_start)
+            ]
+            if invalid_args:
+                error(
+                    f"Task '{task_name}' has an invalid arg names {invalid_args}. "
+                    f"Arg names must be '{arg_start}<remaining>'."
+                )
+                return False
+            if len(arg_names) != len(set(arg_names)):
+                error(
+                    f"Task '{task_name}' has duplicate arg names in its 'args' section."
+                )
+                return False
 
         # Check that the 'imports' section is valid
         imports = plugin.get("imports", [])
         if not isinstance(imports, list) or not all(
             isinstance(imp, str) for imp in imports
         ):
-            logger.error(
+            error(
                 f"Plugin 'imports' section is not a list of strings, but of type '{type(imports)}'."
             )
             return False
@@ -695,7 +722,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             try:
                 cycle = nx.find_cycle(graph)
                 if cycle:
-                    logger.error(
+                    error(
                         f"Circular dependency detected in '{field}' field: {cycle}"
                     )
                     return False
@@ -712,7 +739,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                 msg = f"Imported plugin '{imp}' does not exist locally."
                 if plugin_exists_remotely(imp):
                     msg += f" You can pull it via 'gurk pull {imp}'."
-                logger.error(msg)
+                error(msg)
                 return False
 
             # Check the imports graph for cycles
@@ -722,7 +749,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
 
             # Check imported plugin
             if not _check_local_plugin(Path(get_plugin_entry(imp)["local"])):
-                logger.error(f"Imported plugin '{imp}' is invalid.")
+                error(f"Imported plugin '{imp}' is invalid.")
                 return False
 
         # Add defined tasks to available tasks
@@ -745,7 +772,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             for task_name, task in plugin_definition["tasks"].items():
                 for dep in task.get(field, []):
                     if dep not in available_task_names:
-                        logger.error(
+                        error(
                             f"Task '{task_name}' uses unknown task '{dep}' in '{field}' field."
                         )
                         return False
@@ -776,23 +803,26 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             # Check that all tasks in the option are defined
             for task_name in option.keys():
                 if task_name not in available_task_names:
-                    logger.error(
+                    error(
                         f"Task '{task_name}' in 'run' section is not defined in this or any imported plugins."
                     )
                     return False
+
+            # Check that all args in the option are defined
+            # TODO: For this, instead of 'available_task_names', we need to save all available tasks fully
 
             # Check that at least one task is being run.
             # If any tasks are defined in the plugin, that at least one of them must be enabled
             enabled_tasks = {k: v for k, v in option.items() if v["enabled"]}
             if not enabled_tasks:
-                logger.error(
+                error(
                     "Plugin 'run' section has an option with no enabled tasks."
                 )
                 return False
             if plugin_definition.get("tasks") and not set(
                 plugin_definition["tasks"].keys()
             ) & set(enabled_tasks.keys()):
-                logger.error(
+                error(
                     "Plugin 'run' section has an option with no enabled tasks from this plugin."
                 )
                 return False
@@ -800,7 +830,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             # Check that no two tasks that supercede each other are enabled together
             for u, v in task_supercedes_graph.edges():
                 if u in enabled_tasks and v in enabled_tasks:
-                    logger.error(
+                    error(
                         f"Tasks '{u}' and '{v}' that supercede each other are "
                         f"both enabled in the same 'run' option '{option_name}'."
                     )

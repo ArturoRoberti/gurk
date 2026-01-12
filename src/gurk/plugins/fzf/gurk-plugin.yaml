@@ -26,10 +26,10 @@ define:
 
 run:
   options:
-    fzf/install: &install_option
+    install: &install_option
       fzf/install-loki-shell:
         enabled: true
-    fzf/uninstall:
+    uninstall:
       fzf/uninstall-fzf:
         enabled: true
   default: *install_option

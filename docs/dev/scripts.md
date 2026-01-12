@@ -31,12 +31,57 @@ The helper `run_script_function` (Bash & Python) may be used to run a check func
 
 To add a new helper, add it to any file in `src/gurk/scripts/bash/helpers/` (Bash) resp. anywhere in this package (ideally in `src/gurk/scripts/python/helpers/`) (Python). To add a new check function, add it to `src/gurk/scripts/<language>/<command>/checks.py`.
 
-# Variable passing
-Each script can get access to variables passed by the scheduler via the `get_config_args` helper function. This returns a system info dictionary, the task's config file path, the `--force` flag (True/False), and any remaining arguments as a list:
+# Argument passing
+Each script can get access to the args passed by the scheduler via the `get_task_args` helper function. This returns a system info dictionary, the task's config file path, the `--force` flag (True/False), and any remaining task-specific arguments from its plugin definition.
 
-| Argument       | Python                              | Bash                                              |
-|----------------|-------------------------------------|---------------------------------------------------|
-| System Info    | `Dict[str, str]` First return value | (Associative array) `SYSTEM_INFO` global variable |
-| Config File    | `Path` Second return value          | (str) `CONFIG_FILE` global variable               |
-| `--force` Flag | `bool` Third return value           | (bool) `FORCE` global variable                    |
-| Remaining Args | `List[str]` Fourth return value     | (array) `REMAINING_ARGS` global variable          |
+## Python
+```python
+from gurk.lib.helpers import parse_task_args
+...
+def my_task_function(*args: list[str]) -> None:
+    """Task function description."""
+    # Parse task args
+    task_args = parse_task_args(args)
+    ...
+
+    # (pathlib.Path) Config file
+    config_file = task_args.config_file
+
+    # (bool) Force flag
+    force = task_args.force
+
+    # (dict[str, str]) System info
+    system_info = task_args.system_info
+
+    # (Any) Remaining parsed task args (NOTE: --some-arg -> some_arg)
+    some_arg = task_args.some_arg
+    ...
+```
+
+## Bash
+```bash
+# Helper is automatically sourced by scheduler
+...
+my_task_function() {
+    : '
+    Task function description.
+    '
+    # Parse task args
+	parse_task_args "$@"
+
+    # (str) Config file
+    local config_file="${CONFIG_FILE}"
+
+    # (bool) Force flag
+    local force="${FORCE}"
+
+    # (associative array) System info
+    for key in "${!SYSTEM_INFO[@]}"; do
+        echo "Key: $key, Value: ${SYSTEM_INFO[$key]}"
+    done
+    local version="${SYSTEM_INFO[version]}"
+
+    # (Any) Remaining parsed task args (NOTE: --some-arg -> SOME_ARG)
+    SOME_ARG="${SOME_ARG}"
+    ...
+}

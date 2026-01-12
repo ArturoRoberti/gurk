@@ -7,7 +7,10 @@ from gurk.lib.utils.common import PACKAGE_SRC_PATH
 
 def main(argv, prog, description):
     parser = GurkArgumentParser(
-        prog=prog, description=description, add_logger_options=False
+        prog=prog,
+        description=description,
+        add_verbose_arg=False,
+        add_non_interactive_arg=False,
     )
     parser.parse_args(argv)
 
