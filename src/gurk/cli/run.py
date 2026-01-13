@@ -49,7 +49,6 @@ def parse_task(value: str) -> tuple[str, str]:
     return tuple(parts)  # (plugin_name, task_name)
 
 
-# TODO: Is it possible to get flags from core here dynamically?
 def main(argv, prog, description):
     parser = GurkArgumentParser(prog=prog, description=description)
 
@@ -104,7 +103,7 @@ def main(argv, prog, description):
                 logger.fatal(
                     f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
                 )
-            if full_task_name not in plugin_yaml["define"]["tasks"]:
+            if full_task_name not in plugin_yaml["tasks"]:
                 logger.fatal(
                     f"Plugin '{plugin_name}' does not have a task named '{full_task_name}'. "
                     f"Available tasks are: {list(plugin_yaml['define']['tasks'].keys())}."

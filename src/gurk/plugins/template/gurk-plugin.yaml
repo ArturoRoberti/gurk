@@ -8,26 +8,23 @@ _defaults: &defaults
     allowed: []
     default: []
 
-# (Optional) Define external plugins to import first. Same functionality as `gurk plugin import`
+# (Optional) Define external plugins to import first. Same functionality as `gurk plugin pull`
 imports: []
 
-# Define this plugin
-define:
-  name: "template"
-  description: "A template plugin for Gurk demonstrating the gurk-plugin.yaml structure."
-# Optionally, define new tasks here, with at least mandatory fields ('description', 'script' and 'function')
-  tasks:
-    template/install-some-task:
-      description: "A sample task"
-      script: scripts/some_script.bash
-      function: some_function
-    template/configure-another-task:
-      description: "Another sample task"
-      script: scripts/another_script.py
-      function: null
-      depends_on: [template/install-some-task]
-      config_file: config/another_task_config.yaml
+# (Optional) Define new tasks here, with at least mandatory fields ('description', 'script' and 'function')
+tasks:
+  template/install-some-task:
+    description: "A sample task"
+    script: scripts/some_script.bash
+    function: some_function
+  template/configure-another-task:
+    description: "Another sample task"
+    script: scripts/another_script.py
+    function: null
+    depends_on: [template/install-some-task]
+    config_file: config/another_task_config.yaml
 
+# TODO: Restructure to have just 'run-options' (-> 'default' at the same level as other options)
 # Define how to run this plugin
 # - This can either use existing tasks (in other plugins) or use your defined tasks.
 # - The 'default' option will be used when running `gurk plugin run <plugin-name>`.

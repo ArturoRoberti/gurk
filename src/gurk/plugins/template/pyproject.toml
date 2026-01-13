@@ -1,0 +1,7 @@
+[project]
+name = "template"
+version = "1.0.0"
+description = "A template gurk plugin demonstrating the desired structure structure."
+
+[project.optional-dependencies]
+gurk = [ "commentjson",]

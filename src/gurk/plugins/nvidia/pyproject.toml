@@ -1,0 +1,6 @@
+[project]
+name = "nvidia"
+version = "1.0.0"
+description = "A gurk plugin to install NVIDIA CUDA Toolkit, drivers, and IsaacSim/Lab"
+
+# No pip requirements

@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 from argparse import (
     SUPPRESS,
     ArgumentDefaultsHelpFormatter,
@@ -17,12 +18,15 @@ from pathlib import Path
 from typing import Iterator, NotRequired, Sequence, TypeAlias, TypedDict
 
 import networkx as nx
+import toml
+from packaging.version import InvalidVersion, Version
 from ruamel.yaml import YAML
 
 from gurk.lib.logger import get_logger
 from gurk.lib.utils.common import (
     PACKAGE_HOME_PATH,
     PACKAGE_SRC_PATH,
+    PIPX_PYTHON_PATH,
     YES_ANSWERS,
     FilePath,
     generate_random_path,
@@ -59,12 +63,91 @@ from gurk.lib.utils.yaml import load_yaml
 #########################################################################################
 
 
-class PluginDefine(TypedDict):
+class FilteredPluginMetadata(TypedDict):
     # fmt: off
-    name:        str
-    description: str
-    tasks:       NotRequired[DefaultTaskDictCollection]
+    name:         str
+    version:      str
+    description:  str
+    dependencies: list[str]
     # fmt: on
+
+
+class PluginMetadataDependencies(TypedDict):
+    gurk: NotRequired[list[str]]
+
+
+class PluginMetadata(TypedDict):
+    # fmt: off
+    name:                  str
+    version:               str
+    description:           str
+    optional_dependencies: NotRequired[PluginMetadataDependencies]
+    # fmt: on
+
+    @staticmethod
+    def filtered(metadata: dict) -> FilteredPluginMetadata | None:
+        """
+        Return a filtered version of the PluginMetadata containing only relevant fields.
+
+        :param metadata: Raw pyproject.toml metadata dictionary
+        :type metadata: dict
+        :return: Filtered PluginMetadata
+        :rtype: FilteredPluginMetadata
+        """
+        # Get logger
+        logger = get_logger()
+
+        if not isinstance(metadata, dict):
+            logger.debug(
+                f"Invalid plugin metadata type. Expected dict, got {type(metadata)}."
+            )
+            return None
+
+        # 'Project' section
+        project_data = metadata.get("project")
+        if not project_data or not isinstance(project_data, dict):
+            logger.debug(
+                f"Missing or 'project' section or invalid type in plugin metadata. Expected dict, got {type(project_data)}."
+            )
+            return None
+
+        # Allow other fields, thus filter them out before validating
+        filtered_metadata = {
+            k.replace("-", "_"): v
+            for k, v in project_data.items()
+            if k.replace("-", "_") in PluginMetadata.__annotations__
+        }
+        filtered_metadata["optional_dependencies"] = {
+            k: v
+            for k, v in project_data.get("optional-dependencies", {}).items()
+            if k in PluginMetadataDependencies.__annotations__
+        }
+
+        # Validate structure
+        if not validate_typed_dict(filtered_metadata, PluginMetadata):
+            logger.debug(
+                "Plugin metadata does not conform to PluginMetadata structure."
+            )
+            return None
+
+        # Version
+        try:
+            Version(filtered_metadata["version"])
+        except InvalidVersion:
+            logger.debug(
+                f"Invalid version string in plugin metadata: {filtered_metadata['version']}"
+            )
+            return None
+
+        # Dependencies
+        if "optional_dependencies" in filtered_metadata:
+            filtered_metadata["dependencies"] = filtered_metadata[
+                "optional_dependencies"
+            ].get("gurk", [])
+        else:
+            filtered_metadata["dependencies"] = []
+
+        return filtered_metadata
 
 
 class PluginRun(TypedDict):
@@ -72,10 +155,10 @@ class PluginRun(TypedDict):
     default: CustomTaskDictCollection
 
 
-class GurkPlugin(TypedDict):
+class Plugin(TypedDict):
     # fmt: off
     imports: NotRequired[list[GitRef | str]]
-    define:  PluginDefine
+    tasks:   NotRequired[DefaultTaskDictCollection]
     run:     PluginRun
     # fmt: on
 
@@ -85,17 +168,10 @@ class PluginRun(TypedDict):
     default: ResolvedCustomTaskDictCollection
 
 
-class ResolvedPluginDefine(TypedDict):
-    # fmt: off
-    name:        str
-    description: str
-    tasks:       ResolvedDefaultTaskDictCollection
-
-
-class ResolvedGurkPlugin(TypedDict):
+class ResolvedPlugin(TypedDict):
     # fmt: off
     imports: list[GitRef | str]
-    define:  ResolvedPluginDefine
+    tasks:   ResolvedDefaultTaskDictCollection
     run:     PluginRun
     # fmt: on
 
@@ -333,14 +409,14 @@ def plugin_exists(plugin: PluginSpec) -> bool:
     return plugin_exists_locally(plugin) or plugin_exists_remotely(plugin)
 
 
-def load_raw_plugin_yaml(plugin: PluginSpec) -> GurkPlugin | None:
+def load_raw_plugin_yaml(plugin: PluginSpec) -> Plugin | None:
     """
     Get the gurk-plugin.yaml configuration of a plugin if it exists locally.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
-    :return: GurkPlugin configuration if the plugin exists locally, None otherwise
-    :rtype: GurkPlugin | None
+    :return: Plugin configuration if the plugin exists locally, None otherwise
+    :rtype: Plugin | None
     """
     plugin_entry = get_plugin_entry(plugin)
     if not plugin_entry:
@@ -353,7 +429,7 @@ def load_raw_plugin_yaml(plugin: PluginSpec) -> GurkPlugin | None:
 
 
 # TODO: Remove all non-debug log messages in commands, as this should suffice
-def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
+def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedPlugin | None:
     """
     Get the gurk-plugin.yaml configuration of a local plugin with
     - all paths resolved and converted to "Path" objects
@@ -361,8 +437,8 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
-    :return: GurkPlugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
-    :rtype: ResolvedGurkPlugin | None
+    :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
+    :rtype: ResolvedPlugin | None
     """
     # Get logger
     logger = get_logger()
@@ -377,11 +453,11 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
         logger.debug(f"Successfully loaded plugin '{plugin}'.")
 
     # Fill missing properties
-    plugin_yaml: GurkPlugin = fill_typed_dict(plugin_yaml, GurkPlugin)
+    plugin_yaml: Plugin = fill_typed_dict(plugin_yaml, Plugin)
 
     # Expand task paths
     plugin_path = get_plugin_entry(plugin)["local"]
-    for _, task in plugin_yaml["define"]["tasks"].items():
+    for _, task in plugin_yaml["tasks"].items():
         # Expand script path
         task["script"] = str(Path(plugin_path) / task["script"])
 
@@ -392,27 +468,48 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedGurkPlugin | None:
     return plugin_yaml
 
 
-def get_plugin_data(
-    plugin: PluginSpec,
-) -> tuple[PluginRegistryEntry | None, ResolvedGurkPlugin | None]:
+def load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     """
-    Get the registry entry and gurk-plugin.yaml configuration of a local plugin.
+    Get the pyproject.toml metadata of a local plugin.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
-    :return: Tuple of PluginRegistryEntry and GurkPlugin configuration if the plugin exists locally, None each otherwise.
-             If an entry exists but the yaml is invalid, returns (entry, None).
-    :rtype: tuple[PluginRegistryEntry | None, ResolvedGurkPlugin | None]
+    :return: Plugin metadata if the plugin exists locally, None otherwise
+    :rtype: FilteredPluginMetadata | None
     """
     plugin_entry = get_plugin_entry(plugin)
     if not plugin_entry:
-        return None, None
+        return None
+
+    if not check_local_plugin(plugin_entry["local"]):
+        return None
+
+    toml_data = toml.load(Path(plugin_entry["local"]) / "pyproject.toml")
+    return PluginMetadata.filtered(toml_data)
+
+
+def get_plugin_data(
+    plugin: PluginSpec,
+) -> tuple[
+    PluginRegistryEntry | None,
+    ResolvedPlugin | None,
+    FilteredPluginMetadata | None,
+]:
+    """
+    Get the registry entry, gurk-plugin.yaml configuration and pyproject.toml metadata of a local plugin.
+
+    :param plugin: Name, FilePath, or GitRef of the plugin
+    :type plugin: PluginSpec
+    :return: Tuple of PluginRegistryEntry, Plugin configuration and Plugin metadata if the plugin exists locally, None each otherwise.
+    :rtype: tuple[PluginRegistryEntry | None, ResolvedPlugin | None, FilteredPluginMetadata | None]
+    """
+    plugin_entry = get_plugin_entry(plugin)
+    if not plugin_entry:
+        return None, None, None
 
     plugin_yaml = load_resolved_plugin_yaml(plugin)
-    if not plugin_yaml:
-        return plugin_entry, None
-
-    return plugin_entry, plugin_yaml
+    plugin_metadata = load_plugin_metadata(plugin)
+    return plugin_entry, plugin_yaml, plugin_metadata
 
 
 def get_available_plugin_names() -> list[str]:
@@ -437,7 +534,7 @@ def get_combined_plugin_tasks() -> ResolvedDefaultTaskDictCollection:
     for plugin in get_available_plugin_names():
         plugin_yaml = load_resolved_plugin_yaml(plugin)
         if plugin_yaml:
-            combined_tasks.update(plugin_yaml["define"]["tasks"])
+            combined_tasks.update(plugin_yaml["tasks"])
 
     return combined_tasks
 
@@ -827,17 +924,17 @@ class GurkArgumentParser(ArgumentParser):
         :raises ValueError: If the plugin YAML could not be loaded
         """
         plugin = task_name.split("/", 1)[0]
-        plugin_yaml: ResolvedGurkPlugin = load_resolved_plugin_yaml(plugin)
+        plugin_yaml: ResolvedPlugin = load_resolved_plugin_yaml(plugin)
         if not plugin_yaml:
             raise ValueError(f"Plugin '{plugin}' could not be loaded")
 
         try:
-            task_args = plugin_yaml["define"]["tasks"][task_name]["args"]
+            task_args = plugin_yaml["tasks"][task_name]["args"]
             self.extend_arguments(task_args)
         except KeyError as e:
             self.error(
-                f"Key 'define'/'tasks'/'{task_name}'/'args' not "
-                f"found in plugin '{plugin}' YAML. Broken link: {e}"
+                f"Key 'tasks'/'{task_name}'/'args' not found "
+                f"in plugin '{plugin}' YAML. Broken link: {e}"
             )
 
     def _reorder_actions(self):
@@ -910,30 +1007,32 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
         def error(message: str) -> bool:
             logger.error(f"'{_plugin_path}': {message}")
 
-        # Load gurk-plugin.yaml
-        plugin: GurkPlugin = load_yaml(_plugin_path / "gurk-plugin.yaml")
-        if not plugin:
+        # Load pyproject.toml
+        pyproject_file = _plugin_path / "pyproject.toml"
+        if not pyproject_file.is_file():
             error(
-                f"Plugin source '{_plugin_path}' has no 'gurk-plugin.yaml' file or it is invalid YAML."
+                f"Plugin source '{_plugin_path}' is missing 'pyproject.toml' file."
+            )
+            return False
+        try:
+            pyproject_data = toml.load(pyproject_file)
+        except toml.TomlDecodeError as e:
+            error(
+                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file: {e}"
             )
             return False
 
-        # Validate structure
-        plugin_without_helpers: GurkPlugin = {
-            k: v
-            for k, v in plugin.items()
-            if isinstance(k, str) and not k.startswith("_")
-        }
-        if not validate_typed_dict(plugin_without_helpers, GurkPlugin):
+        # Validate pyproject.toml
+        project_metadata = PluginMetadata.filtered(pyproject_data)
+        if not project_metadata:
             error(
-                f"Plugin at '{_plugin_path}' has invalid structure. Expected:"
+                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file: invalid 'project' section structure. Expected:"
             )
-            print_typed_dict_types(GurkPlugin)
+            print_typed_dict_types(PluginMetadata)
             return False
 
-        ## Check that the plugin name is unique
-        plugin_definition: PluginDefine = plugin["define"]
-        plugin_name = plugin_definition["name"]
+        ## Unique plugin name
+        plugin_name = project_metadata["name"]
         existing_plugin = get_plugin_entry(plugin_name)
         if (
             existing_plugin
@@ -944,17 +1043,30 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             )
             return False
 
-        ## Check plugin description
-        min_description_length = 10
-        if len(plugin_definition["description"]) < min_description_length:
+        # Load gurk-plugin.yaml
+        plugin: Plugin = load_yaml(_plugin_path / "gurk-plugin.yaml")
+        if not plugin:
             error(
-                f"Plugin '{plugin_name}' description is too short. Please provide a more "
-                f"detailed description (at least {min_description_length} characters)."
+                f"Plugin source '{_plugin_path}' has no 'gurk-plugin.yaml' file or it is invalid YAML."
             )
             return False
 
+        # Validate structure
+        plugin_without_helpers: Plugin = {
+            k: v
+            for k, v in plugin.items()
+            if isinstance(k, str) and not k.startswith("_")
+        }
+        if not validate_typed_dict(plugin_without_helpers, Plugin):
+            error(
+                f"Plugin at '{_plugin_path}' has invalid structure. Expected:"
+            )
+            print_typed_dict_types(Plugin)
+            return False
+
         ## Check each task field
-        for task_name, task in plugin_definition["tasks"].items():
+        plugin_tasks = plugin.get("tasks", {})
+        for task_name, task in plugin_tasks.items():
             # Check task name
             plugin_prefix, remaining = (task_name.split("/", 1) + [None])[:2]
             if plugin_prefix != plugin_name or not remaining:
@@ -964,11 +1076,8 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                 return False
 
             # Check task description
-            if len(task["description"]) < min_description_length:
-                error(
-                    f"Task '{task_name}' description is too short. Please provide a more "
-                    f"detailed description (at least {min_description_length} characters)."
-                )
+            if not task["description"]:
+                error(f"Task '{task_name}' description is missing or empty.")
                 return False
 
             # Check 'script' field
@@ -1088,8 +1197,8 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                 return False
 
         # Add defined tasks to available tasks
-        task_names = list(plugin_definition["tasks"].keys())
-        available_tasks.update(plugin_definition["tasks"])
+        task_names = list(plugin_tasks.keys())
+        available_tasks.update(plugin_tasks)
 
         def expand_graph(graph: nx.DiGraph, field: str) -> bool:
             """
@@ -1104,7 +1213,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             :rtype: bool
             """
             graph.add_nodes_from(task_names)
-            for task_name, task in plugin_definition["tasks"].items():
+            for task_name, task in plugin_tasks.items():
                 for dep in task.get(field, []):
                     if dep not in available_tasks:
                         error(
@@ -1175,9 +1284,9 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                     "Plugin 'run' section has an option with no enabled tasks."
                 )
                 return False
-            if plugin_definition.get("tasks") and not set(
-                plugin_definition["tasks"].keys()
-            ) & set(enabled_tasks.keys()):
+            if plugin_tasks and not set(plugin_tasks.keys()) & set(
+                enabled_tasks.keys()
+            ):
                 error(
                     "Plugin 'run' section has an option with no enabled tasks from this plugin."
                 )
@@ -1249,8 +1358,8 @@ def pull_plugin(plugin: GitRef) -> bool:
         return False
 
     # Load gurk-plugin.yaml
-    gurk_plugin: GurkPlugin = load_resolved_plugin_yaml(plugin)
-    if not gurk_plugin:
+    _, plugin_yaml, plugin_metadata = get_plugin_data(plugin)
+    if not plugin_yaml or not plugin_metadata:
         error(
             f"Failed to load a (valid) 'gurk-plugin.yaml' from plugin at '{plugin}'",
             temp_plugin_path,
@@ -1258,7 +1367,7 @@ def pull_plugin(plugin: GitRef) -> bool:
         return False
 
     # Add plugin
-    plugin_name = gurk_plugin["define"]["name"]
+    plugin_name = plugin_metadata["name"]
     plugin_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
     ## Add plugin folder
     shutil.move(temp_plugin_path, plugin_path)
@@ -1271,6 +1380,24 @@ def pull_plugin(plugin: GitRef) -> bool:
         ),
     )
 
+    # Install plugin dependencies
+    # TODO: Install each in a (hidden) venv instead, and use that for running the plugin tasks.
+    dependencies = plugin_metadata["dependencies"]
+    if dependencies:
+        logger.debug(
+            f"Installing optional dependencies for plugin '{plugin_name}': {dependencies}"
+        )
+        subprocess.run(
+            [
+                str(PIPX_PYTHON_PATH),
+                "-m",
+                "pip",
+                "install",
+                *dependencies,
+            ],
+            check=False,
+        )
+
 
 def remove_plugin(plugin: PluginSpec) -> None:
     """
@@ -1282,15 +1409,11 @@ def remove_plugin(plugin: PluginSpec) -> None:
     # Get logger
     logger = get_logger()
 
-    # Get plugin entry
-    plugin_entry = get_plugin_entry(plugin)
-    if not plugin_entry:
-        logger.error(f"Plugin '{plugin}' is not installed.")
+    # Get plugin data
+    plugin_entry, _, plugin_metadata = get_plugin_data(plugin)
+    if not plugin_entry or not plugin_metadata:
+        logger.error(f"Plugin '{plugin}' is not installed or is invalid.")
         return
-
-    # Get plugin name
-    plugin_data = load_resolved_plugin_yaml(plugin)
-    plugin_name = plugin_data["define"]["name"]
 
     # Remove plugin folder
     plugin_path = Path(plugin_entry["local"])
@@ -1298,4 +1421,4 @@ def remove_plugin(plugin: PluginSpec) -> None:
         shutil.rmtree(plugin_path)
 
     # Remove plugin registry entry
-    remove_plugin_entry(plugin_name)
+    remove_plugin_entry(plugin_metadata["name"])

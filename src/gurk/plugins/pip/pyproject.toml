@@ -1,0 +1,7 @@
+[project]
+name = "pip"
+version = "1.0.0"
+description = "A gurk plugin to install pip virtual environments and pipx CLI packages"
+
+[project.optional-dependencies]
+gurk = [ "commentjson",]

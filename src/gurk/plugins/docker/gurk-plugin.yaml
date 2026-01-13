@@ -1,32 +1,29 @@
 # No plugin imports
 
-define:
-  name: "docker"
-  description: "Plugin to install anything related to Docker."
-  tasks:
-    docker/install-docker:
-      description: Install Docker and related tools
-      script: scripts/docker.bash
-      function: null
-      args:
+tasks:
+  docker/install-docker:
+    description: Install Docker and related tools
+    script: scripts/docker.bash
+    function: null
+    args:
 # TODO: Separate these choices into separate tasks
-        --docker-additional-packages:
-          help: Specify Docker-related packages to install
-          choices:
-            - nvidia-container-toolkit
-            - devcontainers-cli
-            - distrobox
-          nargs: '+'
-          default:
-            - nvidia-container-toolkit
-            - devcontainers-cli
-            - distrobox
-    docker/install-docker-images:
-      description: Pull a list of Docker images
-      script: scripts/docker_images.py
-      function: install_docker_images
-      config_file: config/install_docker_images.jsonc
-      depends_on: [docker/install-docker]
+      --docker-additional-packages:
+        help: Specify Docker-related packages to install
+        choices:
+          - nvidia-container-toolkit
+          - devcontainers-cli
+          - distrobox
+        nargs: '+'
+        default:
+          - nvidia-container-toolkit
+          - devcontainers-cli
+          - distrobox
+  docker/install-docker-images:
+    description: Pull a list of Docker images
+    script: scripts/docker_images.py
+    function: install_docker_images
+    config_file: config/install_docker_images.jsonc
+    depends_on: [docker/install-docker]
 
 run:
   default:
