@@ -11,6 +11,8 @@ from gurk.lib.utils.cli import SETUP_DONE_FILE
 from gurk.lib.utils.interface import prompt_bool
 from gurk.lib.utils.system_info import get_manufacturer
 
+# TODO: Restructure to use new logger setup
+
 
 @dataclass
 class SSHKeysManager:

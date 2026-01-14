@@ -26,8 +26,11 @@ def pattern_factory(base_type: str) -> PatternFactory:
 
         :param progress: Whether the step indicates progress
         :type progress: bool
+        :param warning: Whether the step indicates a warning
+        :type warning: bool
         :return: Compiled regex pattern for the step message
         :rtype: Pattern
+        :raises ValueError: If an unknown base_type is provided
         """
         step_type = "STEP"
         if not progress:

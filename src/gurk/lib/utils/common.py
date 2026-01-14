@@ -144,10 +144,19 @@ class CommandKind(Enum):
 
     @property
     def exe(self) -> str:
+        """Get the executable associated with the command kind."""
         return self.value
 
     @property
     def ext(self) -> str:
+        """
+        Get the file extension associated with the command kind.
+
+        :param self: Instance of CommandKind
+        :return: File extension as a string
+        :rtype: str
+        :raises ValueError: If the CommandKind is unsupported
+        """
         try:
             return ScriptExtension[self.name].value
         except KeyError:
@@ -181,6 +190,8 @@ def get_script_path(script: FilePath, command: str) -> Path:
     :type command: str
     :return: Full path to the script file
     :rtype: Path
+    :raises TypeError: If script is not a str or Path
+    :raises ValueError: If an unknown command is provided
     """
     if not isinstance(script, (str, Path)):
         raise TypeError("script must be a str or Path")
@@ -203,6 +214,8 @@ def get_config_path(config_file: FilePath, command: str) -> Path:
     :type command: str
     :return: Full path to the config file
     :rtype: Path
+    :raises TypeError: If config_file is not a str or Path
+    :raises ValueError: If an unknown command is provided
     """
     if not isinstance(config_file, (str, Path)):
         raise TypeError("config_file must be a str or Path")

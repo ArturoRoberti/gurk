@@ -27,6 +27,7 @@ def get_architecture() -> str:
 
     :return: System architecture string
     :rtype: str
+    :raises RuntimeError: If the dpkg command fails
     """
     result = subprocess.run(
         ["dpkg", "--print-architecture"],
@@ -47,6 +48,7 @@ def get_manufacturer() -> str:
 
     :return: System manufacturer string
     :rtype: str
+    :raises RuntimeError: If the manufacturer information cannot be retrieved
     """
     try:
         with open("/sys/class/dmi/id/sys_vendor") as f:
@@ -67,6 +69,7 @@ def get_system_info() -> SystemInfo:
 
     :return: System information dictionary
     :rtype: SystemInfo
+    :raises RuntimeError: If the OS is unsupported or required info cannot be retrieved
     """
     system_info = SystemInfo()
     # OS-independent values

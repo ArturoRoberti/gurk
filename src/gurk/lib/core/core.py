@@ -18,6 +18,19 @@ def main(
     parser_base: GurkArgumentParser,
     _captured: list[str] | None = None,
 ):
+    """
+    Main entry point for the 'run' command.
+
+    :param option: Run option of the requested gurk plugin
+    :type option: CustomTaskDictCollection
+    :param cli_args: Command-line arguments to be passed to the resp. tasks
+    :type cli_args: list[str]
+    :param parser_base: Base argument parser, on which each task parser is built
+    :type parser_base: GurkArgumentParser
+    :param _captured: (Internal) Captured output for testing purposes
+    :type _captured: list[str] | None
+    :raises Exception: Propagates any exception raised during processing
+    """
     # Get logger
     logger = get_logger()
 

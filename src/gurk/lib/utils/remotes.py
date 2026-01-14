@@ -134,7 +134,7 @@ def get_remote_heads(url: str, HEAD: Literal[True]) -> str:
     ...
 
 
-def get_remote_heads(url: str, HEAD: bool = False):
+def get_remote_heads(url: str, HEAD: bool = False) -> dict[str, str] | str:
     """
     Get remote Git repository heads (branches) and their commit hashes.
 
@@ -142,6 +142,9 @@ def get_remote_heads(url: str, HEAD: bool = False):
     :type url: str
     :param HEAD: If True, return the default branch's commit hash only (default: False)
     :type HEAD: bool
+    :return: Dictionary of branch names to commit hashes, or commit hash of default branch if HEAD=True
+    :rtype: dict[str, str] | str
+    :raises RuntimeError: If the git command fails
     """
     flags = " --heads" if not HEAD else ""
     result = run_git_command(f"git ls-remote{flags} {url}", timeout=10)
@@ -165,6 +168,7 @@ def get_cached_repo(repo: GitRef) -> Path | None:
     :type repo: GitRef
     :return: None if not cached, or Path to cached repo if found
     :rtype: Path | None
+    :raises ValueError: If the specified branch is not found on remote
     """
     parsed = parse_git_ref(repo)
     if parsed["commit"]:
@@ -356,6 +360,7 @@ def clone_git_files(
     :type overwrite: bool
     :return: Path to the cloned files or None if cloning failed
     :rtype: Path | None
+    :raises FileNotFoundError: If the specified path is not found in the repo
     """
     parsed = parse_git_ref(repo)
     if not handle_existing_dest(dest_path, overwrite):

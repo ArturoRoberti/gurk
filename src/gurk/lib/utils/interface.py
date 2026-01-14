@@ -239,6 +239,7 @@ def prompt_bool(message: str, answer: str | None = None) -> bool:
     :type answer: str | None
     :return: True if the user responds with 'y', False for 'n'.
     :rtype: bool
+    :raises ValueError: If the predefined answer is invalid.
     """
     # Automatic answer handling
     if answer not in (None, "y", "n"):

@@ -141,9 +141,8 @@ class PluginMetadata(TypedDict):
 
         # Dependencies
         if "optional_dependencies" in filtered_metadata:
-            filtered_metadata["dependencies"] = filtered_metadata[
-                "optional_dependencies"
-            ].get("gurk", [])
+            optional_deps = filtered_metadata.pop("optional_dependencies")
+            filtered_metadata["dependencies"] = optional_deps.get("gurk", [])
         else:
             filtered_metadata["dependencies"] = []
 
@@ -242,12 +241,31 @@ def get_combined_plugin_registry() -> dict[str, PluginRegistryEntry]:
     :rtype: dict[str, PluginRegistryEntry]
     """
     home_registry_file, package_registry_file = _get_plugin_registries()
+
+    # Get home registry and prepend path to 'local' entries
     home_registry = load_yaml(home_registry_file) or {}
+    for entry in home_registry.values():
+        entry["local"] = (
+            str(Path(home_registry_file).parent / entry["local"])
+            if entry["local"]
+            else entry["local"]
+        )
+
+    # Get package registry and prepend path to 'local' entries
     package_registry = load_yaml(package_registry_file) or {}
+    for entry in package_registry.values():
+        entry["local"] = (
+            str(Path(package_registry_file).parent / entry["local"])
+            if entry["local"]
+            else entry["local"]
+        )
 
     # Combine registries, prioritizing home registry
     combined_registry = package_registry.copy()
     combined_registry.update(home_registry)
+
+    # Remove the template plugin
+    del combined_registry["template"]
 
     return combined_registry
 
@@ -689,7 +707,7 @@ class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
     """
 
     def __init__(self, prog):
-        super().__init__(prog, max_help_position=60)
+        super().__init__(prog, max_help_position=80)
 
     def _get_help_string(self, action):
         if action.default not in (None, SUPPRESS):
@@ -833,13 +851,16 @@ class GurkArgumentParser(ArgumentParser):
         :type args_dict: ResolvedArgsDefinitionCollection
         """
 
-        def make_wildcard_validator(patterns: list[str]):
+        def make_wildcard_validator(patterns: list[str]) -> tuple:
             """
-            Create:
-            - an argparse type() validator supporting '*' wildcards
-            - a matching metavar string
-            """
+            Docstring for make_wildcard_validator
 
+            :param patterns: List of wildcard patterns to validate against
+            :type patterns: list[str]
+            :return: A tuple containing a validator function and a metavar string
+            :rtype: tuple
+            :raises ArgumentTypeError: If validation fails
+            """
             regexes = [
                 re.compile("^" + re.escape(p).replace(r"\*", ".*") + "$")
                 for p in patterns

@@ -11,6 +11,9 @@ _current_logger = ContextVar("current_logger", default=None)
 
 @contextmanager
 def allow_missing_logger():
+    """
+    Context manager to allow operations without an active logger.
+    """
     token = _allow_missing_logger.set(True)
     try:
         yield
@@ -19,7 +22,13 @@ def allow_missing_logger():
 
 
 def get_logger() -> Logger:
-    """Get the currently active logger, if set."""
+    """
+    Get the currently active logger, if set.
+
+    :return: The currently active logger
+    :rtype: Logger
+    :raises RuntimeError: If no logger is initialized and missing loggers are not allowed
+    """
     logger = _current_logger.get()
     if logger is None:
         if not _allow_missing_logger.get():
@@ -47,6 +56,8 @@ class DummyLogger:
 
 
 class ActiveLogger:
+    """Context manager to set an active logger globally."""
+
     def __init__(self, logger: Logger):
         self.logger = logger
         self._token = None

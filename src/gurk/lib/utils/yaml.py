@@ -85,6 +85,7 @@ def overlay_dicts(dicts: list[dict]) -> dict:
     :type dicts: list[dict]
     :return: The resulting overlaid dictionary
     :rtype: dict
+    :raises ValueError: If any item in dicts is not a dictionary
     """
 
     def _overlay_two_dicts(base: dict, overlay: dict) -> dict:

@@ -190,7 +190,6 @@ class Scheduler:
         # 3. Define the single reader function for the PTY master
         def pty_reader(master_fd: int) -> None:
             """Reads lines from the single PTY master stream."""
-
             # Use os.fdopen in a 'with' block to guarantee closing the master_fd upon exit.
             with os.fdopen(master_fd, "rb", 0) as master_file:
                 try:

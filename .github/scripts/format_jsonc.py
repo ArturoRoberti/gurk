@@ -17,7 +17,15 @@ import commentjson
 KEY_RE = re.compile(r'^\s*"([^"]+)":')
 
 
-def split_content_and_comment(line: str):
+def split_content_and_comment(line: str) -> tuple[str, str | None]:
+    """
+    Split a line into content and inline comment.
+
+    :param line: The line of text to split
+    :type line: str
+    :return: A tuple containing the content part and the inline comment (if any)
+    :rtype: tuple[str, str | None]
+    """
     in_string = False
     escaped = False
     for i, ch in enumerate(line):
@@ -38,7 +46,17 @@ def split_content_and_comment(line: str):
     return line.rstrip(), None
 
 
-def extract_comments(lines):
+def extract_comments(
+    lines: list[str],
+) -> tuple[list[str], list[str], dict[str, list[str]], dict[str, str]]:
+    """
+    Extract comments from JSONC lines.
+
+    :param lines: The lines of the JSONC file
+    :type lines: list[str]
+    :return: A tuple containing top comments, bottom comments, leading comments, and inline comments
+    :rtype: tuple[list[str], list[str], dict[str, list[str]], dict[str, str]]
+    """
     top, bottom, leading, inline = [], [], {}, {}
     cur_comments, path_stack = [], []
     in_obj = False
@@ -88,7 +106,13 @@ def extract_comments(lines):
     return top, leading, inline, bottom
 
 
-def format_jsonc_file(path: Path):
+def format_jsonc_file(path: Path) -> None:
+    """
+    Format a JSONC file while preserving comments.
+
+    :param path: The path to the JSONC file to format
+    :type path: Path
+    """
     lines = [ln + "\n" for ln in path.read_text().splitlines()]
     top, leading, inline, bottom = extract_comments(lines)
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import IO
+from typing import IO, Any
 
 from rich import print as richprint
 from rich.console import Console
@@ -290,6 +290,7 @@ class Logger:
         :type task_id: int
         :param success: Task termination type indicating how the task completed
         :type success: TaskTerminationType
+        :raises ValueError: If an unknown task termination type is provided
         """
         with self._tasks_lock:
             if task_id not in self.task_infos:
@@ -404,6 +405,30 @@ class Logger:
         Logger.richprint("=" * total_length, color=color, file=file)
 
     @staticmethod
+    def pprint_simple_dict(
+        dct: dict[str, Any],
+        color: str = "white",
+        capitalize: bool = False,
+        indent: int = 0,
+    ) -> None:
+        """
+        Pretty-print a simple dictionary with aligned keys and colored output.
+
+        :param dct: Dictionary to pretty-print
+        :type dct: dict
+        :param color: Color name for the keys
+        :type color: str
+        :param capitalize: Whether to capitalize the keys
+        :type capitalize: bool
+        :param indent: Number of spaces to indent the output
+        :type indent: int
+        """
+        maxlen = max((len(str(k)) for k in dct), default=0)
+        for k, v in dct.items():
+            k = k.capitalize() if capitalize else k
+            richprint(f"{' ' * indent}[{color}]{k:<{maxlen}} :[/{color}] {v}")
+
+    @staticmethod
     def step(message: str, warning: bool = False) -> None:
         """
         Log a step message indicating progress. Only to be used from within tasks.
@@ -453,6 +478,8 @@ class Logger:
         :type answer: bool | None
         :return: True if the user responds with 'y', False for 'n'.
         :rtype: bool
+        :raises RuntimeError: If in non-interactive mode without a predefined answer.
+        :raises ValueError: If the predefined answer is invalid.
         """
         # Non-interactive mode
         if not self.can_prompt and answer is None:
@@ -496,6 +523,7 @@ class Logger:
         :type password: bool
         :return: The user's input.
         :rtype: str
+        :raises RuntimeError: If in non-interactive mode.
         """
         # Non-interactive mode
         if not self.can_prompt:

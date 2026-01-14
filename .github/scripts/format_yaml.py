@@ -13,8 +13,13 @@ yaml.Representer.add_representer(
 )  # conserve 'null'
 
 
-def compress_comments(file_path: Path):
-    """Compress comment-only files or comment lines between YAML nodes."""
+def compress_comments(file_path: Path) -> None:
+    """
+    Compress comment-only files or comment lines between YAML nodes.
+
+    :param file_path: The path to the YAML file to compress
+    :type file_path: Path
+    """
     lines = file_path.read_text(encoding="utf-8").splitlines()
 
     compressed = []
@@ -31,14 +36,26 @@ def compress_comments(file_path: Path):
     file_path.write_text("\n".join(compressed) + "\n")
 
 
-def strip_trailing_whitespace(file_path: Path):
+def strip_trailing_whitespace(file_path: Path) -> None:
+    """
+    Strip trailing whitespace from each line in the given file.
+
+    :param file_path: The path to the YAML file to process
+    :type file_path: Path
+    """
     # Ensure whitespace consistency
     lines = file_path.read_text(encoding="utf-8").splitlines()
     stripped = [ln.rstrip() for ln in lines]
     file_path.write_text("\n".join(stripped) + "\n", encoding="utf-8")
 
 
-def format_file(file_path: Path):
+def format_file(file_path: Path) -> None:
+    """
+    Format a YAML file while preserving comments.
+
+    :param file_path: The path to the YAML file to format
+    :type file_path: Path
+    """
     text = file_path.read_text(encoding="utf-8")
     if text == "":
         # Leave empty files completely untouched
