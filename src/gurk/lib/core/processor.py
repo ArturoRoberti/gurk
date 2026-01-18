@@ -3,12 +3,12 @@ from textwrap import dedent
 
 import networkx as nx
 
-from gurk.lib.core.plugin_utils import (
+from gurk.lib.logger import get_logger
+from gurk.lib.utils.common import generate_random_path
+from gurk.lib.utils.plugins import (
     GurkArgumentParser,
     get_combined_plugin_tasks,
 )
-from gurk.lib.logger import get_logger
-from gurk.lib.utils.common import generate_random_path
 from gurk.lib.utils.scripts import Command
 from gurk.lib.utils.tasks import (
     CustomTaskDictCollection,

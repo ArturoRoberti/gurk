@@ -1,8 +1,8 @@
 from argparse import Namespace
 from pathlib import Path
 
-from gurk.lib.core.plugin_utils import GurkArgumentParser
 from gurk.lib.logger import allow_missing_logger
+from gurk.lib.utils.plugins import GurkArgumentParser
 from gurk.lib.utils.system_info import SystemInfo
 
 

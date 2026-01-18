@@ -4,17 +4,17 @@ from pprint import pprint
 
 import toml
 
-from gurk.lib.core.plugin_utils import (
+from gurk.lib.logger import ActiveLogger, Logger
+from gurk.lib.utils.common import PACKAGE_SRC_PATH
+from gurk.lib.utils.plugins import (
     GURK_MANIFEST_FILENAME,
     GurkArgumentParser,
-    Plugin,
+    PluginManifest,
     PluginMetadata,
     get_combined_plugin_registry,
     get_combined_plugin_tasks,
     get_plugin_data,
 )
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.common import PACKAGE_SRC_PATH
 from gurk.lib.utils.system_info import get_system_info
 from gurk.lib.utils.typed_dict import print_typed_dict_types
 
@@ -213,7 +213,7 @@ def main(argv, prog, description):
             logger.padded_print(
                 f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan"
             )
-            print_typed_dict_types(Plugin)
+            print_typed_dict_types(PluginManifest)
             print()
 
             logger.padded_print(

@@ -1,5 +1,3 @@
-# TODO: Move much of this to utils/common.py. Can any of this be moved to utils/plugins.py? If so, update docs accordingly.
-
 import json
 import os
 import re
@@ -48,7 +46,6 @@ from gurk.lib.utils.tasks import (
     ArgsDefinitionCollection,
     CustomTaskDictCollection,
     DefaultTaskDictCollection,
-    ResolvedArgsDefinitionCollection,
     ResolvedCustomTaskDictCollection,
     ResolvedDefaultTaskDictCollection,
     TaskDictCollection,
@@ -141,7 +138,7 @@ class PluginRun(TypedDict):
     default: CustomTaskDictCollection
 
 
-class Plugin(TypedDict):
+class PluginManifest(TypedDict):
     # fmt: off
     imports: NotRequired[list[GitRef | str]]
     tasks:   NotRequired[DefaultTaskDictCollection]
@@ -154,7 +151,7 @@ class PluginRun(TypedDict):
     default: ResolvedCustomTaskDictCollection
 
 
-class ResolvedPlugin(TypedDict):
+class ResolvedPluginManifest(TypedDict):
     # fmt: off
     imports: list[GitRef | str]
     tasks:   ResolvedDefaultTaskDictCollection
@@ -171,7 +168,7 @@ class PluginRegistryEntry(TypedDict):
 class PluginData(TypedDict):
     # fmt: off
     registration: PluginRegistryEntry
-    manifest:     ResolvedPlugin
+    manifest:     ResolvedPluginManifest
     metadata:     FilteredPluginMetadata
     # fmt: on
 
@@ -408,14 +405,14 @@ def plugin_exists(plugin: PluginSpec) -> bool:
     return plugin_exists_locally(plugin) or plugin_exists_remotely(plugin)
 
 
-def _load_raw_plugin_manifest(plugin: PluginSpec) -> Plugin | None:
+def _load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
     """
     Get the raw manifest of a plugin if it exists locally.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
-    :return: Plugin configuration if the plugin exists locally, None otherwise
-    :rtype: Plugin | None
+    :return: Plugin manifest if the plugin exists locally, None otherwise
+    :rtype: PluginManifest | None
     """
     plugin_registration = _get_plugin_registration(plugin)
     if not plugin_registration:
@@ -435,7 +432,7 @@ def _load_raw_plugin_manifest(plugin: PluginSpec) -> Plugin | None:
 
 def _load_resolved_plugin_manifest(
     plugin: PluginSpec,
-) -> ResolvedPlugin | None:
+) -> ResolvedPluginManifest | None:
     """
     Get the manifest of a local plugin with
     - all paths resolved and converted to "Path" objects
@@ -444,14 +441,16 @@ def _load_resolved_plugin_manifest(
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
-    :rtype: ResolvedPlugin | None
+    :rtype: ResolvedPluginManifest | None
     """
     plugin_manifest = _load_raw_plugin_manifest(plugin)
     if not plugin_manifest:
         return None
 
     # Fill missing properties
-    plugin_manifest: Plugin = fill_typed_dict(plugin_manifest, Plugin)
+    plugin_manifest: PluginManifest = fill_typed_dict(
+        plugin_manifest, PluginManifest
+    )
 
     # Expand task paths
     plugin_path = _get_plugin_registration(plugin)["local"]
@@ -940,14 +939,12 @@ class GurkArgumentParser(ArgumentParser):
         """
         return self.add_argument_group(self.required_group_title)
 
-    def extend_arguments(
-        self, args_dict: ResolvedArgsDefinitionCollection
-    ) -> None:
+    def extend_arguments(self, args_dict: ArgsDefinitionCollection) -> None:
         """
         Extend the parser with arguments defined in a plugin.
 
         :param args_dict: Dictionary of argument definitions
-        :type args_dict: ResolvedArgsDefinitionCollection
+        :type args_dict: ArgsDefinitionCollection
         :raises ArgumentTypeError: If argument definitions are invalid
         """
         if not check_args_dict(args_dict):
@@ -1004,13 +1001,13 @@ class GurkArgumentParser(ArgumentParser):
         """
         Extend the parser with task-specific arguments defined in a plugin, if any.
 
-        :param plugin: Plugin specification
-        :type plugin: PluginSpec
+        :param task_name: Full name of a task in the form 'plugin_name/task_name'
+        :type task_name: str
         :raises ValueError: If the plugin YAML could not be loaded
         """
         plugin = task_name.split("/", 1)[0]
-        plugin_manifest: ResolvedPlugin = _load_resolved_plugin_manifest(
-            plugin
+        plugin_manifest: ResolvedPluginManifest = (
+            _load_resolved_plugin_manifest(plugin)
         )
         if not plugin_manifest:
             raise ValueError(f"Plugin '{plugin}' could not be loaded")
@@ -1134,7 +1131,9 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
             return False
 
         # Load manifest file
-        plugin: Plugin = load_yaml(_plugin_path / GURK_MANIFEST_FILENAME)
+        plugin: PluginManifest = load_yaml(
+            _plugin_path / GURK_MANIFEST_FILENAME
+        )
         if not plugin:
             error(
                 f"Plugin source '{_plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is invalid YAML."
@@ -1142,16 +1141,16 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
             return False
 
         # Validate structure
-        plugin_without_helpers: Plugin = {
+        plugin_without_helpers: PluginManifest = {
             k: v
             for k, v in plugin.items()
             if isinstance(k, str) and not k.startswith("_")
         }
-        if not validate_typed_dict(plugin_without_helpers, Plugin):
+        if not validate_typed_dict(plugin_without_helpers, PluginManifest):
             error(
                 f"Plugin at '{_plugin_path}' has invalid structure. Expected:"
             )
-            print_typed_dict_types(Plugin)
+            print_typed_dict_types(PluginManifest)
             return False
 
         ## Check each task field

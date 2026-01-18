@@ -5,7 +5,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from gurk.lib.core.plugin_utils import (
+from gurk.lib.utils.plugins import (
     get_combined_plugin_tasks,
     iter_configs,
     iter_scripts,
@@ -21,7 +21,9 @@ except ImportError:
     )
 
 
-# TODO: To make this work with new plugin structure, package plugins need to be imported in main and the PR branch, to be able to see the diff
+# TODO: To make this work with new plugin structure
+#       - Check local plugins as before (iter scripts/configs)
+#       - Check remote plugins via version change (look up remote pyproject.toml). If version changed, assume all tasks affected
 def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
     """
     Parse a unified diff text and return a mapping of file paths to changed line numbers.

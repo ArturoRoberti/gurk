@@ -1,7 +1,7 @@
 import pytest
 
-from gurk.lib.core.plugin_utils import iter_scripts
 from gurk.lib.utils.common import stream_print
+from gurk.lib.utils.plugins import iter_scripts
 from gurk.lib.utils.scripts import check_script_blocks
 
 
