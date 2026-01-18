@@ -2,7 +2,6 @@ import errno
 import json
 import os
 import pty
-import shlex
 import subprocess
 import termios
 from dataclasses import dataclass, field
@@ -109,9 +108,6 @@ class Scheduler:
                         abs_path = (
                             Path(original_path.as_posix()).parent / abs_path
                         ).resolve()
-                    print(
-                        f"Resolved import '{curr_block['name']}' to '{abs_path.as_posix()}'"
-                    )
                     dst.write(f"source {abs_path.as_posix()}\n")
                     continue
 
@@ -149,9 +145,12 @@ class Scheduler:
                     step_msg = f"__STEP__: {step}"
                     if command.kind == CommandKind.PYTHON:
                         step_msg = "\n" + step_msg
-                        msg = f"print({step_msg!r})"
+                        msg = f"print(f{step_msg!r})"
                     else:
-                        msg = f'printf "\\n%s\\n" {shlex.quote(step_msg)}'
+                        msg = step_msg.replace("\\", "\\\\").replace(
+                            '"', '\\"'
+                        )
+                        msg = f'printf "\\n%s\\n" "{msg}"'
 
                     # Write replaced STEP print statement
                     dst.write(f"{' ' * indent}{msg}\n")

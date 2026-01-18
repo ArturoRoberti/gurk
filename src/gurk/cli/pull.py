@@ -3,7 +3,8 @@ from gurk.lib.logger import ActiveLogger, Logger
 
 # TODO: Make so that any repo can be pulled, and then only the relevant paths defined in gurk-plugin.yaml are kept
 #       That way, larger repositories can include gurk plugins, instead of requiring each plugin to be in its own repo
-# TODO: Create 'gurk clean' command for the above and to remove invalid plugins (and cache?)
+# TODO: Create 'gurk clean' command for the above and to remove invalid plugins (and cache?). If any can be removed, prmpt user and ask for confirmation for those unless --non-interactive is set
+#       Maybe unify with 'gurk remove' command?
 
 
 def main(argv, prog, description):

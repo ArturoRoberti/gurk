@@ -63,6 +63,7 @@ class Processor:
         task_args = {
             task_name: task_args[task_name] for task_name in tasks.keys()
         }
+        logger.debug(f"Enabled tasks: {list(tasks.keys())}")
 
         # Extract run args
         run_args = dict()
@@ -84,12 +85,10 @@ class Processor:
 
         # Parse cli args
         parsed_cli_args = self.parser_base.parse_args(self.cli_args)
+        logger.debug("Parsed CLI args successfully")
 
         # If all args are good, re-insert them back
         for task_name, task in tasks.items():
-            if not task["enabled"]:
-                continue
-
             task["args"] = []
 
             # Re-assign run args, if any
@@ -124,11 +123,14 @@ class Processor:
 
             task["args"].extend(common_args)
 
+        logger.debug("Assigned args to resp. tasks successfully")
+
         # Prepend system preparation task
         tasks = self.add_preparation_task(tasks)
 
         # Create logging directory
         logger.create_log_dir()
+        logger.debug(f"Created logging directory at '{logger.logdir}'")
 
         # Convert to ResolvedTask list
         for task_name, task in tasks.items():
@@ -145,9 +147,8 @@ class Processor:
             )
             self.tasks.append(resolved_task)
 
-    def enable_dependencies(
-        self, tasks: TaskDictCollection
-    ) -> TaskDictCollection:
+    @staticmethod
+    def enable_dependencies(tasks: TaskDictCollection) -> TaskDictCollection:
         """
         Enable dependencies of enabled tasks.
 
@@ -176,8 +177,9 @@ class Processor:
 
         return tasks
 
+    @staticmethod
     def add_preparation_task(
-        self, tasks: ResolvedTaskDictCollection
+        tasks: ResolvedTaskDictCollection,
     ) -> ResolvedTaskDictCollection:
         """
         Prepend a system preparation task to update and upgrade apt packages.

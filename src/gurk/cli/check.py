@@ -16,7 +16,7 @@ def main(argv, prog, description):
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         for source in args.paths:
-            if not check_local_plugin(source):
+            if not check_local_plugin(source, True):
                 logger.fatal(f"Plugin source '{source}' is invalid.")
             else:
                 logger.info(f"Plugin source '{source}' is valid.")

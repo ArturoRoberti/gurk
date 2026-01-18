@@ -5,13 +5,13 @@ from pprint import pprint
 import toml
 
 from gurk.lib.core.plugin_utils import (
+    GURK_MANIFEST_FILENAME,
     GurkArgumentParser,
     Plugin,
     PluginMetadata,
     get_combined_plugin_registry,
     get_combined_plugin_tasks,
     get_plugin_data,
-    get_plugin_entry,
 )
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
@@ -63,14 +63,7 @@ def main(argv, prog, description):
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         # Print help about gurk itself
-        if not (
-            args.plugins
-            or args.tasks
-            or args.available_plugins
-            or args.available_tasks
-            or args.system_info
-            or args.structure
-        ):
+        if not any(vars(args).values()):
             # Load help from pyproject.toml
             gurk_toml = toml.load(
                 PACKAGE_SRC_PATH.parents[1] / "pyproject.toml"
@@ -93,54 +86,65 @@ def main(argv, prog, description):
         # Show help for specific plugins
         elif args.plugins:
             for plugin_name in args.plugins:
-                # Get plugin (if installed)
-                plugin_entry, plugin_yaml, plugin_metadata = get_plugin_data(
-                    plugin_name
-                )
-                if not plugin_entry or not plugin_yaml or not plugin_metadata:
-                    logger.error(
-                        f"Plugin '{plugin_name}' is not installed or has an invalid 'gurk-plugin.yaml' file."
-                    )
+                # Get plugin data (if installed)
+                try:
+                    plugin_data = get_plugin_data(plugin_name)
+                except ModuleNotFoundError as e:
+                    logger.error(str(e))
                     continue
 
                 # Re-get plugin name from metadata if available, in case another PluginSpec was used
-                plugin_name = plugin_metadata["name"]
+                plugin_name = plugin_data["metadata"]["name"]
 
                 # Print general info
                 logger.padded_print(
                     f"Plugin '{plugin_name}' General Info", "green"
                 )
-                general_info = deepcopy(plugin_metadata)
+                general_info = deepcopy(plugin_data["metadata"])
                 general_info["source"] = (
-                    plugin_entry["remote"]
-                    if plugin_entry["remote"]
-                    else plugin_entry["local"]
+                    plugin_data["registration"]["remote"]
+                    or plugin_data["registration"]["local"]
                 )
+
                 logger.pprint_simple_dict(
                     general_info, color="yellow", capitalize=True
                 )
                 print()
 
                 # Print tasks defined by the plugin
-                if plugin_yaml.get("tasks"):
+                plugin_manifest = plugin_data["manifest"]
+                if plugin_manifest.get("tasks"):
                     logger.padded_print("Defined Tasks", "cyan")
-                    for task_name, task_info in plugin_yaml["tasks"].items():
+                    for task_name, task_info in plugin_manifest[
+                        "tasks"
+                    ].items():
                         logger.richprint(f"- {task_name}:", "yellow")
                         pprint(task_info)
                         print()
 
                 # Print imported plugins
-                if plugin_yaml.get("imports"):
-                    logger.padded_print("Imported Plugins", "cyan")
-                    for imported_plugin in plugin_yaml["imports"]:
-                        plugin_entry = get_plugin_entry(imported_plugin)
-                        print(
-                            f"- {imported_plugin}: {plugin_entry['remote'] if plugin_entry['remote'] else plugin_entry['local']}"
+                if plugin_manifest.get("imports"):
+                    imports = {}
+                    for imported_plugin in plugin_manifest["imports"]:
+                        # Plugin is not installed
+                        try:
+                            plugin_data = get_plugin_data(imported_plugin)
+                        except ModuleNotFoundError:
+                            imports[imported_plugin] = "Not installed"
+                            continue
+
+                        # Plugin is installed - print source
+                        imports[imported_plugin] = (
+                            plugin_data["registration"]["remote"]
+                            or plugin_data["registration"]["local"]
                         )
+
+                    logger.padded_print("Imported Plugins", "cyan")
+                    logger.pprint_simple_dict(imports, color="yellow")
                     print()
 
                 # Print 'run' section
-                run_section = plugin_yaml["run"]
+                run_section = plugin_manifest["run"]
                 ## Print default
                 logger.padded_print("Run Options", "cyan")
                 default_value = next(iter(run_section["default"].values()))
@@ -206,7 +210,9 @@ def main(argv, prog, description):
 
         # Show required plugin structure
         elif args.structure:
-            logger.padded_print("Structure of 'gurk-plugin.yaml'", "cyan")
+            logger.padded_print(
+                f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan"
+            )
             print_typed_dict_types(Plugin)
             print()
 

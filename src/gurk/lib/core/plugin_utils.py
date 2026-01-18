@@ -44,6 +44,8 @@ from gurk.lib.utils.scripts import (
 )
 from gurk.lib.utils.system_info import SystemInfo
 from gurk.lib.utils.tasks import (
+    ArgsDefinition,
+    ArgsDefinitionCollection,
     CustomTaskDictCollection,
     DefaultTaskDictCollection,
     ResolvedArgsDefinitionCollection,
@@ -94,21 +96,12 @@ class PluginMetadata(TypedDict):
         :return: Filtered PluginMetadata
         :rtype: FilteredPluginMetadata
         """
-        # Get logger
-        logger = get_logger()
-
         if not isinstance(metadata, dict):
-            logger.debug(
-                f"Invalid plugin metadata type. Expected dict, got {type(metadata)}."
-            )
             return None
 
         # 'Project' section
         project_data = metadata.get("project")
         if not project_data or not isinstance(project_data, dict):
-            logger.debug(
-                f"Missing or 'project' section or invalid type in plugin metadata. Expected dict, got {type(project_data)}."
-            )
             return None
 
         # Allow other fields, thus filter them out before validating
@@ -125,18 +118,12 @@ class PluginMetadata(TypedDict):
 
         # Validate structure
         if not validate_typed_dict(filtered_metadata, PluginMetadata):
-            logger.debug(
-                "Plugin metadata does not conform to PluginMetadata structure."
-            )
             return None
 
         # Version
         try:
             Version(filtered_metadata["version"])
         except InvalidVersion:
-            logger.debug(
-                f"Invalid version string in plugin metadata: {filtered_metadata['version']}"
-            )
             return None
 
         # Dependencies
@@ -178,10 +165,20 @@ class ResolvedPlugin(TypedDict):
 class PluginRegistryEntry(TypedDict):
     local: str
     remote: GitRef | None
-    # version: str # Keep? How to read remote repo versions?
+    # version: str # TODO: Keep? How to read remote repo versions?
+
+
+class PluginData(TypedDict):
+    # fmt: off
+    registration: PluginRegistryEntry
+    manifest:     ResolvedPlugin
+    metadata:     FilteredPluginMetadata
+    # fmt: on
 
 
 PluginSpec: TypeAlias = str | FilePath | GitRef
+
+GURK_MANIFEST_FILENAME = "gurk-manifest.yaml"
 
 
 def _get_plugin_dirs(
@@ -291,9 +288,6 @@ def _get_possible_plugin_entries(
     """
     plugin = str(plugin)
 
-    # Get logger
-    logger = get_logger()
-
     def _load_plugin(registry_file: Path) -> PluginRegistryEntry | None:
         registry: dict[str, PluginRegistryEntry] = (
             load_yaml(registry_file) or {}
@@ -317,30 +311,19 @@ def _get_possible_plugin_entries(
             # Access plugin by name
             entry = registry[plugin]
         else:
-            if plugin == "template-gurk-plugin":
-                logger.debug(
-                    f"Returning None, as entry is not found in {registry_file}"
-                )
+            # Plugin not found
             return None
 
         # Validate structure
         if not validate_typed_dict(entry, PluginRegistryEntry):
-            logger.debug(
-                f"Invalid plugin registry entry {entry} for plugin '{plugin}' in registry '{registry_file}'."
-            )
             return None
 
         # Resolve local path
         local_path = registry_file.parent / entry["local"]
-        if not local_path.is_dir():
-            logger.debug(
-                f"Local path '{local_path}' for plugin '{plugin}' does not exist or is not a directory."
-            )
-            return None
-        elif not (local_path / "gurk-plugin.yaml").is_file():
-            logger.debug(
-                f"Local path '{local_path}' for plugin '{plugin}' is missing 'gurk-plugin.yaml' file."
-            )
+        if (
+            not local_path.is_dir()
+            or not (local_path / GURK_MANIFEST_FILENAME).is_file()
+        ):
             return None
         entry["local"] = str(local_path)
 
@@ -355,7 +338,7 @@ def _get_possible_plugin_entries(
         )
 
 
-def get_plugin_entry(
+def _get_plugin_registration(
     plugin: PluginSpec,
     home_registry: bool = True,
     package_registry: bool = True,
@@ -380,15 +363,13 @@ def get_plugin_entry(
     # Logging
     logger = get_logger()
     if not plugin_data:
-        logger.debug(
-            f"ERROR: Plugin '{plugin}' does not exist locally in a valid form."
-        )
+        return None
     elif len(plugin_data) > 1:
         logger.debug(
-            f"WARNING: Multiple entries found for plugin '{plugin}'. Using the first one."
+            f"WARNING: Multiple registry entries found for plugin '{plugin}'. Using the home one."
         )
 
-    return plugin_data[0] if plugin_data else None
+    return plugin_data[0]
 
 
 def plugin_exists_locally(plugin: PluginSpec) -> bool:
@@ -400,7 +381,7 @@ def plugin_exists_locally(plugin: PluginSpec) -> bool:
     :return: True if the plugin exists locally, False otherwise
     :rtype: bool
     """
-    return get_plugin_entry(plugin) is not None
+    return _get_plugin_registration(plugin) is not None
 
 
 def plugin_exists_remotely(plugin: GitRef) -> bool:
@@ -427,29 +408,36 @@ def plugin_exists(plugin: PluginSpec) -> bool:
     return plugin_exists_locally(plugin) or plugin_exists_remotely(plugin)
 
 
-def load_raw_plugin_yaml(plugin: PluginSpec) -> Plugin | None:
+def _load_raw_plugin_manifest(plugin: PluginSpec) -> Plugin | None:
     """
-    Get the gurk-plugin.yaml configuration of a plugin if it exists locally.
+    Get the raw manifest of a plugin if it exists locally.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Plugin configuration if the plugin exists locally, None otherwise
     :rtype: Plugin | None
     """
-    plugin_entry = get_plugin_entry(plugin)
-    if not plugin_entry:
+    plugin_registration = _get_plugin_registration(plugin)
+    if not plugin_registration:
         return None
 
-    if not check_local_plugin(plugin_entry["local"]):
+    if not check_local_plugin(plugin_registration["local"]):
         return None
 
-    return load_yaml(Path(plugin_entry["local"]) / "gurk-plugin.yaml")
+    raw_plugin_yaml = load_yaml(
+        Path(plugin_registration["local"]) / GURK_MANIFEST_FILENAME
+    )
+    if not raw_plugin_yaml:
+        return None
+
+    return raw_plugin_yaml
 
 
-# TODO: Remove all non-debug log messages in commands, as this should suffice
-def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedPlugin | None:
+def _load_resolved_plugin_manifest(
+    plugin: PluginSpec,
+) -> ResolvedPlugin | None:
     """
-    Get the gurk-plugin.yaml configuration of a local plugin with
+    Get the manifest of a local plugin with
     - all paths resolved and converted to "Path" objects
     - missing properties filled with default values
 
@@ -458,24 +446,16 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedPlugin | None:
     :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
     :rtype: ResolvedPlugin | None
     """
-    # Get logger
-    logger = get_logger()
-
-    plugin_yaml = load_raw_plugin_yaml(plugin)
-    if not plugin_yaml:
-        logger.warning(
-            f"Plugin '{plugin}' is missing a valid 'gurk-plugin.yaml' file - not loading it."
-        )
+    plugin_manifest = _load_raw_plugin_manifest(plugin)
+    if not plugin_manifest:
         return None
-    else:
-        logger.debug(f"Successfully loaded plugin '{plugin}'.")
 
     # Fill missing properties
-    plugin_yaml: Plugin = fill_typed_dict(plugin_yaml, Plugin)
+    plugin_manifest: Plugin = fill_typed_dict(plugin_manifest, Plugin)
 
     # Expand task paths
-    plugin_path = get_plugin_entry(plugin)["local"]
-    for _, task in plugin_yaml["tasks"].items():
+    plugin_path = _get_plugin_registration(plugin)["local"]
+    for _, task in plugin_manifest["tasks"].items():
         # Expand script path
         task["script"] = str(Path(plugin_path) / task["script"])
 
@@ -483,10 +463,10 @@ def load_resolved_plugin_yaml(plugin: PluginSpec) -> ResolvedPlugin | None:
         if task["config_file"] is not None:
             task["config_file"] = str(Path(plugin_path) / task["config_file"])
 
-    return plugin_yaml
+    return plugin_manifest
 
 
-def load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
+def _load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     """
     Get the pyproject.toml metadata of a local plugin.
 
@@ -495,39 +475,64 @@ def load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     :return: Plugin metadata if the plugin exists locally, None otherwise
     :rtype: FilteredPluginMetadata | None
     """
-    plugin_entry = get_plugin_entry(plugin)
-    if not plugin_entry:
+    plugin_registration = _get_plugin_registration(plugin)
+    if not plugin_registration:
         return None
 
-    if not check_local_plugin(plugin_entry["local"]):
+    if not check_local_plugin(plugin_registration["local"]):
         return None
 
-    toml_data = toml.load(Path(plugin_entry["local"]) / "pyproject.toml")
+    try:
+        toml_data = toml.load(
+            Path(plugin_registration["local"]) / "pyproject.toml"
+        )
+    except (toml.TomlDecodeError, FileNotFoundError):
+        return None
+
     return PluginMetadata.filtered(toml_data)
 
 
-def get_plugin_data(
-    plugin: PluginSpec,
-) -> tuple[
-    PluginRegistryEntry | None,
-    ResolvedPlugin | None,
-    FilteredPluginMetadata | None,
-]:
+def get_plugin_data(plugin: PluginSpec) -> PluginData:
     """
-    Get the registry entry, gurk-plugin.yaml configuration and pyproject.toml metadata of a local plugin.
+    Get the registry entry, manifest and pyproject.toml metadata of a local plugin.
 
     :param plugin: Name, FilePath, or GitRef of the plugin
     :type plugin: PluginSpec
-    :return: Tuple of PluginRegistryEntry, Plugin configuration and Plugin metadata if the plugin exists locally, None each otherwise.
-    :rtype: tuple[PluginRegistryEntry | None, ResolvedPlugin | None, FilteredPluginMetadata | None]
+    :return: Plugin data containing registry entry, manifest and metadata
+    :rtype: PluginData
+    :raises ModuleNotFoundError: If no valid plugin was found
     """
-    plugin_entry = get_plugin_entry(plugin)
-    if not plugin_entry:
-        return None, None, None
 
-    plugin_yaml = load_resolved_plugin_yaml(plugin)
-    plugin_metadata = load_plugin_metadata(plugin)
-    return plugin_entry, plugin_yaml, plugin_metadata
+    def error_msg(message: str) -> str:
+        return f"ERROR loading plugin data for {plugin}: {message}"
+
+    plugin_registration = _get_plugin_registration(plugin)
+    if not plugin_registration:
+        raise ModuleNotFoundError(
+            error_msg("Could not load a (valid) plugin entry")
+        )
+
+    plugin_manifest = _load_resolved_plugin_manifest(plugin)
+    if not plugin_manifest:
+        raise ModuleNotFoundError(
+            error_msg(
+                f"Could not load a (valid) {GURK_MANIFEST_FILENAME} file"
+            )
+        )
+
+    plugin_metadata = _load_plugin_metadata(plugin)
+    if not plugin_metadata:
+        raise ModuleNotFoundError(
+            error_msg(
+                "Could not load plugin metadata from a (valid) pyproject.toml file"
+            )
+        )
+
+    return PluginData(
+        registration=plugin_registration,
+        manifest=plugin_manifest,
+        metadata=plugin_metadata,
+    )
 
 
 def get_available_plugin_names() -> list[str]:
@@ -550,9 +555,9 @@ def get_combined_plugin_tasks() -> ResolvedDefaultTaskDictCollection:
     """
     combined_tasks: TaskDictCollection = {}
     for plugin in get_available_plugin_names():
-        plugin_yaml = load_resolved_plugin_yaml(plugin)
-        if plugin_yaml:
-            combined_tasks.update(plugin_yaml["tasks"])
+        plugin_manifest = _load_resolved_plugin_manifest(plugin)
+        if plugin_manifest:
+            combined_tasks.update(plugin_manifest["tasks"])
 
     return combined_tasks
 
@@ -599,9 +604,9 @@ def add_plugin_entry(
     logger = get_logger()
 
     # Check if the plugin already exists
-    plugin_entry = get_plugin_entry(plugin_name)
-    if plugin_entry:
-        logger.debug(
+    plugin_registration = _get_plugin_registration(plugin_name)
+    if plugin_registration:
+        logger.error(
             f"Plugin '{plugin_name}' already exists in some registry."
         )
         return False
@@ -621,7 +626,7 @@ def add_plugin_entry(
     return True
 
 
-def remove_plugin_entry(plugin_name: PluginSpec) -> None:
+def _remove_plugin_entry(plugin_name: PluginSpec) -> None:
     """
     Remove a plugin from the home plugin registry.
 
@@ -632,9 +637,11 @@ def remove_plugin_entry(plugin_name: PluginSpec) -> None:
     logger = get_logger()
 
     # Check if the plugin exists
-    plugin_entry = get_plugin_entry(plugin_name, package_registry=False)
-    if not plugin_entry:
-        logger.debug(
+    plugin_registration = _get_plugin_registration(
+        plugin_name, package_registry=False
+    )
+    if not plugin_registration:
+        logger.error(
             f"Plugin '{plugin_name}' does not exist in home registry."
         )
         return
@@ -670,7 +677,7 @@ def update_plugin_entry(
 
     # Check args
     if local is None and remote is None:
-        logger.debug("No fields to update for plugin entry.")
+        logger.warning("No fields to update for plugin entry.")
         return False
 
     # Load registry files and update entry
@@ -696,6 +703,99 @@ def update_plugin_entry(
         return True
 
     return False
+
+
+def _create_wildcard_validator(patterns: list[str]) -> tuple:
+    """
+    Create a validator function for wildcard patterns.
+
+    :param patterns: List of wildcard patterns to validate against
+    :type patterns: list[str]
+    :return: A tuple containing a validator function and a metavar string
+    :rtype: tuple
+    :raises ArgumentTypeError: If validation fails
+    """
+    regexes = [
+        re.compile("^" + re.escape(p).replace(r"\*", ".*") + "$")
+        for p in patterns
+    ]
+
+    quoted = ", ".join(f"'{p}'" for p in patterns)
+    metavar = "{" + ",".join(patterns) + "}"
+
+    def validate(value: str) -> str:
+        if any(rx.match(value) for rx in regexes):
+            return value
+        raise ArgumentTypeError(
+            f"invalid choice: {value!r} (choose from {quoted})"
+        )
+
+    return validate, metavar
+
+
+def check_args_dict(args_dict: ArgsDefinitionCollection) -> bool:
+    """
+    Extend the parser with arguments defined in a plugin.
+
+    :param args_dict: Dictionary of argument definitions
+    :type args_dict: ArgsDefinitionCollection
+    :return: True if arguments are valid, False otherwise
+    :rtype: bool
+    """
+    # Validate structure
+    if not (
+        isinstance(args_dict, dict)
+        and all(isinstance(key, str) for key in args_dict.keys())
+        and all(
+            validate_typed_dict(arg_spec, ArgsDefinition)
+            for arg_spec in args_dict.values()
+        )
+    ):
+        return False
+
+    # Validate mutually exclusive groups
+    mutex_groups = defaultdict(list)
+    for name, spec in args_dict.items():
+        mutex = spec.get("mutex")
+        if mutex:
+            mutex_groups[mutex].append(name)
+    for members in mutex_groups.values():
+        if len(members) < 2:
+            return False
+
+    # Validate arguments
+    for name, spec in args_dict.items():
+        # nargs
+        nargs = spec.get("nargs")
+        if nargs and not (isinstance(nargs, int) or nargs in ("?", "*", "+")):
+            return False
+
+        # Choices
+        default = spec.get("default")
+        choices = spec.get("choices")
+        if choices is not None:
+            validator, _ = _create_wildcard_validator(choices)
+
+            # Validate default(s) against choices
+            if default is not None:
+                if not isinstance(default, list):
+                    default = [default]
+                for d in default:
+                    try:
+                        validator(d)
+                    except ArgumentTypeError:
+                        return False
+            # Validate nargs
+            elif nargs in ("?", "*"):
+                return False
+
+        # Boolean flags
+        elif isinstance(default, bool):
+            # Validate nargs
+            if nargs is not None:
+                return False
+
+    return True
 
 
 class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
@@ -840,7 +940,6 @@ class GurkArgumentParser(ArgumentParser):
         """
         return self.add_argument_group(self.required_group_title)
 
-    # TODO: Clean this up
     def extend_arguments(
         self, args_dict: ResolvedArgsDefinitionCollection
     ) -> None:
@@ -849,34 +948,10 @@ class GurkArgumentParser(ArgumentParser):
 
         :param args_dict: Dictionary of argument definitions
         :type args_dict: ResolvedArgsDefinitionCollection
+        :raises ArgumentTypeError: If argument definitions are invalid
         """
-
-        def make_wildcard_validator(patterns: list[str]) -> tuple:
-            """
-            Docstring for make_wildcard_validator
-
-            :param patterns: List of wildcard patterns to validate against
-            :type patterns: list[str]
-            :return: A tuple containing a validator function and a metavar string
-            :rtype: tuple
-            :raises ArgumentTypeError: If validation fails
-            """
-            regexes = [
-                re.compile("^" + re.escape(p).replace(r"\*", ".*") + "$")
-                for p in patterns
-            ]
-
-            quoted = ", ".join(f"'{p}'" for p in patterns)
-            metavar = "{" + ",".join(patterns) + "}"
-
-            def validate(value: str) -> str:
-                if any(rx.match(value) for rx in regexes):
-                    return value
-                raise ArgumentTypeError(
-                    f"invalid choice: {value!r} (choose from {quoted})"
-                )
-
-            return validate, metavar
+        if not check_args_dict(args_dict):
+            raise ArgumentTypeError("Invalid argument definitions")
 
         # Collect mutually exclusive groups
         mutex_groups = defaultdict(list)
@@ -884,42 +959,30 @@ class GurkArgumentParser(ArgumentParser):
             mutex = spec.get("mutex")
             if mutex:
                 mutex_groups[mutex].append(name)
-
         argparse_mutex_groups = {
             name: self.add_mutually_exclusive_group() for name in mutex_groups
         }
 
+        # Add arguments
         for name, spec in args_dict.items():
-            help_text = spec.get("help")
+            kwargs = {"help": spec["help"]}  # To be passed to add_argument()
+
             default = spec.get("default")
             nargs = spec.get("nargs")
             choices = spec.get("choices")
 
-            kwargs = {}
-
-            if help_text is not None:
-                kwargs["help"] = help_text
-
+            # Choices
             if choices is not None:
-                validator, metavar = make_wildcard_validator(choices)
+                validator, metavar = _create_wildcard_validator(choices)
                 kwargs["type"] = validator
                 kwargs["metavar"] = metavar
 
-            # --- Boolean flags ---
-            if isinstance(default, bool):
-                if nargs is not None:
-                    raise ValueError(
-                        f"Boolean flag '{name}' must not define nargs"
-                    )
+            # Boolean flags
+            elif isinstance(default, bool):
+                kwargs["action"] = "store_false" if default else "store_true"
 
-                kwargs["action"] = (
-                    "store_true" if default is False else "store_false"
-                )
-                kwargs["default"] = default
-
-            # --- Non-boolean arguments ---
+            # Other argument types (str, list[str])
             else:
-                # if has_default:
                 if default is not None:
                     # optional argument
                     kwargs["default"] = default
@@ -934,6 +997,7 @@ class GurkArgumentParser(ArgumentParser):
             mutex = spec.get("mutex")
             target = argparse_mutex_groups[mutex] if mutex else self
 
+            # Finally, add the argument
             target.add_argument(name, **kwargs)
 
     def extend_task_arguments(self, task_name: str) -> None:
@@ -945,12 +1009,14 @@ class GurkArgumentParser(ArgumentParser):
         :raises ValueError: If the plugin YAML could not be loaded
         """
         plugin = task_name.split("/", 1)[0]
-        plugin_yaml: ResolvedPlugin = load_resolved_plugin_yaml(plugin)
-        if not plugin_yaml:
+        plugin_manifest: ResolvedPlugin = _load_resolved_plugin_manifest(
+            plugin
+        )
+        if not plugin_manifest:
             raise ValueError(f"Plugin '{plugin}' could not be loaded")
 
         try:
-            task_args = plugin_yaml["tasks"][task_name]["args"]
+            task_args = plugin_manifest["tasks"][task_name]["args"]
             self.extend_arguments(task_args)
         except KeyError as e:
             self.error(
@@ -1003,13 +1069,15 @@ class GurkArgumentParser(ArgumentParser):
 #########################################################################################
 
 
-def check_local_plugin(plugin_path: FilePath) -> bool:
+def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
     """
     Check if a local plugin is valid.
         NOTE: All imported plugins (recursively) must also be local and valid.
 
-    :param plugin_path: Path to the local plugin
+    :param plugin_path: Path to the local plugin directory
     :type plugin_path: FilePath
+    :param verbose: Whether to print errors
+    :type verbose: bool
     :return: True if the plugin is valid, False otherwise
     :rtype: bool
     """
@@ -1026,7 +1094,8 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
 
     def _check_local_plugin(_plugin_path: Path) -> bool:
         def error(message: str) -> bool:
-            logger.error(f"'{_plugin_path}': {message}")
+            if verbose:
+                logger.error(f"'{_plugin_path}': {message}")
 
         # Load pyproject.toml
         pyproject_file = _plugin_path / "pyproject.toml"
@@ -1054,7 +1123,7 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
 
         ## Unique plugin name
         plugin_name = project_metadata["name"]
-        existing_plugin = get_plugin_entry(plugin_name)
+        existing_plugin = _get_plugin_registration(plugin_name)
         if (
             existing_plugin
             and Path(existing_plugin["local"]) != _plugin_path.resolve()
@@ -1064,11 +1133,11 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
             )
             return False
 
-        # Load gurk-plugin.yaml
-        plugin: Plugin = load_yaml(_plugin_path / "gurk-plugin.yaml")
+        # Load manifest file
+        plugin: Plugin = load_yaml(_plugin_path / GURK_MANIFEST_FILENAME)
         if not plugin:
             error(
-                f"Plugin source '{_plugin_path}' has no 'gurk-plugin.yaml' file or it is invalid YAML."
+                f"Plugin source '{_plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is invalid YAML."
             )
             return False
 
@@ -1144,24 +1213,27 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                     return False
 
             # Check 'args' field
-            arg_start = f"--{plugin_name}-"
-            arg_names = [arg_name for arg_name in task.get("args", {}).keys()]
-            invalid_args = [
-                arg_name
-                for arg_name in arg_names
-                if not arg_name.startswith(arg_start)
-            ]
-            if invalid_args:
-                error(
-                    f"Task '{task_name}' has an invalid arg names {invalid_args}. "
-                    f"Arg names must be '{arg_start}<remaining>'."
-                )
-                return False
-            if len(arg_names) != len(set(arg_names)):
-                error(
-                    f"Task '{task_name}' has duplicate arg names in its 'args' section."
-                )
-                return False
+            task_args = task.get("args")
+            if task_args:
+                # Validate structure
+                if not check_args_dict(task_args):
+                    error(f"Task '{task_name}' has invalid 'args' definition.")
+                    return False
+
+                # Validate arg names
+                arg_start = f"--{plugin_name}-"
+                arg_names = [arg_name for arg_name in task_args.keys()]
+                invalid_args = [
+                    arg_name
+                    for arg_name in arg_names
+                    if not arg_name.startswith(arg_start)
+                ]
+                if invalid_args:
+                    error(
+                        f"Task '{task_name}' has an invalid arg names {invalid_args}. "
+                        f"Arg names must be '{arg_start}<remaining>'."
+                    )
+                    return False
 
         # Check that the 'imports' section is valid
         imports = plugin.get("imports", [])
@@ -1213,7 +1285,9 @@ def check_local_plugin(plugin_path: FilePath) -> bool:
                 return False
 
             # Check imported plugin
-            if not _check_local_plugin(Path(get_plugin_entry(imp)["local"])):
+            if not _check_local_plugin(
+                Path(_get_plugin_registration(imp)["local"])
+            ):
                 error(f"Imported plugin '{imp}' is invalid.")
                 return False
 
@@ -1355,7 +1429,7 @@ def pull_plugin(plugin: GitRef) -> bool:
             shutil.rmtree(_temp_plugin_path)
 
     # Check if plugin with same remote already exists
-    if get_plugin_entry(plugin):
+    if _get_plugin_registration(plugin):
         error(
             f"Plugin with remote '{plugin}' already exists locally. Please remove it "
             f"via 'gurk remove {plugin}' first or update it via 'gurk update {plugin}'"
@@ -1378,17 +1452,15 @@ def pull_plugin(plugin: GitRef) -> bool:
         error(f"Failed to clone remote plugin repository '{plugin}'")
         return False
 
-    # Load gurk-plugin.yaml
-    _, plugin_yaml, plugin_metadata = get_plugin_data(plugin)
-    if not plugin_yaml or not plugin_metadata:
-        error(
-            f"Failed to load a (valid) 'gurk-plugin.yaml' from plugin at '{plugin}'",
-            temp_plugin_path,
-        )
+    # Get plugin data
+    try:
+        plugin_data = get_plugin_data(plugin)
+    except ModuleNotFoundError as e:
+        error(str(e), temp_plugin_path)
         return False
 
     # Add plugin
-    plugin_name = plugin_metadata["name"]
+    plugin_name = plugin_data["metadata"]["name"]
     plugin_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
     ## Add plugin folder
     shutil.move(temp_plugin_path, plugin_path)
@@ -1403,7 +1475,7 @@ def pull_plugin(plugin: GitRef) -> bool:
 
     # Install plugin dependencies
     # TODO: Install each in a (hidden) venv instead, and use that for running the plugin tasks.
-    dependencies = plugin_metadata["dependencies"]
+    dependencies = plugin_data["metadata"]["dependencies"]
     if dependencies:
         logger.debug(
             f"Installing optional dependencies for plugin '{plugin_name}': {dependencies}"
@@ -1426,20 +1498,15 @@ def remove_plugin(plugin: PluginSpec) -> None:
 
     :param plugin: Name, FilePath, or GitRef of the plugin to remove
     :type plugin: PluginSpec
+    :raises ModuleNotFoundError: If no such local plugin is found
     """
-    # Get logger
-    logger = get_logger()
-
     # Get plugin data
-    plugin_entry, _, plugin_metadata = get_plugin_data(plugin)
-    if not plugin_entry or not plugin_metadata:
-        logger.error(f"Plugin '{plugin}' is not installed or is invalid.")
-        return
+    plugin_data = get_plugin_data(plugin)
 
     # Remove plugin folder
-    plugin_path = Path(plugin_entry["local"])
+    plugin_path = Path(plugin_data["registration"]["local"])
     if plugin_path.is_dir():
         shutil.rmtree(plugin_path)
 
     # Remove plugin registry entry
-    remove_plugin_entry(plugin_metadata["name"])
+    _remove_plugin_entry(plugin_data["metadata"]["name"])

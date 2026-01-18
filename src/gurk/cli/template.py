@@ -4,6 +4,8 @@ from pathlib import Path
 from gurk.lib.core.plugin_utils import GurkArgumentParser
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
 
+# TODO: Allow specifying the name of the new plugin to fill in
+
 
 def main(argv, prog, description):
     parser = GurkArgumentParser(

@@ -425,7 +425,7 @@ class Logger:
         """
         maxlen = max((len(str(k)) for k in dct), default=0)
         for k, v in dct.items():
-            k = k.capitalize() if capitalize else k
+            k = k.capitalize() if capitalize and isinstance(k, str) else k
             richprint(f"{' ' * indent}[{color}]{k:<{maxlen}} :[/{color}] {v}")
 
     @staticmethod
@@ -461,6 +461,8 @@ class Logger:
         live: Live | None = getattr(self._progress, "live", None)
         if live and live.is_started:
             live.stop()
+            # ANSI: Move cursor up one line to counteract stop() newline
+            self._console_out.file.write("\033[F")
             try:
                 yield
             finally:
@@ -533,4 +535,6 @@ class Logger:
 
         # Interactive prompt
         with self._suspend_progress():
-            return Prompt.ask(f"{message}", password=password)
+            return Prompt.ask(
+                f"{message}", console=self._console_out, password=password
+            )

@@ -1,4 +1,3 @@
-# TODO: Test if this works without reboot (thanks to modprobe)
 check_install_nvidia_driver() {
 	: '
 	Check if NVIDIA driver is installed.
@@ -83,6 +82,46 @@ check_install_isaaclab() {
 	if bash -ic "conda env list" | grep isaaclab; then
 		return 0
 	else
+		return 1
+	fi
+}
+
+check_gcc_version() {
+	: '
+	Check if the default GCC version is compatible with the kernel compiler version.
+
+	Args:
+	  None
+	Outputs:
+	  Compatibility message.
+	Returns:
+	  0 if compatible, 1 otherwise
+	'
+	# Get kernel compiler version
+	local kernel_cc=$(grep "CONFIG_CC_VERSION_TEXT" /boot/config-$(uname -r) | cut -d'"' -f2)
+	local kernel_major=$(echo "$kernel_cc" | grep -oP '\bgcc-\K[0-9]+')
+	if [[ -z "$kernel_cc" || -z "$kernel_major" ]]; then
+		echo "Cannot determine kernel compiler version - Aborting"
+		return 1
+	fi
+
+	# Get default GCC version
+	local gcc_ver=$(gcc -dumpversion 2>/dev/null)
+	local gcc_major=$(echo "$gcc_ver" | cut -d. -f1)
+	if [[ -z "$gcc_ver" || -z "$gcc_major" ]]; then
+		echo "Cannot determine GCC version - Aborting"
+		return 1
+	fi
+
+	# Compare
+	if [ "$kernel_major" -eq "$gcc_major" ]; then
+		echo "Kernel and default GCC major versions match and are thus likely compatible"
+		return 0
+	elif [ "$gcc_major" -gt "$kernel_major" ]; then
+		echo "Default GCC ($gcc_major) is newer than kernel GCC ($kernel_major), and thus may be incompatible - Aborting"
+		return 1
+	else
+		echo "Default GCC ($gcc_major) is older than kernel GCC ($kernel_major), and is thus likely incompatible - Aborting"
 		return 1
 	fi
 }

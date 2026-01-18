@@ -5,9 +5,8 @@ from ruamel.yaml import YAML
 from gurk.lib.core import core
 from gurk.lib.core.plugin_utils import (
     GurkArgumentParser,
-    get_plugin_entry,
-    load_raw_plugin_yaml,
-    load_resolved_plugin_yaml,
+    _load_raw_plugin_manifest,
+    get_plugin_data,
     pull_plugin,
 )
 from gurk.lib.logger import ActiveLogger, Logger
@@ -84,13 +83,22 @@ def main(argv, prog, description):
     with ActiveLogger(logger):
         plugin_name, option_spec = (plugin.split("=", 1) + [None])[:2]
 
-        # Import plugin if not installed
-        plugin_entry = get_plugin_entry(plugin_name)
-        if not plugin_entry:
+        # Get plugin data
+        try:
+            plugin_data = get_plugin_data(plugin_name)
+        except ModuleNotFoundError:
+            # Plugin not installed - attempt to pull
             logger.info(f"Plugin '{plugin_name}' is not installed. Pulling...")
             if not pull_plugin(plugin):
                 logger.fatal(f"Failed to pull plugin '{plugin}'.")
-        logger.debug(f"Found plugin entry for '{plugin_name}'.")
+
+            # Get plugin data again after pulling
+            try:
+                plugin_data = get_plugin_data(plugin_name)
+            except ModuleNotFoundError as e:
+                logger.fatal(
+                    f"Plugin '{plugin_name}' is still not installed after pulling: {str(e)}"
+                )
 
         if task_name:
             # Run a specific task
@@ -98,15 +106,11 @@ def main(argv, prog, description):
             full_task_name = f"{plugin_name}/{task_name}"
 
             # Check that the task exists in the plugin
-            plugin_yaml = load_resolved_plugin_yaml(plugin_name)
-            if not plugin_yaml:
-                logger.fatal(
-                    f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
-                )
-            if full_task_name not in plugin_yaml["tasks"]:
+            plugin_tasks = plugin_data["manifest"]["tasks"]
+            if full_task_name not in plugin_tasks:
                 logger.fatal(
                     f"Plugin '{plugin_name}' does not have a task named '{full_task_name}'. "
-                    f"Available tasks are: {list(plugin_yaml['define']['tasks'].keys())}."
+                    f"Available tasks are: {list(plugin_tasks.keys())}."
                 )
 
             # Define mock option with the specific task enabled
@@ -115,27 +119,20 @@ def main(argv, prog, description):
             # Run the plugin default or specified option
             run_type = "plugin"
 
-            # Get plugin yaml
-            plugin_yaml = load_resolved_plugin_yaml(plugin_name)
-            if not plugin_yaml:
-                logger.fatal(
-                    f"Plugin '{plugin_name}' is missing a valid 'gurk-plugin.yaml' file."
-                )
-            logger.debug(f"Successfully loaded plugin '{plugin}'.")
-
             # Get option task(s)
+            manifest_run = plugin_data["manifest"]["run"]
             if option_spec is None:
-                option = plugin_yaml["run"]["default"]
+                option = manifest_run["default"]
             else:
-                option = plugin_yaml["run"]["options"].get(option_spec)
+                option = manifest_run["options"].get(option_spec)
                 if not option:
                     logger.fatal(
                         f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. "
-                        f"Available options are: {list(plugin_yaml['run']['options'].keys())} (or default)."
+                        f"Available options are: {list(manifest_run['options'].keys())} (or default)."
                     )
 
             # For any common fields, if they are missing in the raw option, remove them (to be filled later) to use defaults
-            raw_plugin_yaml = load_raw_plugin_yaml(plugin_name)
+            raw_plugin_yaml = _load_raw_plugin_manifest(plugin_name)
             if option_spec is None:
                 raw_option = raw_plugin_yaml["run"]["default"]
             else:

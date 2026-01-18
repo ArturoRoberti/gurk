@@ -410,9 +410,11 @@ install_cuda() {
 	if ! check_gcc_version; then
 		log_step "ERROR: Incompatibility between current default GCC version and kernel CC version detected (see previous logs)." true
 		echo "Consider using the following to install the correct version:"
+		echo ""
 		echo "sudo apt update && sudo apt install gcc-<kernel-major-version> g++-<kernel-major-version>"
 		echo "sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-<CURRENT-GCC-MAJOR-VERSION> 10"
 		echo "sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-<kernel-major-version> 20"
+		echo ""
 		echo "Later, update-alternatives can be used to revert to the previous GCC version (if desired). You can also use 'sudo update-alternatives --config gc' to switch."
 		return 1
 	fi
