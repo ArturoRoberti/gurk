@@ -11,6 +11,8 @@ tasks:
     function: install_vscode_extensions
     config_file: config/install_vscode_extensions.txt
     depends_on: [vscode/install-vscode]
+# TODO: Remove this task, and use 'gurk/configure-filestructure' in a run option instead.
+#       Similarly, configure vscode settings and snippets in run options.
   vscode/configure-vscode-keybindings:
     description: Configure Visual Studio Code keybindings
     script: scripts/configurations.py
@@ -18,7 +20,7 @@ tasks:
     config_file: config/configure_vscode_keybindings.jsonc
     depends_on: [vscode/install-vscode]
 
-run:
+options:
   default:
     vscode/install-vscode-extensions:
       enabled: true

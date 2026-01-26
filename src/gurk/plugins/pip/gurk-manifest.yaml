@@ -12,7 +12,7 @@ tasks:
     function: install_pipx_packages
     config_file: config/install_pipx_packages.txt
 
-run:
+options:
   default:
     pip/install-pip-environments:
       enabled: true

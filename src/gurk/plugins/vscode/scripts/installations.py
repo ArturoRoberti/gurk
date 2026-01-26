@@ -1,8 +1,12 @@
 from gurk import (
-    InstallCommands,
+    InstallCommandsBase,
     install_packages_from_txt_file,
     parse_task_args,
 )
+
+
+class VSCodeInstallCommands(InstallCommandsBase):
+    VSC_EXT = "code --install-extension"
 
 
 def install_vscode_extensions(*args: list[str]) -> None:
@@ -14,5 +18,5 @@ def install_vscode_extensions(*args: list[str]) -> None:
 
     # Install extensions
     install_packages_from_txt_file(
-        InstallCommands.VSC_EXT, task_args.config_file
+        VSCodeInstallCommands.VSC_EXT, task_args.config_file
     )

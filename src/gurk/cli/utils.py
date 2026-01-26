@@ -17,8 +17,6 @@ SUBCOMMAND_CONTEXT_SETTINGS = {
 }
 VERSION = version("gurk")
 
-CORE_COMMANDS = ["install", "uninstall", "configure"]  # TODO: Remove
-
 
 class OrderedGroup(Group):
     def __init__(self, *args, **kwargs):

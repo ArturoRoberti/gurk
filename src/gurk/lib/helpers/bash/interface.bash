@@ -20,7 +20,6 @@ log_step() {
 	echo -e "\n__${step_type}__: $message"
 }
 
-# TODO: Match python function (add 'sudo', 'args', ...)
 run_script_function() {
 	: '
 	Runs a script (Bash or Python), optionally invoking a specific function within it.

@@ -7,10 +7,13 @@ from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.common import generate_random_path
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
-    _load_raw_plugin_manifest,
+    check_local_plugin,
     get_plugin_data,
+    installed_plugin_path,
+    load_raw_plugin_manifest,
     pull_plugin,
 )
+from gurk.lib.utils.remotes import is_git_repo
 from gurk.lib.utils.tasks import COMMON_RESOLVED_TASK_DICT_FIELDS
 
 
@@ -52,19 +55,18 @@ def main(argv, prog, description):
     parser = GurkArgumentParser(prog=prog, description=description)
 
     # Add required arguments
-    required = parser.add_required_group()
-    group = required.add_mutually_exclusive_group(required=True)
+    group = parser.add_required_group(mutex=True)
     group.add_argument(
         "-p",
         "--plugin",
         type=str,
-        help="Name of the installed plugin to run",
+        help="PluginSpec (name, local path or remote) of the plugin to run",
     )
     group.add_argument(
         "-t",
         "--task",
         type=parse_task,
-        help="Specify a task to run as 'plugin_name/task_name'",
+        help="Specify an installed task to run as 'plugin_name/task_name'",
     )
 
     # Only parse 'run' specific args, keep the rest for later
@@ -82,23 +84,41 @@ def main(argv, prog, description):
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         plugin_name, option_spec = (plugin.split("=", 1) + [None])[:2]
+        if option_spec is None:
+            option_spec = "default"
 
         # Get plugin data
         try:
             plugin_data = get_plugin_data(plugin_name)
         except ModuleNotFoundError:
-            # Plugin not installed - attempt to pull
-            logger.info(f"Plugin '{plugin_name}' is not installed. Pulling...")
-            if not pull_plugin(plugin):
-                logger.fatal(f"Failed to pull plugin '{plugin}'.")
-
-            # Get plugin data again after pulling
-            try:
-                plugin_data = get_plugin_data(plugin_name)
-            except ModuleNotFoundError as e:
+            # Plugin is installed, but invalid
+            plugin_local = installed_plugin_path(plugin)
+            if plugin_local:
+                check_local_plugin(plugin_local, True)
                 logger.fatal(
-                    f"Plugin '{plugin_name}' is still not installed after pulling: {str(e)}"
+                    f"Plugin '{plugin_name}' is installed but invalid. Please fix or remove it via 'gurk remove {plugin_name}'."
                 )
+
+            # Plugin is not installed
+            msg = f"Plugin '{plugin_name}' is not installed."
+            if not is_git_repo(plugin):
+                # Local-only plugin, cannot pull
+                logger.fatal(
+                    f"{msg} Please use its remote URL to run it via 'gurk run <plugin-remote>'."
+                )
+            else:
+                # Attempt to pull
+                logger.info(f"{msg} Pulling...")
+                if not pull_plugin(plugin):
+                    logger.fatal(f"Failed to pull plugin '{plugin}'.")
+
+                # Get plugin data again after pulling
+                try:
+                    plugin_data = get_plugin_data(plugin_name)
+                except ModuleNotFoundError as e:
+                    logger.fatal(
+                        f"Plugin '{plugin_name}' is still not installed after pulling: {str(e)}"
+                    )
 
         if task_name:
             # Run a specific task
@@ -120,23 +140,17 @@ def main(argv, prog, description):
             run_type = "plugin"
 
             # Get option task(s)
-            manifest_run = plugin_data["manifest"]["run"]
-            if option_spec is None:
-                option = manifest_run["default"]
-            else:
-                option = manifest_run["options"].get(option_spec)
-                if not option:
-                    logger.fatal(
-                        f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. "
-                        f"Available options are: {list(manifest_run['options'].keys())} (or default)."
-                    )
+            manifest_options = plugin_data["manifest"]["options"]
+            option = manifest_options.get(option_spec)
+            if not option:
+                logger.fatal(
+                    f"Plugin '{plugin_name}' does not have a run option specified for '{option_spec}'. "
+                    f"Available options are: {list(manifest_options.keys())}."
+                )
 
             # For any common fields, if they are missing in the raw option, remove them (to be filled later) to use defaults
-            raw_plugin_yaml = _load_raw_plugin_manifest(plugin_name)
-            if option_spec is None:
-                raw_option = raw_plugin_yaml["run"]["default"]
-            else:
-                raw_option = raw_plugin_yaml["run"]["options"][option_spec]
+            raw_plugin_yaml = load_raw_plugin_manifest(plugin_name)
+            raw_option = raw_plugin_yaml["options"][option_spec]
             for (_, task), raw_task in zip(
                 option.items(), raw_option.values()
             ):

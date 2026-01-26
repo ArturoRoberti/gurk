@@ -16,8 +16,6 @@ from pathlib import Path
 from typing import Iterator, NotRequired, Sequence, TypeAlias, TypedDict
 
 import networkx as nx
-import toml
-from packaging.version import InvalidVersion, Version
 from ruamel.yaml import YAML
 
 from gurk.lib.logger import get_logger
@@ -27,13 +25,16 @@ from gurk.lib.utils.common import (
     PIPX_PYTHON_PATH,
     YES_ANSWERS,
     FilePath,
+    check_version,
     generate_random_path,
 )
+from gurk.lib.utils.configs import load_toml, load_yaml
 from gurk.lib.utils.remotes import (
     GitRef,
-    clone_git_repo,
+    edit_url,
+    extract_url,
+    git_clone,
     is_git_repo,
-    parse_git_ref,
 )
 from gurk.lib.utils.scripts import (
     ScriptBlockTypes,
@@ -55,7 +56,6 @@ from gurk.lib.utils.typed_dict import (
     print_typed_dict_types,
     validate_typed_dict,
 )
-from gurk.lib.utils.yaml import load_yaml
 
 #########################################################################################
 #################################### Minor utilities ####################################
@@ -118,51 +118,42 @@ class PluginMetadata(TypedDict):
             return None
 
         # Version
-        try:
-            Version(filtered_metadata["version"])
-        except InvalidVersion:
+        if not check_version(filtered_metadata["version"]):
             return None
 
         # Dependencies
-        if "optional_dependencies" in filtered_metadata:
-            optional_deps = filtered_metadata.pop("optional_dependencies")
-            filtered_metadata["dependencies"] = optional_deps.get("gurk", [])
-        else:
-            filtered_metadata["dependencies"] = []
+        optional_deps = filtered_metadata.pop("optional_dependencies", {})
+        filtered_metadata["dependencies"] = optional_deps.get("gurk", [])
 
         return filtered_metadata
 
 
-class PluginRun(TypedDict):
-    options: NotRequired[dict[str, CustomTaskDictCollection]]
-    default: CustomTaskDictCollection
+# NOTE: The key "default" is required
+PluginOptions: TypeAlias = dict[str, CustomTaskDictCollection]
+ResolvedPluginOptions: TypeAlias = dict[str, ResolvedCustomTaskDictCollection]
 
 
 class PluginManifest(TypedDict):
     # fmt: off
     imports: NotRequired[list[GitRef | str]]
     tasks:   NotRequired[DefaultTaskDictCollection]
-    run:     PluginRun
+    options: PluginOptions
     # fmt: on
-
-
-class PluginRun(TypedDict):
-    options: dict[str, ResolvedCustomTaskDictCollection]
-    default: ResolvedCustomTaskDictCollection
 
 
 class ResolvedPluginManifest(TypedDict):
     # fmt: off
     imports: list[GitRef | str]
     tasks:   ResolvedDefaultTaskDictCollection
-    run:     PluginRun
+    options: ResolvedPluginOptions
     # fmt: on
 
 
 class PluginRegistryEntry(TypedDict):
-    local: str
-    remote: GitRef | None
-    # version: str # TODO: Keep? How to read remote repo versions?
+    # fmt: off
+    local:   str
+    remote:  GitRef | None
+    # fmt: on
 
 
 class PluginData(TypedDict):
@@ -182,7 +173,7 @@ def _get_plugin_dirs(
     home_registry: bool = True, package_registry: bool = True
 ) -> tuple[Path, ...]:
     """
-    Get a tuple of plugin directories.
+    Get a tuple of plugin directories, with the home one first.
 
     :param home_registry: Whether to include the home plugin directory
     :type home_registry: bool
@@ -208,7 +199,7 @@ def _get_plugin_registries(
     home_registry: bool = True, package_registry: bool = True
 ) -> tuple[Path, ...]:
     """
-    Get a tuple of plugin registries.
+    Get a tuple of plugin registries, with the home one first.
 
     :param home_registry: Whether to include the home plugin registry
     :type home_registry: bool
@@ -264,7 +255,6 @@ def get_combined_plugin_registry() -> dict[str, PluginRegistryEntry]:
     return combined_registry
 
 
-# TODO: See if new parse_git_ref causes secondary issues somewhere else
 def _get_possible_plugin_entries(
     plugin: PluginSpec,
     home_registry: bool = True,
@@ -291,13 +281,12 @@ def _get_possible_plugin_entries(
         )
 
         # Get plugin entry
-        remote_parsed = parse_git_ref(plugin)["url"]
         remote_entry = next(
             (
                 v
                 for v in registry.values()
                 if v.get("remote")
-                and remote_parsed == parse_git_ref(v["remote"])["url"]
+                and extract_url(plugin) == extract_url(v["remote"])
             ),
             None,
         )
@@ -405,7 +394,7 @@ def plugin_exists(plugin: PluginSpec) -> bool:
     return plugin_exists_locally(plugin) or plugin_exists_remotely(plugin)
 
 
-def _load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
+def load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
     """
     Get the raw manifest of a plugin if it exists locally.
 
@@ -443,7 +432,7 @@ def _load_resolved_plugin_manifest(
     :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
     :rtype: ResolvedPluginManifest | None
     """
-    plugin_manifest = _load_raw_plugin_manifest(plugin)
+    plugin_manifest = load_raw_plugin_manifest(plugin)
     if not plugin_manifest:
         return None
 
@@ -481,11 +470,10 @@ def _load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     if not check_local_plugin(plugin_registration["local"]):
         return None
 
-    try:
-        toml_data = toml.load(
-            Path(plugin_registration["local"]) / "pyproject.toml"
-        )
-    except (toml.TomlDecodeError, FileNotFoundError):
+    toml_data = load_toml(
+        Path(plugin_registration["local"]) / "pyproject.toml"
+    )
+    if not toml_data:
         return None
 
     return PluginMetadata.filtered(toml_data)
@@ -523,7 +511,7 @@ def get_plugin_data(plugin: PluginSpec) -> PluginData:
     if not plugin_metadata:
         raise ModuleNotFoundError(
             error_msg(
-                "Could not load plugin metadata from a (valid) pyproject.toml file"
+                "UNEXPECTED: Could not load plugin metadata from a (valid) pyproject.toml file"
             )
         )
 
@@ -532,6 +520,19 @@ def get_plugin_data(plugin: PluginSpec) -> PluginData:
         manifest=plugin_manifest,
         metadata=plugin_metadata,
     )
+
+
+def installed_plugin_path(plugin: PluginSpec) -> Path | None:
+    """
+    Get the local path of a plugin if it is installed.
+
+    :param plugin: Name, FilePath, or GitRef of the plugin
+    :type plugin: PluginSpec
+    :return: Local path of the plugin if it exists locally, None otherwise
+    :rtype: Path | None
+    """
+    plugin_registration = _get_plugin_registration(plugin)
+    return plugin_registration["local"] if plugin_registration else None
 
 
 def get_available_plugin_names() -> list[str]:
@@ -586,6 +587,19 @@ def iter_configs() -> Iterator[Path]:
             yield task["config_file"]
 
 
+def get_local_plugin_version(plugin: PluginSpec) -> str | None:
+    """
+    Get the version of a local plugin from its pyproject.toml file.
+
+    :param plugin: Name, FilePath, or GitRef of the plugin
+    :type plugin: PluginSpec
+    :return: Version string if the plugin exists locally, None otherwise
+    :rtype: str | None
+    """
+    plugin_metadata = _load_plugin_metadata(plugin)
+    return plugin_metadata["version"] if plugin_metadata else None
+
+
 def add_plugin_entry(
     plugin_name: str, plugins_entry: PluginRegistryEntry
 ) -> bool:
@@ -625,83 +639,75 @@ def add_plugin_entry(
     return True
 
 
-def _remove_plugin_entry(plugin_name: PluginSpec) -> None:
+def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
     """
     Remove a plugin from the home plugin registry.
 
-    :param plugin_name: Name of the plugin
-    :type plugin_name: PluginSpec
+    :param plugin: Name, FilePath, or GitRef of the plugin
+    :type plugin: PluginSpec
+    :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
+    :type purge: bool
+    :raises ModuleNotFoundError: If no such local plugin is found
     """
     # Get logger
     logger = get_logger()
 
     # Check if the plugin exists
-    plugin_registration = _get_plugin_registration(
-        plugin_name, package_registry=False
-    )
+    plugin_registration = _get_plugin_registration(plugin)
     if not plugin_registration:
-        logger.error(
-            f"Plugin '{plugin_name}' does not exist in home registry."
+        raise ModuleNotFoundError(
+            f"Could not find plugin '{plugin}' in any registry."
         )
+
+    # Get plugin name
+    plugin_name = (
+        [
+            k
+            for k, v in get_combined_plugin_registry().items()
+            if v == plugin_registration
+        ]
+        + [None]
+    )[0]
+    if not plugin_name:
+        logger.error(f"Could not determine plugin name for '{plugin}'.")
         return
 
-    # Load home plugin registry
-    registry_file = _get_plugin_registries(package_registry=False)[0]
-    registry: dict[str, PluginRegistryEntry] = load_yaml(registry_file) or {}
+    # Remove plugin entries
+    def _remove_single_plugin_entry(
+        registry_file: Path, allow_purge: bool = False
+    ) -> None:
+        """
+        Remove a plugin entry from a specific registry file.
 
-    # Remove plugin entry
-    del registry[plugin_name]
-    with open(registry_file, "w") as f:
-        YAML().dump(registry, f)
-
-
-# TODO: Use
-def update_plugin_entry(
-    plugin_name: str, local: str | None = None, remote: GitRef | None = None
-) -> bool:
-    """
-    Update a plugin entry in any of the plugin registries.
-
-    :param plugin_name: Name of the plugin
-    :type plugin_name: str
-    :param local: New local path of the plugin
-    :type local: str | None
-    :param remote: New remote GitRef of the plugin
-    :type remote: GitRef | None
-    :return: True if the plugin was updated successfully, False otherwise
-    :rtype: bool
-    """
-    # Get logger
-    logger = get_logger()
-
-    # Check args
-    if local is None and remote is None:
-        logger.warning("No fields to update for plugin entry.")
-        return False
-
-    # Load registry files and update entry
-    registry_files = _get_plugin_registries()
-    for registry_file in registry_files:
+        :param registry_file: Path to the registry file
+        :type registry_file: Path
+        :param allow_purge: Whether purging is allowed for this registry
+        :type allow_purge: bool
+        """
+        # Get registry
         registry: dict[str, PluginRegistryEntry] = (
             load_yaml(registry_file) or {}
         )
 
-        # Check if plugin exists
-        if plugin_name not in registry:
-            continue
+        # Edit entry
+        if purge and allow_purge:
+            # Remove whole entry
+            if plugin_name in registry:
+                del registry[plugin_name]
+        else:
+            # Set local path to None
+            if plugin_name in registry:
+                registry[plugin_name]["local"] = None
 
-        # Update plugin entry
-        if local is not None:
-            registry[plugin_name]["local"] = local
-        if remote is not None:
-            registry[plugin_name]["remote"] = remote
-
+        # Save registry
         with open(registry_file, "w") as f:
             YAML().dump(registry, f)
 
-        return True
-
-    return False
+    for registry_file, allow_purge in zip(
+        _get_plugin_registries(),
+        [True, False],
+    ):
+        _remove_single_plugin_entry(registry_file, allow_purge)
 
 
 def _create_wildcard_validator(patterns: list[str]) -> tuple:
@@ -930,14 +936,20 @@ class GurkArgumentParser(ArgumentParser):
             help="Path to an existing config file",
         )
 
-    def add_required_group(self) -> _ArgumentGroup:
+    def add_required_group(self, mutex: bool = False) -> _ArgumentGroup:
         """
         Add a 'required arguments' group to the parser.
 
+        :param mutex: Whether the group is mutually exclusive
+        :type mutex: bool
         :return: The created argument group
         :rtype: _ArgumentGroup
         """
-        return self.add_argument_group(self.required_group_title)
+        required = self.add_argument_group(self.required_group_title)
+        if mutex:
+            return required.add_mutually_exclusive_group(required=True)
+        else:
+            return required
 
     def extend_arguments(self, args_dict: ArgsDefinitionCollection) -> None:
         """
@@ -1098,14 +1110,13 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
         pyproject_file = _plugin_path / "pyproject.toml"
         if not pyproject_file.is_file():
             error(
-                f"Plugin source '{_plugin_path}' is missing 'pyproject.toml' file."
+                f"Plugin source '{_plugin_path}' is missing a 'pyproject.toml' file."
             )
             return False
-        try:
-            pyproject_data = toml.load(pyproject_file)
-        except toml.TomlDecodeError as e:
+        pyproject_data = load_toml(pyproject_file)
+        if not pyproject_data:
             error(
-                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file: {e}"
+                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file"
             )
             return False
 
@@ -1115,7 +1126,8 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
             error(
                 f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file: invalid 'project' section structure. Expected:"
             )
-            print_typed_dict_types(PluginMetadata)
+            if verbose:
+                print_typed_dict_types(PluginMetadata)
             return False
 
         ## Unique plugin name
@@ -1150,7 +1162,8 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
             error(
                 f"Plugin at '{_plugin_path}' has invalid structure. Expected:"
             )
-            print_typed_dict_types(PluginManifest)
+            if verbose:
+                print_typed_dict_types(PluginManifest)
             return False
 
         ## Check each task field
@@ -1244,9 +1257,9 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
             )
             return False
 
-        def check_graph(graph: nx.DiGraph, field: str) -> bool:
+        def _check_graph_cycles(graph: nx.DiGraph, field: str) -> bool:
             """
-            Check for cycles and missing refs in a directed graph.
+            Check for cycles in a directed graph.
 
             :param graph: The directed graph to check
             :type graph: nx.DiGraph
@@ -1280,7 +1293,7 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
 
             # Check the imports graph for cycles
             imports_graph.add_edge(plugin_name, imp)
-            if not check_graph(imports_graph, "imports"):
+            if not _check_graph_cycles(imports_graph, "imports"):
                 return False
 
             # Check imported plugin
@@ -1322,27 +1335,32 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
         dependency_field = "depends_on"
         if not expand_graph(task_dependency_graph, dependency_field):
             return False
-        elif not check_graph(task_dependency_graph, dependency_field):
+        elif not _check_graph_cycles(task_dependency_graph, dependency_field):
             return False
 
         # Check the task supercedes graph
         supercedes_field = "supercedes"
         if not expand_graph(task_supercedes_graph, supercedes_field):
             return False
-        elif not check_graph(task_supercedes_graph, supercedes_field):
+        elif not _check_graph_cycles(task_supercedes_graph, supercedes_field):
             return False
 
-        # Check 'run' section
-        plugin_run: PluginRun = plugin["run"]
-        for option_name, option in [
-            ("default", plugin_run["default"]),
-            *plugin_run.get("options", {}).items(),
-        ]:
+        # Check 'options' section
+        options: PluginOptions = plugin["options"]
+        if "default" not in options:
+            error(
+                "Plugin 'options' section is missing required 'default' option."
+            )
+            return False
+
+        ## Validate each option
+        for option_name, option in options.items():
             # Check that all tasks in the option are defined
             for task_name in option.keys():
                 if task_name not in available_tasks:
                     error(
-                        f"Task '{task_name}' in 'run' section is not defined in this or any imported plugins."
+                        f"Task '{task_name}' in '{option_name}' option "
+                        "is not defined in this or any imported plugins."
                     )
                     return False
 
@@ -1374,15 +1392,13 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
             # If any tasks are defined in the plugin, that at least one of them must be enabled
             enabled_tasks = {k: v for k, v in option.items() if v["enabled"]}
             if not enabled_tasks:
-                error(
-                    "Plugin 'run' section has an option with no enabled tasks."
-                )
+                error(f"Option '{option_name}' has no enabled tasks.")
                 return False
             if plugin_tasks and not set(plugin_tasks.keys()) & set(
                 enabled_tasks.keys()
             ):
                 error(
-                    "Plugin 'run' section has an option with no enabled tasks from this plugin."
+                    f"Option '{option_name}' does not enable any tasks defined in this plugin."
                 )
                 return False
 
@@ -1391,7 +1407,7 @@ def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
                 if u in enabled_tasks and v in enabled_tasks:
                     error(
                         f"Tasks '{u}' and '{v}' that supercede each other are "
-                        f"both enabled in the same 'run' option '{option_name}'."
+                        f"both enabled in the same option '{option_name}'."
                     )
                     return False
 
@@ -1428,7 +1444,7 @@ def pull_plugin(plugin: GitRef) -> bool:
             shutil.rmtree(_temp_plugin_path)
 
     # Check if plugin with same remote already exists
-    if _get_plugin_registration(plugin):
+    if installed_plugin_path(plugin):
         error(
             f"Plugin with remote '{plugin}' already exists locally. Please remove it "
             f"via 'gurk remove {plugin}' first or update it via 'gurk update {plugin}'"
@@ -1442,18 +1458,106 @@ def pull_plugin(plugin: GitRef) -> bool:
         )
         return False
 
-    # Import plugin to temporary directory
+    # Import manifest to random file
+    temp_manifest = generate_random_path(suffix=".yaml", create=False)
+    try:
+        git_clone(plugin, temp_manifest)
+    except subprocess.CalledProcessError:
+        error(
+            f"Failed to clone remote plugin repository '{plugin}'",
+            temp_manifest,
+        )
+        return False
+
+    # Determine relevant files
+    relevant_files = {GURK_MANIFEST_FILENAME, "pyproject.toml"}
+    try:
+        # Load manifest file with basic validation
+        manifest_data = load_yaml(temp_manifest)
+        if not manifest_data:
+            raise ValueError("Empty or invalid YAML")
+
+        # Defined tasks
+        tasks = manifest_data.get("tasks", {})
+        if isinstance(tasks, dict):
+            for task in tasks.values():
+                if isinstance(task, dict):
+                    # Script
+                    script = task.get("script")
+                    if not isinstance(script, str):
+                        raise ValueError(
+                            f"Invalid 'script' field in task: {task}"
+                        )
+                    relevant_files.add(script)
+
+                    # Config file
+                    config_file = task.get("config_file")
+                    if config_file is not None and not isinstance(
+                        config_file, str
+                    ):
+                        raise ValueError(
+                            f"Invalid 'config_file' field in task: {task}"
+                        )
+                    elif config_file is not None:
+                        relevant_files.add(config_file)
+                else:
+                    raise ValueError(
+                        f"Invalid task type in 'tasks': {type(task)} (expected dict)"
+                    )
+        else:
+            raise ValueError(
+                f"Invalid 'tasks' section type: {type(tasks)} (expected dict)"
+            )
+
+        # Options
+        options = manifest_data.get("options", {})
+        if isinstance(options, dict):
+            for option in options.values():
+                if isinstance(option, dict):
+                    for task in option.values():
+                        # Config file
+                        config_file = task.get("config_file")
+                        if config_file is not None and not isinstance(
+                            config_file, str
+                        ):
+                            raise ValueError(
+                                f"Invalid 'config_file' field in task: {task}"
+                            )
+                        elif config_file is not None:
+                            relevant_files.add(config_file)
+                else:
+                    raise ValueError(
+                        f"Invalid task option type in 'options': {type(option)} (expected dict)"
+                    )
+        else:
+            raise ValueError(
+                f"Invalid 'options' section type: {type(options)} (expected dict)"
+            )
+    except Exception as e:
+        error(
+            f"Remote plugin repository '{plugin}' has an invalid '{GURK_MANIFEST_FILENAME}' file: {e}",
+            temp_manifest,
+        )
+        return False
+
+    # Clone only relevant files to temporary directory
     temp_plugin_path = generate_random_path(
         prefix="gurk_plugin_import_", create=False
     )
-    temp_plugin_path = clone_git_repo(plugin, temp_plugin_path)
-    if not temp_plugin_path:
-        error(f"Failed to clone remote plugin repository '{plugin}'")
-        return False
+    for file in relevant_files:
+        pullfile = edit_url(plugin, "path", file)
+        try:
+            git_clone(pullfile, dest=temp_plugin_path / file)
+        except subprocess.CalledProcessError:
+            error(
+                f"Failed to clone file '{file}' from remote plugin repository '{plugin}'",
+                temp_plugin_path,
+            )
+            return False
 
     # Get plugin data
     try:
-        plugin_data = get_plugin_data(plugin)
+        plugin_data = get_plugin_data(temp_plugin_path)
     except ModuleNotFoundError as e:
         error(str(e), temp_plugin_path)
         return False
@@ -1468,7 +1572,9 @@ def pull_plugin(plugin: GitRef) -> bool:
         plugin_name,
         PluginRegistryEntry(
             local=str(plugin_path),
-            remote=plugin,
+            remote=extract_url(plugin)
+            + "?version="
+            + get_local_plugin_version(plugin),
         ),
     )
 
@@ -1491,21 +1597,25 @@ def pull_plugin(plugin: GitRef) -> bool:
         )
 
 
-def remove_plugin(plugin: PluginSpec) -> None:
+def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
     """
     Remove a locally installed plugin.
 
     :param plugin: Name, FilePath, or GitRef of the plugin to remove
     :type plugin: PluginSpec
+    :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
+    :type purge: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
     # Get plugin data
-    plugin_data = get_plugin_data(plugin)
-
-    # Remove plugin folder
-    plugin_path = Path(plugin_data["registration"]["local"])
-    if plugin_path.is_dir():
-        shutil.rmtree(plugin_path)
+    plugin_entry = _get_plugin_registration(plugin)
+    if not plugin_entry:
+        raise ModuleNotFoundError(f"No such local plugin found: {plugin}")
+    elif plugin_entry["local"]:
+        # Remove plugin folder
+        plugin_path = Path(plugin_entry["local"])
+        if plugin_path.is_dir():
+            shutil.rmtree(plugin_path)
 
     # Remove plugin registry entry
-    _remove_plugin_entry(plugin_data["metadata"]["name"])
+    _remove_plugin_entry(plugin, purge)

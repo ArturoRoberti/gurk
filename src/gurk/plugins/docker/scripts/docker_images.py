@@ -3,11 +3,15 @@ from typing import NotRequired, TypedDict
 import commentjson
 
 from gurk import (
-    InstallCommands,
+    InstallCommandsBase,
     Logger,
     install_packages_from_list,
     parse_task_args,
 )
+
+
+class DockerInstallCommands(InstallCommandsBase):
+    DOCKER = "docker pull"
 
 
 def install_docker_images(*args: list[str]) -> None:
@@ -40,4 +44,4 @@ def install_docker_images(*args: list[str]) -> None:
         return
 
     # (STEP) Pulling docker images
-    install_packages_from_list(InstallCommands.DOCKER, docker_images)
+    install_packages_from_list(DockerInstallCommands.DOCKER, docker_images)

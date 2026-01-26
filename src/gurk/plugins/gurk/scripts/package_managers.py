@@ -2,7 +2,7 @@ import subprocess
 import time
 
 from gurk import (
-    InstallCommands,
+    BuiltinInstallCommands,
     Logger,
     LoggerSeverity,
     add_alias,
@@ -21,7 +21,9 @@ def install_apt_packages(*args: list[str]) -> None:
     task_args = parse_task_args(args)
 
     # (STEP) Installing apt packages
-    install_packages_from_txt_file(InstallCommands.APT, task_args.config_file)
+    install_packages_from_txt_file(
+        BuiltinInstallCommands.APT, task_args.config_file
+    )
 
 
 def install_flatpak_packages(*args: list[str]) -> None:
@@ -32,7 +34,7 @@ def install_flatpak_packages(*args: list[str]) -> None:
     task_args = parse_task_args(args)
 
     # (STEP) Installing Requirement(s)
-    install_packages_from_list(InstallCommands.APT, ["flatpak"])
+    install_packages_from_list(BuiltinInstallCommands.APT, ["flatpak"])
 
     # (STEP) Configuring flathub remote - Ignore errors if remote does not exist
     subprocess.run(
@@ -51,7 +53,7 @@ def install_flatpak_packages(*args: list[str]) -> None:
 
     # (STEP) Installing flatpak packages
     install_packages_from_txt_file(
-        InstallCommands.FLATPAK, task_args.config_file
+        BuiltinInstallCommands.FLATPAK, task_args.config_file
     )
 
     # Add aliases for flatpak packages
@@ -71,10 +73,12 @@ def install_npm_packages(*args: list[str]) -> None:
     task_args = parse_task_args(args)
 
     # (STEP) Installing Requirement(s)
-    install_packages_from_list(InstallCommands.APT, ["npm", "nodejs"])
+    install_packages_from_list(BuiltinInstallCommands.APT, ["npm", "nodejs"])
 
     # (STEP) Installing npm packages
-    install_packages_from_txt_file(InstallCommands.NPM, task_args.config_file)
+    install_packages_from_txt_file(
+        BuiltinInstallCommands.NPM, task_args.config_file
+    )
 
 
 def install_snap_packages(*args: list[str]) -> None:
@@ -85,7 +89,7 @@ def install_snap_packages(*args: list[str]) -> None:
     task_args = parse_task_args(args)
 
     # (STEP) Installing Requirement(s)
-    install_packages_from_list(InstallCommands.APT, ["snapd"])
+    install_packages_from_list(BuiltinInstallCommands.APT, ["snapd"])
 
     # (STEP) Ensuring that snapd service is running
     def start_snapd_service(remaining_attempts: int = 3) -> None:
@@ -135,4 +139,6 @@ def install_snap_packages(*args: list[str]) -> None:
     start_snapd_service()
 
     # (STEP) Installing snap packages
-    install_packages_from_txt_file(InstallCommands.SNAP, task_args.config_file)
+    install_packages_from_txt_file(
+        BuiltinInstallCommands.SNAP, task_args.config_file
+    )

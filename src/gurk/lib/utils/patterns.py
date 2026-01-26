@@ -134,8 +134,8 @@ class PatternCollection(Enum):
         "IMPORT":     None,  # Handled via ast module
     }
     PATH: EnumValue[PathPatterns] = {
-        "symlink":    re.compile(r"^symlink://(.*)$"),
-        "package":    re.compile(r"package://([^/]+)/(.*?)"),
+        "package":     re.compile(r"package://([^/]+)/(.*?)"),
+        "symlink":     re.compile(r"^symlink://(.*)$"),
     }
     ANSI:           EnumValue[re.Pattern] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
     TRACEBACK_FILE: EnumValue[re.Pattern] = re.compile(r'^\s*File\s+"([^"]+)",\s+line\s+(\d+)')

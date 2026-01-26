@@ -3,7 +3,8 @@ import traceback
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from .logger import Logger, LoggerSeverity
+from .logger import Logger
+from .utils import LoggerSeverity
 
 _allow_missing_logger = ContextVar("allow_missing_logger", default=False)
 _current_logger = ContextVar("current_logger", default=None)

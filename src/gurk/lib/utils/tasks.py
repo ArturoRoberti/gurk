@@ -52,7 +52,7 @@ class CustomTaskDict(TypedDict):
 
     # fmt: off
     enabled:     bool
-    config_file: NotRequired[str | None]
+    config_file: NotRequired[str]
     args:        NotRequired[list[str]]
     # fmt: on
 

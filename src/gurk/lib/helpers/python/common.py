@@ -8,14 +8,13 @@ from gurk.lib.utils.interface import (
     run_script_function,
 )
 
-# TODO: Allow classes to inherit from InstallCommands for usage in these functions
 
-
-class InstallCommands(Enum):
+class InstallCommandsBase(Enum):
     """
     Predefined installation commands for various package managers.
     """
 
+    @staticmethod
     def _flock_command(cmd: str) -> str:
         """
         Wraps a command with flock to prevent concurrent executions.
@@ -27,15 +26,23 @@ class InstallCommands(Enum):
         """
         return f"sudo flock /var/lib/dpkg/lock-frontend {cmd}"
 
+    @property
+    def command(self) -> str:
+        """Get the installation command string."""
+        return self.value
+
+
+class BuiltinInstallCommands(InstallCommandsBase):
+    """
+    Predefined installation commands for various package managers.
+    """
+
     # fmt: off
-    APT     = _flock_command("apt-get install -y")
+    APT     = InstallCommandsBase._flock_command("apt-get install -y")
+    DPKG    = InstallCommandsBase._flock_command("dpkg -i")
     SNAP    = "sudo snap install"
     FLATPAK = "sudo flatpak install -y"
     NPM     = "sudo npm install -g"
-    PIP     = "python3 -m pip install --user"
-    PIPX    = "python3 -m pipx install"
-    VSC_EXT = "code --install-extension"
-    DOCKER  = "docker pull"
     # fmt: on
 
 
@@ -61,18 +68,18 @@ def get_clean_lines(filename: Path) -> list[str]:
 
 
 def install_packages_from_list(
-    install_command: InstallCommands, packages: list[str]
+    install_command: InstallCommandsBase, packages: list[str]
 ) -> None:
     """
     Installs a list of packages using the specified package manager command.
 
-    :param install_command: InstallCommands enum value specifying the installation command
-    :type install_command: InstallCommands
+    :param install_command: InstallCommandsBase enum value specifying the installation command
+    :type install_command: InstallCommandsBase
     :param packages: List of package names to install
     :type packages: list[str]
     """
     for pkg in packages:
-        cmd = f"{install_command.value} {pkg}"
+        cmd = f"{install_command.command} {pkg}"
         result = subprocess.run(cmd, shell=True)
         if result.returncode != 0:
             Logger.step(f"Failed to install package: {pkg}", warning=True)
@@ -81,13 +88,13 @@ def install_packages_from_list(
 
 
 def install_packages_from_txt_file(
-    install_command: InstallCommands, package_file: Path
+    install_command: InstallCommandsBase, package_file: Path
 ) -> None:
     """
     Installs packages listed in the given requirements file using the specified package manager command.
 
-    :param install_command: InstallCommands enum value specifying the installation command
-    :type install_command: InstallCommands
+    :param install_command: InstallCommandsBase enum value specifying the installation command
+    :type install_command: InstallCommandsBase
     :param package_file: Path to the requirements file
     :type package_file: Path
     """

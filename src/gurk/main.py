@@ -1,6 +1,6 @@
 import click
 
-from gurk.cli import check, help, pull, remove, run, setup, template, update
+from gurk.cli import check, help, pull, remove, run, setup, template, upgrade
 from gurk.cli.utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
@@ -33,11 +33,11 @@ def run_cmd(ctx: click.Context):
     )
 
 
-@main.command(name="update", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@main.command(name="upgrade", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
-def update_cmd(ctx: click.Context):
-    """Update one or all gurk plugins"""
-    update.main(
+def upgrade_cmd(ctx: click.Context):
+    """Upgrade one or all gurk plugins to their newest state"""
+    upgrade.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
         description=ctx.command.help,
@@ -84,7 +84,7 @@ def setup_cmd(ctx: click.Context):
 @main.command(name="help", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def help_cmd(ctx: click.Context):
-    """Show help about gurk"""
+    """Show help about gurk. Use no arguments to see links to documentation."""
     help.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
@@ -92,7 +92,7 @@ def help_cmd(ctx: click.Context):
     )
 
 
-for cmd in ["run", "update", "pull", "setup", "remove", "help"]:
+for cmd in ["run", "upgrade", "pull", "setup", "remove", "help"]:
     main.commands[cmd].category = "Core Commands"
 
 

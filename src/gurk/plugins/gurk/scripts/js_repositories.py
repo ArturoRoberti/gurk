@@ -6,14 +6,13 @@ from tempfile import TemporaryDirectory
 from packaging import version
 
 from gurk import (
-    InstallCommands,
+    BuiltinInstallCommands,
     Logger,
     add_alias,
-    clone_git_files,
+    extract_url,
     get_clean_lines,
-    gitref_dict2str,
+    git_clone,
     install_packages_from_list,
-    parse_git_ref,
     parse_task_args,
 )
 
@@ -34,8 +33,10 @@ def install_js_repositories(*args: list[str]) -> None:
         return
 
     # (STEP) Installing Requirement(s)
-    install_packages_from_list(InstallCommands.APT, ["npm", "nodejs", "git"])
-    install_packages_from_list(InstallCommands.NPM, ["yarn", "pnpm"])
+    install_packages_from_list(
+        BuiltinInstallCommands.APT, ["npm", "nodejs", "git"]
+    )
+    install_packages_from_list(BuiltinInstallCommands.NPM, ["yarn", "pnpm"])
 
     # Directories for npm, yarn and pnpm packages
     yarn_pkg_dir = Path("/opt/yarn")
@@ -44,13 +45,14 @@ def install_js_repositories(*args: list[str]) -> None:
 
     # (STEP) Installing npm repositories
     for repo in repos:
-        parsed = parse_git_ref(repo)
-        pkg_name = Path(parsed["url"]).stem
+        pkg_name = Path(extract_url(repo)).stem
         with TemporaryDirectory() as tmp:
-            # Clone repo (shallow clone)
-            parsed["depth"] = 1
-            repo_path = clone_git_files(gitref_dict2str(parsed), tmp)
-            if not repo_path:
+            tmp = Path(tmp)
+
+            # Clone repo
+            try:
+                git_clone(repo, tmp)
+            except subprocess.CalledProcessError:
                 Logger.step(
                     f"Failed to clone repository {repo}, skipping.",
                     warning=True,
@@ -58,7 +60,7 @@ def install_js_repositories(*args: list[str]) -> None:
                 continue
 
             # Get package name from package.json if possible
-            pkg_json = repo_path / "package.json"
+            pkg_json = tmp / "package.json"
             if not pkg_json.exists():
                 Logger.step(
                     f"No package.json found in {repo}, skipping.", warning=True
@@ -115,7 +117,7 @@ def install_js_repositories(*args: list[str]) -> None:
             try:
                 subprocess.run(
                     f"{package_manager} install",
-                    cwd=repo_path,
+                    cwd=tmp,
                     shell=True,
                     check=True,
                 )
@@ -137,9 +139,7 @@ def install_js_repositories(*args: list[str]) -> None:
                         warning=True,
                     )
                     continue
-            subprocess.run(
-                ["sudo", "mv", str(repo_path), str(target)], check=True
-            )
+            subprocess.run(["sudo", "mv", str(tmp), str(target)], check=True)
 
             # Add alias
             if task_args.gurk_js_create_aliases:

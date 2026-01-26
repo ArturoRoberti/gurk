@@ -344,7 +344,6 @@ class Logger:
     def logrichprint(
         severity: LoggerSeverity | None,
         message: str,
-        newline: bool = False,
         file: IO[str] | None = None,
     ) -> None:
         """
@@ -354,8 +353,6 @@ class Logger:
         :type severity: LoggerSeverity | None
         :param message: The message to print
         :type message: str
-        :param newline: Whether to print a newline before the message
-        :type newline: bool
         :param file: The output file (stdout/stderr). If None, defaults to stdout.
         :type file: IO[str] | None
         """
@@ -363,14 +360,15 @@ class Logger:
             richprint(f"{message}", file=file)
         else:
             logstart = Logger.logstart(severity)
-        prefix = "\n" if newline else ""
-        richprint(f"{prefix}{logstart} {message}", file=file)
+        richprint(f"{logstart} {message}", file=file)
 
     @staticmethod
     def padded_print(
         text: str,
         color: str = "white",
         total_length: int = 128,
+        top: bool = True,
+        bottom: bool = True,
         file: IO[str] | None = None,
     ) -> None:
         """
@@ -382,11 +380,16 @@ class Logger:
         :type color: str
         :param total_length: Total length of the printed line including padding
         :type total_length: int
+        :param top: Whether to print the top padding line
+        :type top: bool
+        :param bottom: Whether to print the bottom padding line
+        :type bottom: bool
         :param file: The output file (stdout/stderr). If None, defaults to stdout.
         :type file: IO[str] | None
         """
         # Top bar
-        Logger.richprint("=" * total_length, color=color, file=file)
+        if top:
+            Logger.richprint("=" * total_length, color=color, file=file)
 
         # Calculate how many "=" signs are needed in the middle
         #   Subtract 2 for extra spaces
@@ -402,7 +405,8 @@ class Logger:
                 file=file,
             )
         # Bottom bar
-        Logger.richprint("=" * total_length, color=color, file=file)
+        if bottom:
+            Logger.richprint("=" * total_length, color=color, file=file)
 
     @staticmethod
     def pprint_simple_dict(
@@ -427,6 +431,11 @@ class Logger:
         for k, v in dct.items():
             k = k.capitalize() if capitalize and isinstance(k, str) else k
             richprint(f"{' ' * indent}[{color}]{k:<{maxlen}} :[/{color}] {v}")
+
+    @staticmethod
+    def newline() -> None:
+        """Print a newline to the console output."""
+        richprint("")
 
     @staticmethod
     def step(message: str, warning: bool = False) -> None:

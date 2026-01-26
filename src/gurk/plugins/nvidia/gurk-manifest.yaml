@@ -46,7 +46,7 @@ tasks:
         default: true
         help: Enable GPU prime-select after installation (if applicable)
 
-run:
+options:
   default:
     nvidia/install-cuda:
       enabled: true

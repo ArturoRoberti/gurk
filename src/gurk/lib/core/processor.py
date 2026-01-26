@@ -5,6 +5,7 @@ import networkx as nx
 
 from gurk.lib.logger import get_logger
 from gurk.lib.utils.common import generate_random_path
+from gurk.lib.utils.configs import overlay_dicts
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
     get_combined_plugin_tasks,
@@ -19,7 +20,6 @@ from gurk.lib.utils.tasks import (
     TaskDictCollection,
 )
 from gurk.lib.utils.typed_dict import fill_typed_dict
-from gurk.lib.utils.yaml import overlay_dicts
 
 
 @dataclass

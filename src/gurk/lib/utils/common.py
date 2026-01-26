@@ -8,13 +8,11 @@ from pathlib import Path
 from tempfile import mkdtemp, mkstemp
 from typing import TypeAlias
 
-from gurk.cli.utils import CORE_COMMANDS
+from packaging.version import InvalidVersion, Version
+
 from gurk.lib.utils.patterns import PatternCollection
 
 PACKAGE_SRC_PATH = Path(resources.files("gurk")).expanduser().resolve()
-PACKAGE_CONFIG_PATH = PACKAGE_SRC_PATH / "config"  # TODO: Remove
-DEFAULT_CONFIG_FILE = PACKAGE_CONFIG_PATH / "default.yaml"  # TODO: Remove
-ENABLED_CONFIG_FILE = PACKAGE_CONFIG_PATH / "enabled.yaml"  # TODO: Remove
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
 PACKAGE_HOME_PATH = Path.home() / ".gurk"
@@ -177,54 +175,21 @@ class CommandKind(Enum):
 
 
 SCRIPT_LANGUAGES = [kind.name for kind in CommandKind]
-
-
-# TODO: Remove, as plugin loading already expands paths
-def get_script_path(script: FilePath, command: str) -> Path:
-    """
-    Create a full path to a script inside the package's scripts directory.
-
-    :param script: Name of the script file
-    :type script: FilePath
-    :param command: Name of the command that uses the script
-    :type command: str
-    :return: Full path to the script file
-    :rtype: Path
-    :raises TypeError: If script is not a str or Path
-    :raises ValueError: If an unknown command is provided
-    """
-    if not isinstance(script, (str, Path)):
-        raise TypeError("script must be a str or Path")
-
-    if command not in CORE_COMMANDS:
-        raise ValueError(f"Unknown command: {command}")
-
-    language = CommandKind.from_script(script).name.lower()
-    return PACKAGE_SRC_PATH / "scripts" / language / command / script
-
-
-# TODO: Remove, as plugin loading already expands paths
-def get_config_path(config_file: FilePath, command: str) -> Path:
-    """
-    Create a full path to a config file inside the package's config directory.
-
-    :param config_file: Name of the config file
-    :type config_file: FilePath
-    :param command: Name of the command that uses the config file
-    :type command: str
-    :return: Full path to the config file
-    :rtype: Path
-    :raises TypeError: If config_file is not a str or Path
-    :raises ValueError: If an unknown command is provided
-    """
-    if not isinstance(config_file, (str, Path)):
-        raise TypeError("config_file must be a str or Path")
-
-    if command not in CORE_COMMANDS:
-        raise ValueError(f"Unknown command: {command}")
-
-    return PACKAGE_CONFIG_PATH / command / config_file
-
-
 YES_ANSWERS = ["y", "yes", "true", "1"]
 NO_ANSWERS = ["n", "no", "false", "0"]
+
+
+def check_version(version: str) -> bool:
+    """
+    Check if the given version string is a valid version.
+
+    :param version: The version string to check.
+    :type version: str
+    :return: True if valid, False otherwise.
+    :rtype: bool
+    """
+    try:
+        Version(version)
+        return True
+    except InvalidVersion:
+        return False

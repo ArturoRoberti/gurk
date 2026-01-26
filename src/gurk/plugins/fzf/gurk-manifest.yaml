@@ -21,12 +21,11 @@ tasks:
     function: uninstall_fzf
     depends_on: [fzf/uninstall-loki-shell]
 
-run:
-  options:
-    install: &install_option
-      fzf/install-loki-shell:
-        enabled: true
-    uninstall:
-      fzf/uninstall-fzf:
-        enabled: true
+options:
+  install: &install_option
+    fzf/install-loki-shell:
+      enabled: true
+  uninstall:
+    fzf/uninstall-fzf:
+      enabled: true
   default: *install_option

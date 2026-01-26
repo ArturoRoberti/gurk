@@ -5,7 +5,7 @@ import pytest
 
 from gurk.lib.core import core
 from gurk.lib.utils.common import DEFAULT_CONFIG_FILE, get_config_path
-from gurk.lib.utils.yaml import load_yaml
+from gurk.lib.utils.configs import load_yaml
 
 from .utils import _get_sudo_askpass
 

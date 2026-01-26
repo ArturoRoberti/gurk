@@ -31,16 +31,15 @@ tasks:
         choices: [micromamba, mamba]
         default: micromamba
 
-run:
-  options:
-    conda:
-      conda/install-conda:
-        enabled: true
-      conda/install-conda-environments:
-        enabled: true
-    mamba: &mamba_option
-      conda/install-mamba:
-        enabled: true
-      conda/install-conda-environments:
-        enabled: true
+options:
+  conda:
+    conda/install-conda:
+      enabled: true
+    conda/install-conda-environments:
+      enabled: true
+  mamba: &mamba_option
+    conda/install-mamba:
+      enabled: true
+    conda/install-conda-environments:
+      enabled: true
   default: *mamba_option

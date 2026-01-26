@@ -9,8 +9,8 @@ from gurk import (
     Logger,
     LoggerSeverity,
     PatternCollection,
-    clone_git_files,
     get_clean_lines,
+    git_clone,
     is_git_repo,
     is_url,
     load_yaml,
@@ -91,10 +91,9 @@ def configure_filestructure(*args: list[str]) -> None:
                     Logger.step(
                         f"Cloning git repository {content} into {dest_path}..."
                     )
-                    cloned_path = clone_git_files(
-                        content, dest_path, overwrite
-                    )
-                    if cloned_path is None:
+                    try:
+                        git_clone(content, dest_path, overwrite)
+                    except subprocess.CalledProcessError:
                         Logger.step(
                             f"Failed to clone git repository {content}. Skipping...",
                             warning=True,
@@ -116,7 +115,21 @@ def configure_filestructure(*args: list[str]) -> None:
                         )
                 else:
                     # Assumed local path (possibly symlinked)
-                    content = Path(content).expanduser()
+                    content = Path(
+                        content
+                    ).expanduser()  # TODO: Does this work when this is working in privileged mode?
+                    ## Absolute path
+                    if content.is_absolute():
+                        pass
+                    ## Relative path (to base path)
+                    elif str(content).startswith("./"):
+                        content = (base_path / content).resolve()
+                    ## Relative path (to config file)
+                    else:
+                        content = (
+                            task_args.config_file.parent / content
+                        ).resolve()
+
                     if not content.exists():
                         Logger.step(
                             f"Source '{content}' does not exist. Skipping...",
@@ -143,7 +156,7 @@ def configure_filestructure(*args: list[str]) -> None:
                 recursive_create_structure(dest_path, content, overwrite, sudo)
             else:
                 Logger.step(
-                    f"Unsupported entry type '{type(content)}' for {content}. Skipping...",
+                    f"Unsupported entry type '{type(content).__name__}' for {content}. Skipping...",
                     warning=True,
                 )
 

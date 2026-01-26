@@ -6,13 +6,16 @@
 # - (str) a github repository reference (indicating a repo to clone from)
 #           (see see 'parse_git_ref' function in this repo for expected format)
 # - (str) a URL (indicating a file to download from), starting with "http(s)://"
-# - (str) a local path (indicating a file/directory to copy from) you may add the "symlink://" prefix
-#           to create a symlink instead of copying. Also, the user's home (~) will be expanded.
+# - (str) a local path (indicating a file/directory to copy from)
+#         - You may add the "symlink://" prefix to create a symlink instead of copying.
+#         - To specify a path relative to the its folder (in this structure), use "./<relative_path>".
+#         - To specify a path relative to this config file, simply use "<relative_path>".
+#         - Also, the user's home (~) will be expanded.
 # Recommended: Add custom executable scripts and aliases in $HOME/.cmds, then add it to PATH
 HOME:
   .cmds:
     argparse.bash:
-      https://github.com/nhoffman/argparse-bash.git?depth=1&path=argparse.bash
+      https://github.com/nhoffman/argparse-bash.git?path=argparse.bash
   git: null
   Documents:
     Personal:

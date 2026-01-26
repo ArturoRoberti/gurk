@@ -6,12 +6,19 @@ from pathlib import Path
 import commentjson
 
 from gurk import (
-    InstallCommands,
+    InstallCommandsBase,
     Logger,
     LoggerSeverity,
     install_packages_from_txt_file,
     parse_task_args,
 )
+
+
+class PipInstallCommands(InstallCommandsBase):
+    # fmt: off
+    PIP  = "python3 -m pip install --user"
+    PIPX = "python3 -m pipx install"
+    # fmt: on
 
 
 def install_pipx_packages(*args: list[str]) -> None:
@@ -22,7 +29,9 @@ def install_pipx_packages(*args: list[str]) -> None:
     task_args = parse_task_args(args)
 
     # (STEP) Installing pipx packages
-    install_packages_from_txt_file(InstallCommands.PIPX, task_args.config_file)
+    install_packages_from_txt_file(
+        PipInstallCommands.PIPX, task_args.config_file
+    )
 
 
 def install_pip_environments(*args: list[str]) -> None:

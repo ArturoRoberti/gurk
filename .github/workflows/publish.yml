@@ -24,7 +24,7 @@ jobs:
 
     - name: Install required tools
       run: |
-        pip install build twine toml requests
+        pip install build twine tomli-w requests
 
     # Set git user for committing changes and ensure we are on the correct branch
     - name: Configure git

@@ -1,17 +1,13 @@
-import getpass
 import os
 import subprocess
-import traceback
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
 from pathlib import Path
+from textwrap import dedent
 
-from gurk.lib.logger import Logger, LoggerSeverity
+from gurk.lib.logger import ActiveLogger, Logger, get_logger
 from gurk.lib.utils.cli import SETUP_DONE_FILE
-from gurk.lib.utils.interface import prompt_bool
+from gurk.lib.utils.plugins import GurkArgumentParser
 from gurk.lib.utils.system_info import get_manufacturer
-
-# TODO: Restructure to use new logger setup
 
 
 @dataclass
@@ -20,18 +16,9 @@ class SSHKeysManager:
     Manage SSH keys for the user.
     """
 
-    # fmt: off
-    ssh_directory: Path        = field(init=False, default=Path("~/.ssh").expanduser())
-    curr_ssh_key:  Path | None = field(init=False, repr=False, default=None)
-    # fmt: on
-
-    @property
-    def ssh_key_pub_path(self) -> Path:
-        return (
-            self.curr_ssh_key.with_suffix(".pub")
-            if self.curr_ssh_key
-            else None
-        )
+    ssh_directory: Path = field(
+        init=False, default=Path("~/.ssh").expanduser()
+    )
 
     def keys_exist(self) -> bool:
         """
@@ -55,89 +42,88 @@ class SSHKeysManager:
             # ssh-agent may not be running
             return False
 
-    def prompt_name(self) -> None:
-        """
-        Prompt the user for an SSH key name.
-        """
-        Logger.richprint("=== SSH Key Name ===", "cyan")
+    def setup_key(self) -> None:
+        # Get logger
+        logger = get_logger()
+        logger.padded_print("New SSH Key", "cyan", 64)
+
+        # Get key name
+        logger.padded_print(
+            "SSH Key Name", "yellow", 32, top=False, bottom=False
+        )
         while True:
-            key_name = input(
-                "Enter a name for your SSH key (e.g. id_ed25519): "
+            key_name = logger.ask(
+                "Enter a name for your SSH key (e.g. id_ed25519)"
             ).strip()
             if key_name:
-                self.curr_ssh_key = self.ssh_directory / key_name
-                if self.curr_ssh_key.is_file():
-                    print(
+                curr_ssh_key = self.ssh_directory / key_name
+                ssh_key_pub_path = curr_ssh_key.with_suffix(".pub")
+                if curr_ssh_key.is_file():
+                    logger.warning(
                         f"Key '{key_name}' already exists. Please choose a different name.\n"
                     )
                     continue
-                return
+                break
             else:
-                print("Key name cannot be empty. Please try again.\n")
+                logger.warning("Key name cannot be empty. Please try again.\n")
 
-    def create(self) -> None:
-        """
-        Create a new SSH key pair and add it to the ssh-agent.
-        """
-        Logger.richprint("\n=== SSH Key Password ===", "cyan")
+        # Get key password
+        logger.padded_print(
+            "SSH Key Password", "yellow", 32, top=False, bottom=False
+        )
         while True:
-            password = getpass.getpass(
-                "Enter a password for the SSH key (can be empty): "
+            password = logger.ask(
+                "Enter a password for the SSH key (can be empty)",
+                password=True,
             )
-            password_confirm = getpass.getpass("Confirm the password: ")
+            password_confirm = logger.ask(
+                "Confirm the password", password=True
+            )
             if password == password_confirm:
                 break
-            print("Passwords do not match. Try again.\n")
+            logger.warning("Passwords do not match. Try again.")
 
+        # Create key
         os.makedirs(self.ssh_directory, exist_ok=True)
-
-        # Run ssh-keygen
         subprocess.run(
             [
                 "ssh-keygen",
                 "-t",
                 "ed25519",
                 "-f",
-                self.curr_ssh_key,
+                curr_ssh_key,
                 "-N",
                 password,
             ],
             capture_output=True,
         )
-
-        # Add key to ssh-agent
         subprocess.run(["eval", "$(ssh-agent -s)"], shell=True)
-        subprocess.run(["ssh-add", self.curr_ssh_key])
+        subprocess.run(["ssh-add", curr_ssh_key])
 
-        print(f"SSH key successfully created at {self.curr_ssh_key}")
-
-    def prompt_upload(self) -> None:
-        """
-        Prompt the user to upload the public SSH key.
-        """
-        Logger.richprint("\n=== SSH Key Upload ===", "cyan")
-        print(
-            f"Please upload the public key ({self.ssh_key_pub_path}) in your account settings (GitHub, GitLab, etc.). Public key (between dashes):"
+        # Prompt the user to upload the public SSH key
+        logger.padded_print(
+            "SSH Key Upload", "yellow", 32, top=False, bottom=False
         )
-        print("-" * 100)
-        with open(self.ssh_key_pub_path) as f:
-            print(f.read().strip())
-        print("-" * 100)
+        logger.richprint(
+            f"Please upload the public key ({ssh_key_pub_path}) to your account settings (GitHub, GitLab, etc.). Public key:"
+        )
+        with open(ssh_key_pub_path) as f:
+            logger.richprint(f.read().strip(), "green")
         input("After uploading your key, press anything to continue...")
 
     def setup_keys(self) -> None:
         """
         Set up SSH keys by prompting the user for input.
         """
+        # Get logger
+        logger = get_logger()
         while True:
-            self.prompt_name()
-            self.create()
-            self.prompt_upload()
-            Logger.richprint("\n=== New SSH Key ===", "cyan")
-            if not prompt_bool("Would you like to create another SSH key?"):
+            self.setup_key()
+            if not logger.prompt_bool(
+                "Would you like to create another SSH key?"
+            ):
                 break
-            print()  # Newline for better readability
-        Logger.richprint("SSH key setup complete!\n", "green")
+        logger.info("SSH key setup complete!")
 
 
 @dataclass
@@ -147,8 +133,8 @@ class GitCredentialsManager:
     """
 
     # fmt: off
-    user_name:  str    = field(default="")
-    user_email: str    = field(default="")
+    user_name:  str = field(default="")
+    user_email: str = field(default="")
     # fmt: on
 
     def credentials_exist(self) -> bool:
@@ -158,11 +144,7 @@ class GitCredentialsManager:
         :return: True if both user name and email are set, False otherwise
         :rtype: bool
         """
-        self.get_credentials()
-        return bool(self.user_name and self.user_email)
-
-    def get_credentials(self) -> None:
-        """Retrieve existing git user name and email if set."""
+        # Get username
         try:
             self.user_name = (
                 subprocess.check_output(
@@ -174,6 +156,7 @@ class GitCredentialsManager:
         except subprocess.CalledProcessError:
             self.user_name = ""
 
+        # Get user email
         try:
             self.user_email = (
                 subprocess.check_output(
@@ -185,30 +168,52 @@ class GitCredentialsManager:
         except subprocess.CalledProcessError:
             self.user_email = ""
 
-    def prompt_credentials(self) -> None:
-        """
-        Prompt the user for git user name and email.
-        """
-        Logger.richprint("=== Git User Info ===", "cyan")
-        while True:
-            self.user_name = input("Enter your Git username: ").strip()
-            self.user_email = input("Enter your Git email: ").strip()
-            if self.user_name and self.user_email:
-                return
-            print("Both username and email are required. Please try again.\n")
+        # Return whether both are set
+        return bool(self.user_name and self.user_email)
 
     def setup_credentials(self) -> None:
         """Set up git user name and email."""
-        self.prompt_credentials()
+        # Get logger
+        logger = get_logger()
+        logger.padded_print("Git User Info", "cyan", 64)
+
+        # Prompt for username
+        logger.padded_print(
+            "Git User Name", "yellow", 32, top=False, bottom=False
+        )
+        while True:
+            self.user_name = logger.ask("Enter your Git username").strip()
+            if not self.user_name:
+                logger.warning("Username cannot be empty. Please try again.")
+                continue
+            break
+
+        # Prompt for email
+        logger.padded_print(
+            "Git User Email", "yellow", 32, top=False, bottom=False
+        )
+        while True:
+            self.user_email = logger.ask("Enter your Git email").strip()
+            if not self.user_email:
+                logger.warning("Email cannot be empty. Please try again.")
+                continue
+            elif (
+                "@" not in self.user_email
+                or "." not in self.user_email.split("@")[-1]
+            ):
+                logger.warning("Invalid email format. Please try again.")
+                continue
+            break
+
+        # Set credentials
         subprocess.run(
             ["git", "config", "--global", "user.name", self.user_name]
         )
         subprocess.run(
             ["git", "config", "--global", "user.email", self.user_email]
         )
-        Logger.richprint(
-            f"Git user name and email set to '{self.user_name}' resp. '{self.user_email}'\n",
-            "green",
+        logger.info(
+            f"Git user name and email set to '{self.user_name}' resp. '{self.user_email}'."
         )
 
 
@@ -216,7 +221,9 @@ def print_secure_boot_steps() -> None:
     """
     Print steps to disable Secure Boot in UEFI/BIOS.
     """
-    Logger.richprint("=== Disable Secure Boot Steps ===", "cyan")
+    # Get logger
+    logger = get_logger()
+    logger.padded_print("Disable Secure Boot Steps", "cyan", 64)
 
     # Table of common manufacturers → probable keys
     key_table = {
@@ -249,21 +256,23 @@ def print_secure_boot_steps() -> None:
         all_keys_str = ", ".join([key for _, keys in matches for key in keys])
 
     # Print steps
-    print(
-        f"1. Reboot your computer. During the initial boot screen, repeatedly press one of the following keys to enter the UEFI/BIOS setup: {all_keys_str}\n"
-        "2. Navigate to the 'Security' or 'Boot' tab using the arrow keys, locate the 'Secure Boot' option disable it.\n"
-        "3. Save your changes and exit the UEFI/BIOS setup - Your computer will reboot with Secure Boot disabled."
+    logger.richprint(
+        dedent(
+            f"""\
+            1. Reboot your computer. During the initial boot screen, repeatedly press one of the following keys to enter the UEFI/BIOS setup: {all_keys_str}
+            2. Navigate to the 'Security' or 'Boot' tab using the arrow keys, locate the 'Secure Boot' option disable it.
+            3. Save your changes and exit the UEFI/BIOS setup - Your computer will reboot with Secure Boot disabled.
+        """
+        )
     )
 
 
 def main(argv, prog, description):
-    parser = ArgumentParser(
+    parser = GurkArgumentParser(
         prog=prog,
         description=description,
-        formatter_class=lambda prog: ArgumentDefaultsHelpFormatter(
-            prog=prog,
-            max_help_position=30,
-        ),
+        add_verbose_arg=False,
+        add_non_interactive_arg=False,
     )
     # Flags to short-circuit specific pre-setup tasks
     parser.add_argument(
@@ -287,77 +296,57 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # If none are enabled, enable all
-    if not (args.ssh_keys or args.git_credentials or args.disable_secure_boot):
-        args.ssh_keys = True
-        args.git_credentials = True
-        args.disable_secure_boot = True
+    flags = vars(args)
+    if not any(flags.values()):
+        for flag in flags:
+            flags[flag] = True
 
-    try:
+    # Execute with active logger
+    logger = Logger(False, False)
+    with ActiveLogger(logger):
         # Set up SSH keys
         ssh_keys_manager = SSHKeysManager()
         ssh_keys_exist = ssh_keys_manager.keys_exist()
-        if args.ssh_keys and (
-            (
+        if args.ssh_keys:
+            if (
                 not ssh_keys_exist
-                and prompt_bool(
+                and logger.prompt_bool(
                     "No SSH keys detected. Would you like to create SSH keys?"
                 )
-            )
-            or (
+            ) or (
                 ssh_keys_exist
-                and prompt_bool(
+                and logger.prompt_bool(
                     "Existing SSH keys detected. Would you still like to create new ones?"
                 )
-            )
-        ):
-            ssh_keys_manager.setup_keys()
-        else:
-            Logger.richprint("Skipping SSH key setup\n", "yellow")
+            ):
+                ssh_keys_manager.setup_keys()
+            logger.newline()
 
         # Set up Git Credentials
         git_credentials_manager = GitCredentialsManager()
         git_credentials_exist = git_credentials_manager.credentials_exist()
-        if args.git_credentials and (
-            (
+        if args.git_credentials:
+            if (
                 not git_credentials_exist
-                and prompt_bool(
+                and logger.prompt_bool(
                     "Git user name/email not set. Would you like to set them up?"
                 )
-            )
-            or (
+            ) or (
                 git_credentials_exist
-                and prompt_bool(
+                and logger.prompt_bool(
                     f"Git user name/email already set (to '{git_credentials_manager.user_name}' resp. '{git_credentials_manager.user_email}'). Would you like to update them?"
                 )
-            )
-        ):
-            git_credentials_manager.setup_credentials()
-        else:
-            Logger.richprint("Skipping Git credentials setup\n", "yellow")
+            ):
+                git_credentials_manager.setup_credentials()
+            logger.newline()
 
         # Print Secure Boot disabling steps
-        if args.disable_secure_boot and prompt_bool(
+        if args.disable_secure_boot and logger.prompt_bool(
             "Would you like to see the steps to disable Secure Boot in UEFI/BIOS?"
         ):
             print_secure_boot_steps()
-        else:
-            Logger.richprint("Skipping Secure Boot disabling steps", "yellow")
 
         # Mark setup as done
         if not SETUP_DONE_FILE.is_file():
             SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
             SETUP_DONE_FILE.touch()
-
-    except (KeyboardInterrupt, Exception) as e:
-        traceback_str = traceback.format_exc()
-        traceback_msg = (
-            f"An Exception occured: {e.__class__.__name__} - {e}\n\n{traceback_str}"
-            if str(e).strip()
-            else ""
-        )
-        interrupt_msg = (
-            "Process interrupted by user"
-            if isinstance(e, KeyboardInterrupt)
-            else traceback_msg
-        )
-        Logger.logrichprint(LoggerSeverity.FATAL, interrupt_msg, newline=True)

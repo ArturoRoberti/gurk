@@ -2,10 +2,9 @@ from collections import defaultdict
 from copy import deepcopy
 from pprint import pprint
 
-import toml
-
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
+from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.plugins import (
     GURK_MANIFEST_FILENAME,
     GurkArgumentParser,
@@ -20,7 +19,12 @@ from gurk.lib.utils.typed_dict import print_typed_dict_types
 
 
 def main(argv, prog, description):
-    parser = GurkArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser(
+        prog=prog,
+        description=description,
+        add_verbose_arg=False,
+        add_non_interactive_arg=False,
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "-p",
@@ -47,12 +51,12 @@ def main(argv, prog, description):
         help="List installed tasks",
     )
     group.add_argument(
+        "-s",
         "--structure",
         action="store_true",
         help="Show the required structure of a plugin",
     )
     group.add_argument(
-        "-s",
         "--system-info",
         action="store_true",
         help="Print system information",
@@ -60,12 +64,12 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
+    logger = Logger(False, False)
     with ActiveLogger(logger):
         # Print help about gurk itself
         if not any(vars(args).values()):
             # Load help from pyproject.toml
-            gurk_toml = toml.load(
+            gurk_toml = load_toml(
                 PACKAGE_SRC_PATH.parents[1] / "pyproject.toml"
             )
 
@@ -109,7 +113,7 @@ def main(argv, prog, description):
                 logger.pprint_simple_dict(
                     general_info, color="yellow", capitalize=True
                 )
-                print()
+                logger.newline()
 
                 # Print tasks defined by the plugin
                 plugin_manifest = plugin_data["manifest"]
@@ -120,7 +124,7 @@ def main(argv, prog, description):
                     ].items():
                         logger.richprint(f"- {task_name}:", "yellow")
                         pprint(task_info)
-                        print()
+                        logger.newline()
 
                 # Print imported plugins
                 if plugin_manifest.get("imports"):
@@ -141,25 +145,19 @@ def main(argv, prog, description):
 
                     logger.padded_print("Imported Plugins", "cyan")
                     logger.pprint_simple_dict(imports, color="yellow")
-                    print()
+                    logger.newline()
 
-                # Print 'run' section
-                run_section = plugin_manifest["run"]
-                ## Print default
+                # Print 'options' section
                 logger.padded_print("Run Options", "cyan")
-                default_value = next(iter(run_section["default"].values()))
-                logger.richprint(f"- {plugin_name} (default):", "green")
-                pprint(default_value)
-                print()
-                ## Print other options
-                if run_section.get("options"):
-                    options = run_section.get("options", {})
-                    for run_option, run_info in options.items():
-                        logger.richprint(
-                            f"- {plugin_name}={run_option}: ", "yellow"
-                        )
-                        pprint(run_info)
-                        print()
+                for option_name, option in plugin_manifest["options"].items():
+                    key = plugin_name + (
+                        " (default)"
+                        if option_name == "default"
+                        else f"={option_name}"
+                    )
+                    logger.richprint(f"- {key}: ", "yellow")
+                    pprint(option)
+                    logger.newline()
 
         # Show help for specific tasks
         elif args.tasks:
@@ -179,7 +177,7 @@ def main(argv, prog, description):
                 logger.pprint_simple_dict(
                     task_info, color="yellow", capitalize=True, indent=2
                 )
-                print()
+                logger.newline()
 
         # Show available plugins
         elif args.available_plugins:
@@ -190,7 +188,7 @@ def main(argv, prog, description):
                 logger.pprint_simple_dict(
                     plugin_info, color="yellow", indent=2
                 )
-                print()
+                logger.newline()
 
         # Show available tasks
         elif args.available_tasks:
@@ -214,7 +212,7 @@ def main(argv, prog, description):
                 f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan"
             )
             print_typed_dict_types(PluginManifest)
-            print()
+            logger.newline()
 
             logger.padded_print(
                 "Structure of 'project' section in 'pyproject.toml'", "cyan"

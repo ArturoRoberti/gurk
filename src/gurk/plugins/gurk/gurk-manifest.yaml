@@ -61,24 +61,23 @@ tasks:
     function: configure_pinned_apps
     config_file: config/configure_pinned_apps.txt
 
-run:
-  options:
-    install: &install_option
-      gurk/install-apt-packages:
-        enabled: true
-      gurk/install-flatpak-packages:
-        enabled: true
-      gurk/install-js-repositories:
-        enabled: true
-      gurk/install-npm-packages:
-        enabled: true
-      gurk/install-snap-packages:
-        enabled: true
-    configure:
-      gurk/configure-bashrc:
-        enabled: true
-      gurk/configure-filestructure:
-        enabled: true
-      gurk/configure-pinned-apps:
-        enabled: true
+options:
+  install: &install_option
+    gurk/install-apt-packages:
+      enabled: true
+    gurk/install-flatpak-packages:
+      enabled: true
+    gurk/install-js-repositories:
+      enabled: true
+    gurk/install-npm-packages:
+      enabled: true
+    gurk/install-snap-packages:
+      enabled: true
+  configure:
+    gurk/configure-bashrc:
+      enabled: true
+    gurk/configure-filestructure:
+      enabled: true
+    gurk/configure-pinned-apps:
+      enabled: true
   default: *install_option

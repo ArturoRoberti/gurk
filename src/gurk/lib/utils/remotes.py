@@ -1,51 +1,68 @@
 import os
-import shlex
+import re
 import shutil
 import subprocess
+from contextlib import contextmanager
+from functools import wraps
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Literal, TypeAlias, TypedDict, overload
-from urllib.parse import parse_qs, urlparse
+from typing import Any, TypeAlias, TypedDict
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-import git
 import requests
+import tomllib
+from filelock import FileLock
+from ruamel.yaml import YAML
 
-from gurk.lib.utils.common import PACKAGE_CACHE_PATH, generate_random_path
+from gurk.lib.utils.common import (
+    PACKAGE_CACHE_PATH,
+    check_version,
+    generate_random_path,
+)
+from gurk.lib.utils.configs import load_toml, load_yaml
+from gurk.lib.utils.typed_dict import fill_typed_dict, validate_typed_dict
+
+PACKAGE_GIT_CACHE_PATH = PACKAGE_CACHE_PATH / "git"
+MIRRORS_DIR = PACKAGE_GIT_CACHE_PATH / "mirrors"
+MIRRORS_DIR.mkdir(parents=True, exist_ok=True)
+
+PACKAGE_GIT_CACHE_METADATA_PATH = PACKAGE_GIT_CACHE_PATH / "registry.yaml"
+PACKAGE_GIT_CACHE_METADATA_PATH.touch(exist_ok=True)
 
 
-def run_git_command(
-    command: str, timeout: int = 300
+@contextmanager
+def _repo_lock(repo: Path):
+    with FileLock(repo / ".repo_lock"):
+        yield
+
+
+@wraps(subprocess.run)
+def _git_run(
+    *args: Any,
+    **kwargs: Any,
 ) -> subprocess.CompletedProcess:
     """
-    Run a git command with SSH options to disable strict host key checking.
+    Wrapper around subprocess.run to run a git command with SSH options to disable strict host key checking.
 
-    :param command: Git command to run
-    :type command: str
-    :param timeout: Timeout in seconds
-    :type timeout: int
     :return: CompletedProcess result of the command
     :rtype: CompletedProcess
     """
-    env = os.environ.copy()
-    env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no"
-    return subprocess.run(
-        shlex.split(command),
-        env=env,
-        timeout=timeout,
-        capture_output=True,
-        text=True,
-    )
+    # Add GIT_SSH_COMMAND to disable strict host key checking
+    if not (kwargs.get("env") and isinstance(kwargs["env"], dict)):
+        kwargs["env"] = os.environ.copy()
+    kwargs["env"]["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no"
+
+    return subprocess.run(*args, **kwargs)
 
 
 class GitRefInfo(TypedDict):
     """TypedDict representing parsed Git reference information."""
 
     # fmt: off
-    url:    str
-    branch: str | None
-    commit: str | None
-    path:   str | None
-    depth:  int | None
+    url:     str
+    branch:  str | None
+    commit:  str | None
+    path:    str | None
+    version: str | None
     # fmt: on
 
 
@@ -60,185 +77,91 @@ def parse_git_ref(repo: GitRef) -> GitRefInfo:
     ```
         "https://github.com/user/repo.git"
         "https://github.com/user/repo.git?branch=main"
-        "https://github.com/user/repo.git?commit=abc123&branch=dev&depth=1"
+        "https://github.com/user/repo.git?path=subdir&commit=abc123&branch=dev"
     ```
 
     Supported query parameters:
         - branch: branch name
         - commit: commit hash (overrides branch if both provided)
         - path: subdirectory path within the repo
-        - depth: clone depth (integer)
 
     :param repo: GitRef string of the above format
     :type repo: GitRef
-    :return: Parsed GitRefInfo dictionary with keys: 'url', 'branch', 'commit', 'path', 'depth'.
-             Missing fields are set to None. Depth is returned as an int if present.
+    :return: Parsed GitRefInfo dictionary with keys: 'url', 'branch', 'commit', 'path'.
+             Missing fields are set to None.
     :rtype: GitRefInfo
     """
     parts = urlparse(repo)
     query = parse_qs(parts.query)
-
-    # Get elements
-    url = repo.split("?", 1)[0]
-    branch = query.get("branch", [None])[0]
-    commit = query.get("commit", [None])[0]
-    path = query.get("path", [None])[0]
-    depth_val = query.get("depth", [None])[0]
-    try:
-        depth_val = int(depth_val)
-    except Exception:
-        depth_val = None
-
     return {
-        "url": url,
-        "branch": branch,
-        "commit": commit,
-        "path": path,
-        "depth": depth_val,
+        "url": repo.split("?", 1)[0],
+        "branch": query.get("branch", [None])[0],
+        "commit": query.get("commit", [None])[0],
+        "path": query.get("path", [None])[0],
+        "version": query.get("version", [None])[0],
     }
 
 
-def gitref_dict2str(git_ref_info: GitRefInfo) -> GitRef:
+def extract_url(repo: str | GitRef) -> str:
     """
-    Convert a GitRefInfo dict back to a GitRef string.
+    Extract the URL from a string. If any string other than a GitRef is given, it is returned as-is.
 
-    :param git_ref_info: GitRefInfo dictionary
-    :type git_ref_info: GitRefInfo
-    :return: GitRef string
-    :rtype: GitRef
+    :param repo: str string
+    :type repo: str | GitRef
+    :return: URL without query parameters
+    :rtype: str
     """
-    url = git_ref_info["url"]
-    query_params = []
-    if git_ref_info.get("branch"):
-        query_params.append(f"branch={git_ref_info['branch']}")
-    if git_ref_info.get("commit"):
-        query_params.append(f"commit={git_ref_info['commit']}")
-    if git_ref_info.get("path"):
-        query_params.append(f"path={git_ref_info['path']}")
-    if git_ref_info.get("depth") is not None:
-        query_params.append(f"depth={git_ref_info['depth']}")
-
-    if query_params:
-        return f"{url}?{'&'.join(query_params)}"
-    else:
-        return url
+    return parse_git_ref(repo)["url"]
 
 
-@overload
-def get_remote_heads(url: str, HEAD: Literal[False] = False) -> dict[str, str]:
-    ...
-
-
-@overload
-def get_remote_heads(url: str, HEAD: Literal[True]) -> str:
-    ...
-
-
-def get_remote_heads(url: str, HEAD: bool = False) -> dict[str, str] | str:
+def edit_url(url: str, **kwargs: dict[str, str | None]) -> str:
     """
-    Get remote Git repository heads (branches) and their commit hashes.
+    Add, update, or remove query parameters in a URL.
 
-    :param url: URL of the remote Git repository
+    :param url: Original URL
     :type url: str
-    :param HEAD: If True, return the default branch's commit hash only (default: False)
-    :type HEAD: bool
-    :return: Dictionary of branch names to commit hashes, or commit hash of default branch if HEAD=True
-    :rtype: dict[str, str] | str
-    :raises RuntimeError: If the git command fails
+    :param kwargs: Query parameters to add/update (key=value) or remove (key=None)
+    :type kwargs: str | None
+    :return: Modified URL with updated query parameters
+    :rtype: str
+    :raises ValueError: If the input kwargs are invalid
     """
-    flags = " --heads" if not HEAD else ""
-    result = run_git_command(f"git ls-remote{flags} {url}", timeout=10)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr)
+    if not all(
+        isinstance(k, str) and (isinstance(v, str) or v is None)
+        for k, v in kwargs.items()
+    ):
+        raise ValueError(
+            "All keys in kwargs must be strings and values must be strings or None."
+        )
 
-    heads = {}
-    for line in result.stdout.strip().splitlines():
-        commit, ref = line.split()
-        branch = ref.removeprefix("refs/heads/")
-        heads[branch] = commit
+    parts = urlparse(url)
+    query = parse_qs(parts.query)
 
-    return heads
-
-
-def get_cached_repo(repo: GitRef) -> Path | None:
-    """
-    Check if a Git repository with the specified commit exists in the cache.
-
-    :param repo: GitRef string of the repository to check
-    :type repo: GitRef
-    :return: None if not cached, or Path to cached repo if found
-    :rtype: Path | None
-    :raises ValueError: If the specified branch is not found on remote
-    """
-    parsed = parse_git_ref(repo)
-    if parsed["commit"]:
-        # Case 1: commit specified
-        parsed["commit"] = parsed["commit"]
-    elif parsed["branch"]:
-        # Case 2: branch specified → resolve to commit
-        heads = get_remote_heads(parsed["url"])
-        if parsed["branch"] not in heads:
-            raise ValueError(
-                f"Branch '{parsed['branch']}' not found on remote"
-            )
-
-        parsed["commit"] = heads[parsed["branch"]]
-    else:
-        # Case 3: neither commit nor branch specified → use default branch HEAD
-        parsed["commit"] = get_remote_heads(parsed["url"], HEAD=True)
-
-    # Check cache
-    cached_repo = None
-    git_cache_dir = PACKAGE_CACHE_PATH / "git"
-    git_cache_dir.mkdir(parents=True, exist_ok=True)
-    for repo_dir in git_cache_dir.iterdir():
-        if not repo_dir.is_dir():
-            continue
-
-        # Check if it's a git repo
-        try:
-            repo_obj = git.Repo(repo_dir)
-        except (git.InvalidGitRepositoryError, git.NoSuchPathError):
-            continue
-
-        # Check if it has an 'origin' remote
-        try:
-            origin = repo_obj.remotes.origin
-        except AttributeError:
-            continue
-
-        # Check remote URL
-        if origin.url != parsed["url"]:
-            continue
-
-        # Repo found
-        if repo_obj.head.commit.hexsha == parsed["commit"]:
-            # Already at desired commit
-            cached_repo = repo_dir
+    for key, value in kwargs.items():
+        if value is None:
+            query.pop(key, None)
         else:
-            # Checkout desired commit
-            repo_obj.git.fetch("origin", parsed["commit"])
-            repo_obj.git.checkout(
-                parsed["commit"]
-            )  # TODO: Try-except or similar? What if the commit is not found?
+            query[key] = [value]
 
-        # Repo matched, no need to check further
-        break
-
-    return cached_repo
+    new_query = urlencode(query, doseq=True)
+    parts = parts._replace(query=new_query)
+    return urlunparse(parts)
 
 
-def is_git_repo(repo: GitRef) -> bool:
+def is_git_repo(repo: str | GitRef) -> bool:
     """
     Check if a string is a valid Git repository URL. Also checks existence of the repo.
 
-    :param repo: GitRef string to check
-    :type repo: GitRef
+    :param repo: Git repository URL or GitRef (in which case only the URL is used)
+    :type repo: str | GitRef
     :return: True if the URL is a valid Git repository, False otherwise
     :rtype: bool
     """
-    parsed = parse_git_ref(repo)
-    result = run_git_command(f"git ls-remote {parsed['url']}", timeout=10)
+    result = _git_run(
+        ["git", "ls-remote", extract_url(repo)],
+        timeout=10,
+        capture_output=True,
+    )
     return result.returncode == 0
 
 
@@ -267,134 +190,415 @@ def is_url(string: str, check: bool = True) -> bool:
     return True
 
 
-def handle_existing_dest(dest_path: Path, overwrite: bool) -> bool:
+def _register_mirror(url: str) -> Path:
     """
-    Handle existing destination path before cloning.
+    Register a new mirror for the specified Git repository URL.
+        NOTE: Distinguishes between the same repo cloned with HTTP and SSH for fetching purposes
 
-    :param dest_path: Path to the destination
-    :type dest_path: Path
-    :param overwrite: Whether to overwrite existing path
-    :type overwrite: bool
-    :return: True if destination is ready for cloning, False otherwise
-    :rtype: bool
+    :param url: Git repository URL
+    :type url: str
+    :return: Path to the created mirror directory
+    :rtype: Path
     """
-    if dest_path.exists():
-        if not overwrite:
-            print(f"Destination '{dest_path}' already exists.")
-            return False
-        else:
-            if dest_path.is_dir():
-                shutil.rmtree(dest_path)
-            else:
-                dest_path.unlink()
-    return True
-
-
-def clone_git_repo(
-    repo: GitRef, dest_path: Path | None = None, overwrite: bool = False
-) -> Path | None:
-    """
-    Clone a Git repository to the specified destination path.
-
-    :param repo: GitRef string of the repository to clone
-    :type repo: GitRef
-    :param dest_path: Destination path to clone the repository into
-    :type dest_path: Path | None
-    :param overwrite: Whether to overwrite existing path
-    :type overwrite: bool
-    :return: Path to the cloned repository or None if cloning failed
-    :rtype: Path | None
-    """
-    parsed = parse_git_ref(repo)
-
-    dest_path = (
-        Path(dest_path) if dest_path else Path(Path(parsed["url"]).stem)
+    # Create mirror
+    mirror = (
+        MIRRORS_DIR / generate_random_path(prefix=Path(url).stem + "_").stem
     )
-    if dest_path.suffix:
-        # Error: Cannot clone repo as file
-        return None
-
-    if not handle_existing_dest(dest_path, overwrite):
-        return None
-
-    temp_repo = get_cached_repo(repo)
-    if not temp_repo:
-        tmp_dir = generate_random_path()
-        try:
-            git_clone_cmd = f"git clone {parsed['url']} {tmp_dir}"
-            if parsed["branch"]:
-                git_clone_cmd += f" --branch {parsed['branch']}"
-            if parsed["depth"] is not None:
-                git_clone_cmd += f" --depth {parsed['depth']}"
-            result = run_git_command(git_clone_cmd)
-            if result.returncode != 0:
-                print(f"Git clone failed for {parsed['url']}")
-                return None
-            repo_obj = git.Repo(tmp_dir)
-
-            if parsed["commit"]:
-                repo_obj.git.fetch("origin", parsed["commit"])
-                repo_obj.git.checkout(parsed["commit"])
-
-            temp_repo = tmp_dir
-        except git.exc.GitCommandError:
-            return None
-
-    # Copy from cache or temporary location
-    shutil.copytree(temp_repo, dest_path)
-
-    return dest_path
-
-
-def clone_git_files(
-    repo: GitRef, dest_path: Path | None = None, overwrite: bool = False
-) -> Path | None:
-    """
-    Clone specific files or directories from a Git repository.
-
-    :param repo: GitRef string of the repository to clone files from
-    :type repo: GitRef
-    :param dest_path: Destination path to clone the files into
-    :type dest_path: Path | None
-    :param overwrite: Whether to overwrite existing path
-    :type overwrite: bool
-    :return: Path to the cloned files or None if cloning failed
-    :rtype: Path | None
-    :raises FileNotFoundError: If the specified path is not found in the repo
-    """
-    parsed = parse_git_ref(repo)
-    if not handle_existing_dest(dest_path, overwrite):
-        return None
-
-    if not parsed.get("path"):
-        return clone_git_repo(repo, dest_path, overwrite)
-
-    dest_path = (
-        Path(dest_path) if dest_path else Path(Path(parsed["url"]).stem)
+    mirror.mkdir(parents=True)
+    result = _git_run(
+        ["git", "clone", "--mirror", "--filter=blob:none", url, str(mirror)],
+        capture_output=True,
+        text=True,
     )
-    if dest_path.suffix and not Path(parsed["path"]).suffix:
-        # Error: Cannot clone dir as file
-        return None
-
-    with TemporaryDirectory() as tmp_dir:
-        repo_path = clone_git_repo(
-            repo,
-            dest_path=Path(tmp_dir),
-            overwrite=True,
+    if result.returncode != 0:
+        shutil.rmtree(mirror)
+        raise RuntimeError(
+            f"Failed to create mirror for {url}:\n{result.stderr}"
         )
-        if repo_path is None:
-            return None
 
-        src_path = repo_path / parsed["path"]
-        if not src_path.exists():
-            shutil.rmtree(tmp_dir)
-            raise FileNotFoundError(
-                f"Path {parsed['path']} not found in repo."
+    # Update metadata
+    metadata_lock = PACKAGE_GIT_CACHE_PATH / ".metadata_lock"
+    with FileLock(metadata_lock):
+        meta = load_yaml(PACKAGE_GIT_CACHE_METADATA_PATH) or {}
+        meta[url] = str(mirror)
+        with PACKAGE_GIT_CACHE_METADATA_PATH.open("w") as f:
+            YAML().dump(meta, f)
+
+    return mirror
+
+
+def _get_mirror(url: str) -> Path:
+    """
+    Get the mirror path for the specified Git repository URL, creating it if it doesn't exist.
+
+    :param url: Git repository URL
+    :type url: str
+    :return: Path to the mirror directory
+    :rtype: Path
+    """
+    meta = load_yaml(PACKAGE_GIT_CACHE_METADATA_PATH) or {}
+    if url not in meta or not Path(meta[url]).exists():
+        return _register_mirror(url)
+    else:
+        return Path(meta[url])
+
+
+def version2commit(
+    repo: str | GitRef,
+    version: str,
+) -> str | None:
+    """
+    Return the commit hash where a specified version change was made
+    in the pyproject.toml file of a git repo, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
+
+    :param repo: Git repository URL or GitRef (in which case only the URL is used)
+    :type repo: str | GitRef
+    :param version: Version string to search for
+    :type version: str
+    :return: Commit hash where the version was added, or None if not found
+    :rtype: str | None
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that the repo exists
+    if not is_git_repo(repo):
+        raise ValueError(
+            f"Repository {repo} does not exist or is not accessible."
+        )
+
+    mirror = _get_mirror(extract_url(repo))
+    with _repo_lock(mirror):
+        # Fetch updates
+        _git_run(
+            ["git", "fetch", "--prune", "--all"],
+            cwd=mirror,
+            check=True,
+            capture_output=True,
+        )
+
+        # Get commits that touched the versioning file, newest first
+        version_file = "pyproject.toml"
+        result = _git_run(
+            ["git", "rev-list", "HEAD", "--", version_file],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        revs = result.stdout.splitlines()
+
+        # Search for version addition in diffs
+        version_re = re.compile(
+            rf'^\+version\s*=\s*"{re.escape(version)}"\s*$'
+        )
+        for commit in revs:
+            result = _git_run(
+                ["git", "show", commit, "--", version_file],
+                cwd=mirror,
+                capture_output=True,
+                text=True,
+                check=True,
+                errors="ignore",
+            )
+            diff = result.stdout.splitlines()
+
+            for line in diff:
+                if version_re.match(line):
+                    return commit
+
+    return None
+
+
+def git_clone(
+    repo: GitRef | GitRefInfo,
+    dest: Path | None = None,
+    overwrite: bool = False,
+) -> Path:
+    """
+    Clone a Git repository or specific files/directories from it to the specified destination path.
+
+    :param repo: GitRef string or GitRefInfo dictionary representing the repository to clone
+    :type repo: GitRef | GitRefInfo
+    :param dest: Destination path to clone the files as. Required if cloning specific files/directories.
+    :type dest: Path | None
+    :param overwrite: Whether to overwrite existing path
+    :type overwrite: bool
+    :return: Path to the cloned files
+    :rtype: Path
+    :raises ValueError: For invalid input types, directly or downstream
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Handle inputs
+    ## repo
+    if isinstance(repo, GitRef):
+        parsed = parse_git_ref(repo)
+    elif isinstance(repo, dict):
+        parsed = fill_typed_dict(repo, GitRefInfo)
+        if not validate_typed_dict(parsed, GitRefInfo):
+            extra_fields = set(repo.keys()) - set(
+                GitRefInfo.__annotations__.keys()
+            )
+            if extra_fields:
+                raise ValueError(
+                    f"Invalid fields in GitRefInfo dictionary: {extra_fields}"
+                )
+
+            wrong_types = {
+                k
+                for k, v in repo.items()
+                if not isinstance(v, GitRefInfo.__annotations__[k])
+            }
+            if wrong_types:
+                raise ValueError(
+                    f"Wrong types for fields in GitRefInfo dictionary: {wrong_types}"
+                )
+
+            raise ValueError("Invalid GitRefInfo dictionary provided.")
+    else:
+        raise ValueError(
+            "Invalid repo input. Must be GitRef string or GitRefInfo dict."
+        )
+    ## dest
+    if not isinstance(dest, Path) and dest is not None:
+        raise ValueError("Destination 'dest' must be a Path or None.")
+    ## overwrite
+    if not isinstance(overwrite, bool):
+        raise ValueError("Parameter 'overwrite' must be a boolean.")
+
+    if parsed["path"]:
+        # Clone specific files/directories
+        if dest is None:
+            raise ValueError(
+                "Destination path must be specified when cloning specific files/directories from a Git repository."
+            )
+    else:
+        # Clone entire repo
+        if dest is None:
+            dest = Path(Path(parsed["url"]).stem)
+        elif dest.suffix:
+            raise ValueError(
+                "Destination path for cloning entire repository cannot be a file."
             )
 
-        if src_path.is_dir():
-            shutil.copytree(src_path, dest_path)
-        else:
-            shutil.copy2(src_path, dest_path)
+    # Check if the repository exists
+    if not is_git_repo(parsed["url"]):
+        raise ValueError(
+            f"Repository '{parsed['url']}' does not exist or is not accessible."
+        )
 
-    return dest_path
+    # Check if destination exists
+    if dest.exists() and not overwrite:
+        raise ValueError(
+            f"Destination path '{dest}' already exists. Use 'overwrite=True' to overwrite."
+        )
+
+    # Determine ref to clone (commit > version > branch or HEAD)
+    if parsed["commit"]:
+        ref = parsed["commit"]
+    elif parsed["version"]:
+        # Find commit for version
+        ref = version2commit(parsed["url"], parsed["version"])
+        if not ref:
+            raise ValueError(
+                f"Version '{parsed['version']}' not found in repository '{parsed['url']}'."
+            )
+    elif parsed["branch"]:
+        ref = parsed["branch"]
+    else:
+        # Get default branch
+        ref = (
+            _git_run(
+                ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+                cwd=_get_mirror(parsed["url"]),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            .stdout.strip()
+            .removeprefix("refs/remotes/origin/")
+        )
+
+    # Update mirror with requested ref
+    mirror = _get_mirror(parsed["url"])
+    with _repo_lock(mirror):
+        # Fetch updates
+        _git_run(
+            ["git", "fetch", "--prune", "--all"],
+            cwd=mirror,
+            check=True,
+            capture_output=True,
+        )
+        _git_run(
+            ["git", "archive", ref, parsed["path"] or "."],
+            cwd=mirror,
+            check=True,
+            capture_output=True,
+        )
+
+        # Clean up existing destination
+        if dest.exists():
+            if dest.is_dir():
+                shutil.rmtree(dest)
+            else:
+                dest.unlink()
+
+        # Clone to destination
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if parsed["path"]:
+            # Clone specific files/directories
+            before = set(dest.parent.iterdir())
+            git_proc = subprocess.Popen(
+                ["git", "archive", ref, parsed["path"]],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                cwd=mirror,
+            )
+            subprocess.run(
+                ["tar", "-x"],
+                stdin=git_proc.stdout,
+                check=True,
+                capture_output=True,
+                cwd=dest.parent,
+            )
+            git_proc.stdout.close()
+            git_proc.wait()
+
+            # Rename as specified by dest
+            after = set(dest.parent.iterdir())
+            created = after - before
+            if len(created) != 1:
+                raise subprocess.CalledProcessError(
+                    f"Unexpected: {len(created)} items cloned when expecting just one for "
+                    f"path '{parsed['path']}' in repository '{parsed['url']}' at ref '{ref}'."
+                )
+            else:
+                created_path = created.pop()
+                created_path.rename(dest)
+
+        else:
+            # Clone entire repo
+            _git_run(
+                ["git", "clone", str(mirror), str(dest)],
+                check=True,
+                capture_output=True,
+            )
+            _git_run(
+                ["git", "checkout", ref],
+                cwd=dest,
+                check=True,
+                capture_output=True,
+            )
+
+    return dest
+
+
+# TODO: Keep?
+def get_latest_version(
+    repo: str | GitRef,
+) -> str | None:
+    """
+    Return the latest version string from the pyproject.toml file of a git repo, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
+
+    :param repo: Git repository URL or GitRef (in which case only the URL is used)
+    :type repo: str | GitRef
+    :return: Latest version string, or None if not found
+    :rtype: str | None
+    """
+    # Save the versioning file to a temporary location
+    tmp_file = generate_random_path(suffix=".toml")
+
+    try:
+        # Clone the versioning file
+        git_clone(extract_url(repo) + "?path=pyproject.toml", dest=tmp_file)
+
+        # Load the versioning file
+        version = load_toml(tmp_file)["project"]["version"]
+
+        # Parse version
+        if not check_version(version):
+            raise ValueError
+    except Exception:
+        version = None
+    finally:
+        tmp_file.unlink()
+        return version
+
+
+# TODO: Keep? There is the 'get_local_plugin_version' sibling in plugins.py
+def get_local_version(
+    repo_path: Path,
+) -> str | None:
+    """
+    Return the version string from the pyproject.toml file in a local repository path, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
+
+    :param repo_path: Path to the local repository
+    :type repo_path: Path
+    :return: Version string, or None if not found
+    :rtype: str | None
+    """
+    try:
+        version = load_toml(repo_path / "pyproject.toml")["project"]["version"]
+        if not check_version(version):
+            raise ValueError
+        return version
+    except Exception:
+        return None
+
+
+# TODO: Keep?
+def commit2version(
+    repo: str | GitRef,
+    commit: str,
+) -> str | None:
+    """
+    Return the version string at a specified commit in the pyproject.toml file of a git repo, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
+
+    :param repo: Git repository URL or GitRef (in which case only the URL is used)
+    :type repo: str | GitRef
+    :param commit: Commit hash to search for
+    :type commit: str
+    :return: Version string at the specified commit, or None if not found
+    :rtype: str | None
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that the repo exists
+    if not is_git_repo(repo):
+        raise ValueError(
+            f"Repository {repo} does not exist or is not accessible."
+        )
+
+    mirror = _get_mirror(extract_url(repo))
+    with _repo_lock(mirror):
+        # Fetch updates
+        _git_run(
+            ["git", "fetch", "--prune", "--all"],
+            cwd=mirror,
+            check=True,
+            capture_output=True,
+        )
+
+        # Get pyproject.toml at the specified commit
+        result = _git_run(
+            ["git", "show", f"{commit}:pyproject.toml"],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+            errors="ignore",
+        )
+        toml_content = result.stdout
+
+        # Parse version from toml content
+        try:
+            toml_data = tomllib.loads(toml_content)
+            version = toml_data["project"]["version"]
+            if not check_version(version):
+                raise ValueError
+            return version
+        except Exception:
+            return None

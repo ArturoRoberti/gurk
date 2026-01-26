@@ -27,7 +27,7 @@ tasks:
         default: false
         help: Include future ROS distributions in the installation options
 
-run:
+options:
   default:
     ros/install-ros:
       enabled: true

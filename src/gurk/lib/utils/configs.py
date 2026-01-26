@@ -2,9 +2,29 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+import tomllib
 from ruamel.yaml import YAML
 
 from gurk.lib.utils.common import resolve_package_path
+
+
+def load_toml(toml_file: Path) -> dict[str, Any] | None:
+    """
+    Load a TOML file.
+
+    :param toml_file: Path to the TOML file to load
+    :type toml_file: Path
+    :return: Content of the TOML file, or None if loading fails
+    :rtype: dict[str, Any] | None
+    """
+    if not toml_file.is_file():
+        return None
+
+    with open(toml_file, "rb") as f:
+        try:
+            return tomllib.load(f) or {}
+        except tomllib.TOMLDecodeError:
+            return None
 
 
 def load_yaml(yaml_file: Path) -> dict[str, Any] | None:

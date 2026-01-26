@@ -2,8 +2,6 @@ import subprocess
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
 
-from rich.prompt import Confirm
-
 from gurk.lib.utils.common import (
     PACKAGE_SRC_PATH,
     PIPX_PYTHON_PATH,
@@ -62,7 +60,7 @@ def run_script_function(
     except Exception as e:
         # Return a failed CompletedProcess instead of None
         return subprocess.CompletedProcess(
-            args=[str(script)].extend(function if function else []),
+            args=[str(script)] + ([function] if function else []),
             returncode=1,
             stdout=b"",
             stderr=str(e).encode(),
@@ -227,27 +225,3 @@ def revert_sudo_permissions(path: FilePath) -> None:
         run=True,
         check=False,
     )
-
-
-def prompt_bool(message: str, answer: str | None = None) -> bool:
-    """
-    Prompt the user for a yes/no response.
-
-    :param message: The prompt message.
-    :type message: str
-    :param answer: Optional predefined answer for non-interactive usage.
-    :type answer: str | None
-    :return: True if the user responds with 'y', False for 'n'.
-    :rtype: bool
-    :raises ValueError: If the predefined answer is invalid.
-    """
-    # Automatic answer handling
-    if answer not in (None, "y", "n"):
-        raise ValueError(
-            "Automatic answer must be 'y', 'n', or None for interactive prompt."
-        )
-    elif answer is not None:
-        return answer == "y"
-
-    # Interactive prompt
-    return Confirm.ask(message)
