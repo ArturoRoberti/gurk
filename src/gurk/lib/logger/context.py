@@ -1,4 +1,3 @@
-import sys
 import traceback
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -92,4 +91,4 @@ class ActiveLogger:
             )
             msg = f"An Exception occurred: {exc_type.__name__} - {exc}\n\n{traceback_str}"
         Logger.logrichprint(LoggerSeverity.FATAL, msg)
-        sys.exit(1)
+        raise SystemExit(1)

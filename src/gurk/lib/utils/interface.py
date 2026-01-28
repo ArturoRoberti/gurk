@@ -189,7 +189,7 @@ def _run_python_script_function(
         # Import the module dynamically and call the function
         wrapper_src = dedent(
             f"""\
-            import importlib.util, sys
+            import importlib.util
             p = {repr(str(script))}
             spec = importlib.util.spec_from_file_location('_run_mod', p)
             mod = importlib.util.module_from_spec(spec)
@@ -197,7 +197,7 @@ def _run_python_script_function(
             func = getattr(mod, {repr(function)})
             res = func({', '.join(repr(arg) for arg in args)})
             if isinstance(res, int):
-                sys.exit(res)
+                raise SystemExit(res)
         """
         )
     else:

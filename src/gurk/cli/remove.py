@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.plugins import GurkArgumentParser, remove_plugin
+from gurk.lib.utils.remotes import is_git_repo
 
 
 def main(argv, prog, description):
@@ -21,6 +24,22 @@ def main(argv, prog, description):
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
         for plugin_name in args.plugins:
+            # Only allow plugin names
+            if is_git_repo(plugin_name) or Path(plugin_name).exists():
+                logger.fatal(
+                    f"Invalid plugin specification '{plugin_name}' given "
+                    f"for removal. Only plugin names are allowed."
+                )
+                continue
+
+            # Exclude gurk plugin, as it should not be removed
+            if plugin_name == "gurk":
+                logger.info(
+                    "Skipping removal of core 'gurk' plugin, which cannot be removed."
+                )
+                continue
+
+            # Attempt removal
             try:
                 remove_plugin(plugin_name, purge=args.purge)
             except ModuleNotFoundError:

@@ -136,6 +136,18 @@ def main(argv, prog, description):
 
             # Pull plugins
             for source in parsed_sources:
+                # Exclude gurk plugin, as it should be managed via pipx
+                try:
+                    plugin_data = get_plugin_data(source)
+                    plugin_name = plugin_data["metadata"]["name"]
+                    if plugin_name == "gurk":
+                        logger.info(
+                            "Skipping pull of core 'gurk' plugin. Please upgrade 'gurk' separately via 'pipx upgrade gurk'."
+                        )
+                        continue
+                except ModuleNotFoundError:
+                    pass
+
                 if args.replace:
                     # Remove existing plugin (if any)
                     try:

@@ -154,15 +154,15 @@ run_python_script_function() {
 		if func:
 			fn = next((n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == func), None)
 			if not fn:
-				sys.exit(f"Function '{func}' not found in {script}")
+				raise SystemExit(f"Function '{func}' not found in {script}")
 			ns = {}
 			run_nodes([fn], ns)
 			res = ns[func](*args)
-			sys.exit(res if isinstance(res, int) else 0)
+			raise SystemExit(res if isinstance(res, int) else 0)
 		else:
 			body = find_main_body(tree)
 			if not body:
-				sys.exit(f"No '__main__' block found in {script}")
+				raise SystemExit(f"No '__main__' block found in {script}")
 			run_nodes(body)
 	EOF
 }

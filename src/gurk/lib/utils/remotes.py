@@ -9,7 +9,6 @@ from typing import Any, TypeAlias, TypedDict
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
-import tomllib
 from filelock import FileLock
 from ruamel.yaml import YAML
 
@@ -493,7 +492,6 @@ def git_clone(
     return dest
 
 
-# TODO: Use in periodic workflow
 def get_latest_version(
     repo: str | GitRef,
 ) -> str | None:
@@ -524,59 +522,3 @@ def get_latest_version(
     finally:
         tmp_file.unlink()
         return version
-
-
-# TODO: Keep?
-def commit2version(
-    repo: str | GitRef,
-    commit: str,
-) -> str | None:
-    """
-    Return the version string at a specified commit in the pyproject.toml file of a git repo, or None if not found.
-        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
-
-    :param repo: Git repository URL or GitRef (in which case only the URL is used)
-    :type repo: str | GitRef
-    :param commit: Commit hash to search for
-    :type commit: str
-    :return: Version string at the specified commit, or None if not found
-    :rtype: str | None
-    :raises ValueError: If the repository does not exist
-    :raises CalledProcessError: If git commands fail for various reasons
-    """
-    # Check that the repo exists
-    if not is_git_repo(repo):
-        raise ValueError(
-            f"Repository {repo} does not exist or is not accessible."
-        )
-
-    mirror = _get_mirror(extract_url(repo))
-    with _repo_lock(mirror):
-        # Fetch updates
-        _git_run(
-            ["git", "fetch", "--prune", "--all"],
-            cwd=mirror,
-            check=True,
-            capture_output=True,
-        )
-
-        # Get pyproject.toml at the specified commit
-        result = _git_run(
-            ["git", "show", f"{commit}:pyproject.toml"],
-            cwd=mirror,
-            capture_output=True,
-            text=True,
-            check=True,
-            errors="ignore",
-        )
-        toml_content = result.stdout
-
-        # Parse version from toml content
-        try:
-            toml_data = tomllib.loads(toml_content)
-            version = toml_data["project"]["version"]
-            if not check_version(version):
-                raise ValueError
-            return version
-        except Exception:
-            return None

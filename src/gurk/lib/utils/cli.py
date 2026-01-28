@@ -1,7 +1,6 @@
 import getpass
 import os
 import subprocess
-import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -44,7 +43,7 @@ def get_sudo_askpass() -> Path:
                 attempts -= 1
         else:
             print("gurk: 3 incorrect password attempts")
-            sys.exit(1)
+            raise SystemExit(1)
 
         askpass_file.write("#!/bin/sh\n" f"echo '{response}'\n")
         askpass_path = askpass_file.name

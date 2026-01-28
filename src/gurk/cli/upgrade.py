@@ -86,7 +86,9 @@ def main(argv, prog, description):
             # Exclude local-only plugins
             if plugin_name == "gurk":
                 logger.info(
-                    "Skipping upgrade of core 'gurk' plugin. Please upgrade 'gurk' separately via 'pipx upgrade gurk'."
+                    "Skipping upgrade of core 'gurk' plugin. Please "
+                    "upgrade 'gurk' separately via 'pipx upgrade gurk' "
+                    "and initialize it with 'gurk pull' again."
                 )
                 continue
             elif not plugin_remote:

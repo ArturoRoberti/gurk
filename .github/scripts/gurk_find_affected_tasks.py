@@ -218,7 +218,7 @@ def compute_affected_tasks() -> list[str]:
     return sorted(uninstall_tasks) + sorted(affected_tasks - uninstall_tasks)
 
 
-def main():
+if __name__ == "__main__":
     # Pull changed remote plugins and stage for diff analysis
     changed_remote_plugins = _get_changed_remote_plugin_sources()
     for plugin_source in changed_remote_plugins:
@@ -252,7 +252,3 @@ def main():
             f"Affected tasks ({len(affected_tasks)}):\n"
             f"{', '.join(affected_tasks)}"
         )
-
-
-if __name__ == "__main__":
-    main()

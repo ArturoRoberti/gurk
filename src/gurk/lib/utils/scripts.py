@@ -35,12 +35,18 @@ class ScriptBlock(TypedDict):
     # fmt: on
 
 
-def get_block_spans(path: PathLike) -> list[ScriptBlock]:
+def get_block_spans(
+    path: PathLike, top_imports_only: bool = True, merge: bool = True
+) -> list[ScriptBlock]:
     """
     Returns list of (block_type, start_line, end_line) for top-level script blocks in the given file.
 
     :param path: Path to the script file
     :type path: PathLike
+    :param top_imports_only: Whether to count only top-level import blocks as IMPORT type
+    :type top_imports_only: bool
+    :param merge: Whether to merge adjacent blocks of the same type. Comes at the cost of losing block names.
+    :type merge: bool
     :return: List of ScriptBlock dictionaries with block type and line spans
     :rtype: list[ScriptBlock]
     """
@@ -159,9 +165,9 @@ def get_block_spans(path: PathLike) -> list[ScriptBlock]:
             len(source.splitlines()),
         )
 
-    # Set IMPORT blocks that appear after non-import as OTHER (bash only - TODO: why not python?)
-    non_import_found = False
-    if kind == CommandKind.BASH:
+    # Set IMPORT blocks that appear after non-import as OTHER, since imports should be at the top
+    if top_imports_only:
+        non_import_found = False
         for block in positions:
             if block["type"] != ScriptBlockTypes.IMPORT:
                 non_import_found = True
@@ -169,23 +175,25 @@ def get_block_spans(path: PathLike) -> list[ScriptBlock]:
                 block["type"] = ScriptBlockTypes.OTHER
 
     # Merge adjacent OTHER blocks for readability
-    merged_positions = []
-    for block in positions:
-        if (
-            merged_positions
-            and block["type"] == ScriptBlockTypes.OTHER
-            and merged_positions[-1]["type"] == block["type"]
-        ):
-            # Merge with previous block
-            merged_positions[-1]["lines"] = (
-                merged_positions[-1]["lines"][0],
-                block["lines"][1],
-            )
-            merged_positions[-1]["name"] = None  # Mixed names
-        else:
-            merged_positions.append(block)
+    if merge:
+        merged_positions = []
+        for block in positions:
+            if (
+                merged_positions
+                and block["type"] == ScriptBlockTypes.OTHER
+                and merged_positions[-1]["type"] == block["type"]
+            ):
+                # Merge with previous block
+                merged_positions[-1]["lines"] = (
+                    merged_positions[-1]["lines"][0],
+                    block["lines"][1],
+                )
+                merged_positions[-1]["name"] = None  # Mixed names
+            else:
+                merged_positions.append(block)
+        positions = merged_positions
 
-    return merged_positions
+    return positions
 
 
 @dataclass(frozen=True)

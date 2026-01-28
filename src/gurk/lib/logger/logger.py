@@ -1,5 +1,4 @@
 import shutil
-import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -250,9 +249,9 @@ class Logger:
                 )  # +3 accounts for the brackets and space
 
         if severity == LoggerSeverity.DONE:
-            sys.exit(0)
+            raise SystemExit(0)
         elif severity == LoggerSeverity.FATAL:
-            sys.exit(1)
+            raise SystemExit(1)
 
     def debug(self, message: str, syntax_highlight: bool = True) -> None:
         """Log a debug message. See Logger.log for details."""
