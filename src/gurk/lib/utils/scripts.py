@@ -6,7 +6,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import TypedDict
 
-from gurk.lib.utils.common import CommandKind, FilePath, ScriptExtension
+from gurk.lib.utils.common import CommandKind, PathLike, ScriptExtension
 from gurk.lib.utils.patterns import PatternCollection
 
 
@@ -35,12 +35,12 @@ class ScriptBlock(TypedDict):
     # fmt: on
 
 
-def get_block_spans(path: FilePath) -> list[ScriptBlock]:
+def get_block_spans(path: PathLike) -> list[ScriptBlock]:
     """
     Returns list of (block_type, start_line, end_line) for top-level script blocks in the given file.
 
     :param path: Path to the script file
-    :type path: FilePath
+    :type path: PathLike
     :return: List of ScriptBlock dictionaries with block type and line spans
     :rtype: list[ScriptBlock]
     """
@@ -159,7 +159,7 @@ def get_block_spans(path: FilePath) -> list[ScriptBlock]:
             len(source.splitlines()),
         )
 
-    # Set IMPORT blocks that appear after non-import as OTHER (bash only)
+    # Set IMPORT blocks that appear after non-import as OTHER (bash only - TODO: why not python?)
     non_import_found = False
     if kind == CommandKind.BASH:
         for block in positions:
@@ -194,7 +194,7 @@ class Command:
 
     # fmt: off
     script:     str           = field()
-    function:   str | None = field(default=None)
+    function:   str | None    = field(default=None)
     check_func: bool          = field(default=True)
     # fmt: on
 
@@ -252,11 +252,9 @@ def check_script_blocks(path: Path) -> list[str]:
     # Error tracking
     errors = []
 
-    # Check there are no CLASS or OTHER blocks
+    # Check there are no OTHER blocks
     disallowed_blocks = [
-        b
-        for b in blocks
-        if b["type"] in {ScriptBlockTypes.CLASS, ScriptBlockTypes.OTHER}
+        b for b in blocks if b["type"] == ScriptBlockTypes.OTHER
     ]
     if disallowed_blocks:
         disallowed_lines = ", ".join(

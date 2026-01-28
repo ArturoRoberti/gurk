@@ -37,15 +37,16 @@ run_script_function() {
 	'
 	local script="$1"
 	local function="${2:-}"
-	local sudo="${3:-false}"
-	local args=("${@:4}")
+	local venv="${3:-}"
+	local sudo="${4:-false}"
+	local args=("${@:5}")
 	local ext="${script##*.}"
 	case "${ext,,}" in
 		bash)
-			run_bash_script_function "$script" "$function" "${args[@]}"
+			run_bash_script_function "$script" "$function" "$venv" "${args[@]}"
 			;;
 		py)
-			run_python_script_function "$script" "$function" "$sudo" "${args[@]}"
+			run_python_script_function "$script" "$function" "$venv" "$sudo" "${args[@]}"
 			;;
 		*)
 			echo "Unsupported script extension: $ext" >&2
@@ -61,6 +62,7 @@ run_bash_script_function() {
 	Args:
 	  - script:   Path to the script file.
 	  - function: (Optional) Name of the function to invoke within the script. If omitted, the entire script is run.
+	  - venv:     (Optional) Path to a virtual environment to use when running the script. If one, the current venv is used.
 	  - ...:      (Optional) Additional arguments to pass to the script or function.
 	Outputs:
 	  Output from the script or function.
@@ -69,7 +71,13 @@ run_bash_script_function() {
 	'
 	local script="$1"
 	local function="${2:-}"
-	local args=("${@:3}")
+	local venv="${3:-}"
+	local args=("${@:4}")
+
+	if [[ -n "$venv" ]]; then
+		# Activate the virtual environment
+		source "$venv/bin/activate"
+	fi
 
 	if [[ -n "$function" ]]; then
 		# Source the script and call the function
@@ -87,6 +95,7 @@ run_python_script_function() {
 	Args:
 	  - script:   Path to the script file.
 	  - function: (Optional) Name of the function to invoke within the script. If omitted, the entire script is run.
+	  - venv:     (Optional) Path to a virtual environment to use when running the script. If one, the current venv is used.
 	  - sudo:     (Optional) Whether to run the script with sudo privileges (default: false).
 	  - ...:      (Optional) Additional arguments to pass to the script or function.
 	Outputs:
@@ -101,14 +110,19 @@ run_python_script_function() {
 
 	local script="$1"
 	local func="${2:-}"
-	local sudo="${3:-false}"
-	local args=("${@:4}")
+	local venv="${3:-}"
+	local sudo="${4:-false}"
+	local args=("${@:5}")
 
-	local py_exe
-	if [[ "$sudo" == true ]]; then
-		py_exe="sudo python3"
+	local py_exe=""
+	if [[ -n "$venv" ]]; then
+		py_exe="$venv/bin/python3"
 	else
 		py_exe="python3"
+	fi
+
+	if [[ "$sudo" == true ]]; then
+		py_exe="sudo $py_exe"
 	fi
 
 	$py_exe - "${args[@]}" <<-'EOF'

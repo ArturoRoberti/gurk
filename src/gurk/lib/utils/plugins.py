@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import venv
 from argparse import (
     SUPPRESS,
     ArgumentDefaultsHelpFormatter,
@@ -22,9 +23,9 @@ from gurk.lib.logger import get_logger
 from gurk.lib.utils.common import (
     PACKAGE_HOME_PATH,
     PACKAGE_SRC_PATH,
-    PIPX_PYTHON_PATH,
+    PACKAGE_VENVS_PATH,
     YES_ANSWERS,
-    FilePath,
+    PathLike,
     check_version,
     generate_random_path,
 )
@@ -151,7 +152,7 @@ class ResolvedPluginManifest(TypedDict):
 
 class PluginRegistryEntry(TypedDict):
     # fmt: off
-    local:   str
+    local:   str | None
     remote:  GitRef | None
     # fmt: on
 
@@ -164,7 +165,7 @@ class PluginData(TypedDict):
     # fmt: on
 
 
-PluginSpec: TypeAlias = str | FilePath | GitRef
+PluginSpec: TypeAlias = str | PathLike | GitRef
 
 GURK_MANIFEST_FILENAME = "gurk-manifest.yaml"
 
@@ -259,17 +260,20 @@ def _get_possible_plugin_entries(
     plugin: PluginSpec,
     home_registry: bool = True,
     package_registry: bool = True,
+    require_local: bool = True,
 ) -> tuple[PluginRegistryEntry | None, ...]:
     """
     Get possible plugin registry entries for a given plugin name.
         NOTE: This does not check the validity of the plugin yaml file.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :param home_registry: Whether to check the home plugin registry
     :type home_registry: bool
     :param package_registry: Whether to check the package plugin registry
     :type package_registry: bool
+    :param require_local: Whether to only return entries with a local path
+    :type require_local: bool
     :return: Tuple of possible PluginRegistryEntry objects for the plugin, or None if not found
     :rtype: tuple[PluginRegistryEntry | None, ...]
     """
@@ -304,6 +308,10 @@ def _get_possible_plugin_entries(
         if not validate_typed_dict(entry, PluginRegistryEntry):
             return None
 
+        # Validate that it has a local path
+        if require_local and not entry["local"]:
+            return None
+
         # Resolve local path
         local_path = registry_file.parent / entry["local"]
         if (
@@ -328,21 +336,24 @@ def _get_plugin_registration(
     plugin: PluginSpec,
     home_registry: bool = True,
     package_registry: bool = True,
+    require_local: bool = True,
 ) -> PluginRegistryEntry | None:
     """
     Get the registry entry of a plugin (path, remote) if it exists locally.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :param home_registry: Whether to check the home plugin registry
     :type home_registry: bool
     :param package_registry: Whether to check the package plugin registry
-    :type package_registry: bool
+    :type package_registry: bool#
+    :param require_local: Whether to only return entries with a local path
+    :type require_local: bool
     :return: Registry entry if the plugin exists locally, None otherwise
     :rtype: PluginRegistryEntry | None
     """
     possible_plugin_data = _get_possible_plugin_entries(
-        plugin, home_registry, package_registry
+        plugin, home_registry, package_registry, require_local
     )
     plugin_data = tuple(p for p in possible_plugin_data if p is not None)
 
@@ -362,7 +373,7 @@ def plugin_exists_locally(plugin: PluginSpec) -> bool:
     """
     Check if a plugin exists in the possible local plugin paths.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: True if the plugin exists locally, False otherwise
     :rtype: bool
@@ -386,7 +397,7 @@ def plugin_exists(plugin: PluginSpec) -> bool:
     """
     Check if a plugin exists either locally or remotely.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: True if the plugin exists, False otherwise
     :rtype: bool
@@ -398,7 +409,7 @@ def load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
     """
     Get the raw manifest of a plugin if it exists locally.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Plugin manifest if the plugin exists locally, None otherwise
     :rtype: PluginManifest | None
@@ -427,7 +438,7 @@ def _load_resolved_plugin_manifest(
     - all paths resolved and converted to "Path" objects
     - missing properties filled with default values
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
     :rtype: ResolvedPluginManifest | None
@@ -445,11 +456,11 @@ def _load_resolved_plugin_manifest(
     plugin_path = _get_plugin_registration(plugin)["local"]
     for _, task in plugin_manifest["tasks"].items():
         # Expand script path
-        task["script"] = str(Path(plugin_path) / task["script"])
+        task["script"] = Path(plugin_path) / task["script"]
 
         # Expand config_file path (if applicable)
         if task["config_file"] is not None:
-            task["config_file"] = str(Path(plugin_path) / task["config_file"])
+            task["config_file"] = Path(plugin_path) / task["config_file"]
 
     return plugin_manifest
 
@@ -458,7 +469,7 @@ def _load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     """
     Get the pyproject.toml metadata of a local plugin.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Plugin metadata if the plugin exists locally, None otherwise
     :rtype: FilteredPluginMetadata | None
@@ -483,7 +494,7 @@ def get_plugin_data(plugin: PluginSpec) -> PluginData:
     """
     Get the registry entry, manifest and pyproject.toml metadata of a local plugin.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Plugin data containing registry entry, manifest and metadata
     :rtype: PluginData
@@ -526,7 +537,7 @@ def installed_plugin_path(plugin: PluginSpec) -> Path | None:
     """
     Get the local path of a plugin if it is installed.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :return: Local path of the plugin if it exists locally, None otherwise
     :rtype: Path | None
@@ -587,17 +598,25 @@ def iter_configs() -> Iterator[Path]:
             yield task["config_file"]
 
 
-def get_local_plugin_version(plugin: PluginSpec) -> str | None:
+def get_local_plugin_version(plugin_path: PathLike) -> str | None:
     """
-    Get the version of a local plugin from its pyproject.toml file.
+    Return the version string from the pyproject.toml file in a local repository path, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
-    :type plugin: PluginSpec
-    :return: Version string if the plugin exists locally, None otherwise
+    :param plugin_path: Path to the local repository
+    :type plugin_path: PathLike
+    :return: Version string, or None if not found
     :rtype: str | None
     """
-    plugin_metadata = _load_plugin_metadata(plugin)
-    return plugin_metadata["version"] if plugin_metadata else None
+    try:
+        version = load_toml(Path(plugin_path) / "pyproject.toml")["project"][
+            "version"
+        ]
+        if not check_version(version):
+            raise ValueError
+        return version
+    except Exception:
+        return None
 
 
 def add_plugin_entry(
@@ -643,7 +662,7 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
     """
     Remove a plugin from the home plugin registry.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin
+    :param plugin: Name, PathLike, or GitRef of the plugin
     :type plugin: PluginSpec
     :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
     :type purge: bool
@@ -653,7 +672,7 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
     logger = get_logger()
 
     # Check if the plugin exists
-    plugin_registration = _get_plugin_registration(plugin)
+    plugin_registration = _get_plugin_registration(plugin, require_local=False)
     if not plugin_registration:
         raise ModuleNotFoundError(
             f"Could not find plugin '{plugin}' in any registry."
@@ -1078,13 +1097,13 @@ class GurkArgumentParser(ArgumentParser):
 #########################################################################################
 
 
-def check_local_plugin(plugin_path: FilePath, verbose: bool = False) -> bool:
+def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
     """
     Check if a local plugin is valid.
         NOTE: All imported plugins (recursively) must also be local and valid.
 
     :param plugin_path: Path to the local plugin directory
-    :type plugin_path: FilePath
+    :type plugin_path: PathLike
     :param verbose: Whether to print errors
     :type verbose: bool
     :return: True if the plugin is valid, False otherwise
@@ -1555,60 +1574,89 @@ def pull_plugin(plugin: GitRef) -> bool:
             )
             return False
 
-    # Get plugin data
+    # Get plugin metadata
+    metadata = load_toml(temp_plugin_path / "pyproject.toml")
+    if not metadata:
+        error(
+            f"Remote plugin repository '{plugin}' has an invalid or missing 'pyproject.toml' file",
+            temp_plugin_path,
+        )
+        return False
+
+    # Extract relevant metadata
     try:
-        plugin_data = get_plugin_data(temp_plugin_path)
+        plugin_name: str = metadata["project"]["name"]
+    except KeyError as e:
+        error(
+            f"Remote plugin repository '{plugin}' has an invalid 'pyproject.toml' file: missing key {e}",
+            temp_plugin_path,
+        )
+        return False
+    dependencies: list[str] = (
+        metadata["project"].get("optional-dependencies", {}).get("gurk", [])
+    )
+
+    # Add plugin registry entry
+    plugin_remote = (
+        extract_url(plugin)
+        + "?version="
+        + get_local_plugin_version(temp_plugin_path)
+    )
+    if _get_possible_plugin_entries(plugin, home_registry=False)[0]:
+        # Remote package plugin
+        plugin_path = PACKAGE_SRC_PATH / "plugins" / plugin_name
+
+        registry_file = PACKAGE_SRC_PATH / "plugins" / "registry.yaml"
+        registry = load_yaml(registry_file)
+        registry[plugin_name]["local"] = str(plugin_path)
+        registry[plugin_name]["remote"] = plugin_remote
+        with registry_file.open("w") as f:
+            YAML().dump(registry, f)
+    else:
+        # Regular plugin
+        plugin_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
+
+        add_plugin_entry(
+            plugin_name,
+            PluginRegistryEntry(
+                local=str(plugin_path),
+                remote=plugin_remote,
+            ),
+        )
+
+    # Add plugin folder
+    shutil.move(temp_plugin_path, plugin_path)
+
+    # Install plugin dependencies in the plugin venv
+    venv_dir = PACKAGE_VENVS_PATH / plugin_name
+    logger.debug(
+        f"Installing optional dependencies for plugin '{plugin_name}' in {venv_dir}: {dependencies}"
+    )
+    venv.EnvBuilder(with_pip=True).create(venv_dir)
+    pip_bin = str(venv_dir / "bin" / "pip")
+    all_dependencies = dependencies + [PACKAGE_SRC_PATH.parents[1].as_posix()]
+    subprocess.check_call([pip_bin, "install", *all_dependencies])
+
+    # Verify by getting plugin data
+    try:
+        get_plugin_data(temp_plugin_path)
     except ModuleNotFoundError as e:
         error(str(e), temp_plugin_path)
         return False
-
-    # Add plugin
-    plugin_name = plugin_data["metadata"]["name"]
-    plugin_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
-    ## Add plugin folder
-    shutil.move(temp_plugin_path, plugin_path)
-    ## Add plugin registry entry
-    add_plugin_entry(
-        plugin_name,
-        PluginRegistryEntry(
-            local=str(plugin_path),
-            remote=extract_url(plugin)
-            + "?version="
-            + get_local_plugin_version(plugin),
-        ),
-    )
-
-    # Install plugin dependencies
-    # TODO: Install each in a (hidden) venv instead, and use that for running the plugin tasks.
-    dependencies = plugin_data["metadata"]["dependencies"]
-    if dependencies:
-        logger.debug(
-            f"Installing optional dependencies for plugin '{plugin_name}': {dependencies}"
-        )
-        subprocess.run(
-            [
-                str(PIPX_PYTHON_PATH),
-                "-m",
-                "pip",
-                "install",
-                *dependencies,
-            ],
-            check=False,
-        )
 
 
 def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
     """
     Remove a locally installed plugin.
 
-    :param plugin: Name, FilePath, or GitRef of the plugin to remove
+    :param plugin: Name, PathLike, or GitRef of the plugin to remove
     :type plugin: PluginSpec
     :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
     :type purge: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
     # Get plugin data
-    plugin_entry = _get_plugin_registration(plugin)
+    plugin_entry = _get_plugin_registration(plugin, require_local=False)
     if not plugin_entry:
         raise ModuleNotFoundError(f"No such local plugin found: {plugin}")
     elif plugin_entry["local"]:

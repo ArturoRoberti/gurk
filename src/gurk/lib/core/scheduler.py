@@ -14,7 +14,11 @@ from typing import TextIO
 
 from gurk.lib.logger import Logger, get_logger
 from gurk.lib.logger.utils import TaskTerminationType
-from gurk.lib.utils.common import CommandKind, generate_random_path
+from gurk.lib.utils.common import (
+    PACKAGE_VENVS_PATH,
+    CommandKind,
+    generate_random_path,
+)
 from gurk.lib.utils.interface import run_script_function
 from gurk.lib.utils.patterns import PatternCollection
 from gurk.lib.utils.scripts import (
@@ -406,12 +410,20 @@ class Scheduler:
             )
             tmpwrap_path = Path(tmpwrap.name)
 
+            # Get venv path
+            plugin_name = task.name.split("/", 1)[0]
+            if plugin_name == "gurk":
+                venv_path = None  # Use current venv
+            else:
+                venv_path = PACKAGE_VENVS_PATH / plugin_name
+
             # Write
             wrapper_src = run_script_function(
                 script=modified_script,
                 function=task.command.function,
                 args=args,
                 run=False,
+                venv=venv_path,
             )
             tmpwrap.write(wrapper_src)
             tmpwrap.flush()

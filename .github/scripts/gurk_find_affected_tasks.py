@@ -1,18 +1,11 @@
-import os
-import re
-import sys
-from pathlib import Path
-
-import networkx as nx
-
-from gurk.lib.utils.plugins import (
-    get_combined_plugin_tasks,
-    iter_configs,
-    iter_scripts,
-)
-
 try:
-    from gurk.lib.utils.common import PACKAGE_SRC_PATH
+    from gurk.lib.logger import allow_missing_logger
+    from gurk.lib.utils.plugins import (
+        get_combined_plugin_tasks,
+        iter_configs,
+        iter_scripts,
+        pull_plugin,
+    )
     from gurk.lib.utils.scripts import ScriptBlockTypes, get_block_spans
     from gurk.lib.utils.tasks import RUNNER_SPECIFIC_TASKS
 except ImportError:
@@ -20,10 +13,85 @@ except ImportError:
         "The gurk package needs to be installed to run this script."
     )
 
+import os
+import re
+import subprocess
+from pathlib import Path
+from typing import TypeAlias
+from urllib.parse import parse_qs, urlparse
 
-# TODO: To make this work with new plugin structure
-#       - Check local plugins as before (iter scripts/configs)
-#       - Check remote plugins via version change (look up remote pyproject.toml). If version changed, assume all tasks affected
+import networkx as nx
+from utils import PLUGIN_FOLDER_PREFIX, REPO_ROOT, get_git_diff
+
+
+def _get_changed_remote_plugin_sources() -> set[str]:
+    """
+    Get the set of changed or new remote plugin sources under PLUGIN_FOLDER_PREFIX.
+
+    :return: Set of changed or new remote plugin sources
+    :rtype: set[str]
+    """
+    from packaging.version import Version
+    from ruamel.yaml import YAML
+
+    RegistryData: TypeAlias = dict[str, dict[str, str]]
+
+    def filter_remote_plugins(registry_data: RegistryData) -> RegistryData:
+        return {
+            k: v
+            for k, v in registry_data.items()
+            if not v.get("local") and v.get("remote")
+        }
+
+    # Load current registry.yaml
+    registry_path = REPO_ROOT / PLUGIN_FOLDER_PREFIX / "registry.yaml"
+    with registry_path.open("r", encoding="utf-8") as f:
+        curr_registry_data = filter_remote_plugins(YAML().load(f))
+
+    # Load default branch registry.yaml
+    # default_registry = subprocess.check_output(
+    #     ["git", "show", f"{DEFAULT_BRANCH}:{registry_path}"],
+    #     text=True,
+    # )
+    # default_registry_data = filter_remote_plugins(YAML().load(default_registry))
+
+    # TODO: Only temporary until the default registry exists on main. Replace with above ASAP
+    default_registry_data: RegistryData = {}
+
+    # Get new remote plugins
+    new_plugins = {
+        v["remote"]
+        for k, v in curr_registry_data.items()
+        if k not in default_registry_data
+    }
+
+    # Get changed remote plugins
+    changed_plugins = set()
+    for k, v in curr_registry_data.items():
+        if k not in default_registry_data:
+            continue  # New plugin, already handled
+
+        # Get current version
+        parts = urlparse(v["remote"])
+        query = parse_qs(parts.query)
+        version = Version(query["version"])
+
+        # Get default branch version
+        parts_def = urlparse(default_registry_data[k]["remote"])
+        query_def = parse_qs(parts_def.query)
+        version_def = Version(query_def["version"])
+
+        # Compare versions
+        if version > version_def:
+            changed_plugins.add(v["remote"])
+        elif version < version_def:
+            raise RuntimeError(
+                f"Plugin '{k}' has a lower version ({version}) than in the default branch ({version_def})."
+            )
+
+    return new_plugins.union(changed_plugins)
+
+
 def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
     """
     Parse a unified diff text and return a mapping of file paths to changed line numbers.
@@ -53,10 +121,8 @@ def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
                 for line_number in range(start, start + count):
                     changed[current_file].add(line_number)
 
-    # Prepend package path to file paths
-    return {
-        str(PACKAGE_SRC_PATH.parents[1] / k): v for k, v in changed.items()
-    }
+    # Prepend repo root to file paths
+    return {str(REPO_ROOT / k): v for k, v in changed.items()}
 
 
 def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
@@ -86,16 +152,15 @@ def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
     return affected_blocks
 
 
-def compute_affected_tasks(diff_text: str) -> list[str]:
+def compute_affected_tasks() -> list[str]:
     """
-    Compute the set of affected tasks based on the given diff text.
+    Compute the set of affected tasks based on the git diff.
 
-    :param diff_text: The unified diff text
-    :type diff_text: str
     :return: Set of affected task names
     :rtype: set[str]
     """
     # Parse diff to get changed line numbers per file
+    diff_text = get_git_diff(PLUGIN_FOLDER_PREFIX, staged=True)
     changed_lines_map = _parse_diff_changed_lines(diff_text)
 
     # Find affected script blocks (functions/entrypoints)
@@ -115,6 +180,7 @@ def compute_affected_tasks(diff_text: str) -> list[str]:
     tasks = get_combined_plugin_tasks()
     affected_tasks: set[str] = set()
     for task_name, task in tasks.items():
+        # Affected script block
         script = task["script"]
         if script in affected_script_blocks:
             affected_blocks = affected_script_blocks[script]
@@ -153,8 +219,24 @@ def compute_affected_tasks(diff_text: str) -> list[str]:
 
 
 def main():
-    # Compute affected tasks from git diff read from stdin
-    affected_tasks = compute_affected_tasks(sys.stdin.read())
+    # Pull changed remote plugins and stage for diff analysis
+    changed_remote_plugins = _get_changed_remote_plugin_sources()
+    for plugin_source in changed_remote_plugins:
+        if not pull_plugin(plugin_source):
+            raise RuntimeError(
+                f"Failed to pull changed/new remote plugin from source '{plugin_source}'."
+            )
+    if changed_remote_plugins:
+        subprocess.run(
+            ["git", "add", PLUGIN_FOLDER_PREFIX],
+            check=True,
+            cwd=REPO_ROOT,
+            capture_output=True,
+        )
+
+    # Compute affected tasks from git diff
+    with allow_missing_logger():
+        affected_tasks = compute_affected_tasks()
 
     # Write to GitHub Actions env
     github_env = os.environ.get("GITHUB_ENV")

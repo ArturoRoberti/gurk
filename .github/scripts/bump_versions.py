@@ -11,7 +11,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
-from utils import DEFAULT_BRANCH, get_changed_plugin_folders
+from utils import DEFAULT_BRANCH, PLUGIN_FOLDER_PREFIX, REPO_ROOT, get_git_diff
 
 
 def load_toml(path: Path) -> dict:
@@ -103,6 +103,47 @@ def bump_toml_version_if_necessary(file: Path) -> None:
     """
     if not _check_toml_version(file):
         _bump_toml_version(file)
+
+
+def _get_changed_plugin_folder_names() -> set[str]:
+    """
+    Get the set of changed plugin folder names under PLUGIN_FOLDER_PREFIX.
+
+    :return: Set of changed plugin folder names
+    :rtype: set[str]
+    """
+    # Get list of changed files under PLUGIN_FOLDER_PREFIX
+    diff_output = get_git_diff(PLUGIN_FOLDER_PREFIX, name_only=True).strip()
+    if not diff_output:
+        return set()
+
+    # Extract unique plugin folder names
+    plugins = set()
+    for path in diff_output.splitlines():
+        if not path.startswith(PLUGIN_FOLDER_PREFIX):
+            continue
+
+        remainder = path[len(PLUGIN_FOLDER_PREFIX) :]
+        parts = remainder.split("/", 1)
+
+        if len(parts) > 1 and parts[0] not in ("gurk", "template"):
+            plugins.add(parts[0])
+
+    # Return prefixed with PLUGIN_FOLDER_PREFIX
+    return plugins
+
+
+def get_changed_plugin_folders() -> set[Path]:
+    """
+    Get the set of changed plugin folders under PLUGIN_FOLDER_PREFIX.
+
+    :return: Set of changed plugin folder paths
+    :rtype: set[Path]
+    """
+    return {
+        REPO_ROOT / PLUGIN_FOLDER_PREFIX / p
+        for p in _get_changed_plugin_folder_names()
+    }
 
 
 def main():

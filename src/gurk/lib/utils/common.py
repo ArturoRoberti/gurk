@@ -16,16 +16,17 @@ PACKAGE_SRC_PATH = Path(resources.files("gurk")).expanduser().resolve()
 PACKAGE_TESTS_PATH = PACKAGE_SRC_PATH.parents[1] / "tests"
 PIPX_PYTHON_PATH = Path(sys.executable)
 PACKAGE_HOME_PATH = Path.home() / ".gurk"
+PACKAGE_VENVS_PATH = PACKAGE_HOME_PATH / "venvs"
 PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
 SETUP_DONE_FILE = PACKAGE_HOME_PATH / "setup.done"
 IS_GITHUB_RUNNER = os.getenv("GITHUB_ACTIONS") == "true"
 
 
-PACKAGE_HOME_PATH.mkdir(parents=True, exist_ok=True)
+PACKAGE_VENVS_PATH.mkdir(parents=True, exist_ok=True)
 PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
 
 
-FilePath: TypeAlias = Path | str
+PathLike: TypeAlias = str | Path
 
 
 def generate_random_path(
@@ -61,7 +62,7 @@ def generate_random_path(
     return Path(path)
 
 
-def resolve_package_path(raw_script: FilePath) -> FilePath | None:
+def resolve_package_path(raw_script: PathLike) -> PathLike | None:
     """
     Resolve paths that may refer to package resources. Package paths are in the format:
     ```
@@ -71,9 +72,9 @@ def resolve_package_path(raw_script: FilePath) -> FilePath | None:
     multiple times in the string, but only the first occurrence of it is replaced.
 
     :param raw_script: Raw script path
-    :type raw_script: FilePath
+    :type raw_script: PathLike
     :return: Resolved script path or None if package not found. The output type matches the input type.
-    :rtype: FilePath | None
+    :rtype: PathLike | None
     """
     # Return wrong types as-is
     if not isinstance(raw_script, (Path, str)):
@@ -161,12 +162,12 @@ class CommandKind(Enum):
             raise ValueError(f"Unsupported CommandKind: {self.name}")
 
     @staticmethod
-    def from_script(script: FilePath) -> "CommandKind":
+    def from_script(script: PathLike) -> "CommandKind":
         """
         Determine the command kind based on the script file extension.
 
         :param script: Path to the script file
-        :type script: FilePath
+        :type script: PathLike
         :return: CommandKind corresponding to the script type
         :rtype: CommandKind
         """

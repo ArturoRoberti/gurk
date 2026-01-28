@@ -393,7 +393,7 @@ def git_clone(
             f"Destination path '{dest}' already exists. Use 'overwrite=True' to overwrite."
         )
 
-    # Determine ref to clone (commit > version > branch or HEAD)
+    # Determine ref to clone (commit > version > branch or default branch)
     if parsed["commit"]:
         ref = parsed["commit"]
     elif parsed["version"]:
@@ -493,7 +493,7 @@ def git_clone(
     return dest
 
 
-# TODO: Keep?
+# TODO: Use in periodic workflow
 def get_latest_version(
     repo: str | GitRef,
 ) -> str | None:
@@ -524,28 +524,6 @@ def get_latest_version(
     finally:
         tmp_file.unlink()
         return version
-
-
-# TODO: Keep? There is the 'get_local_plugin_version' sibling in plugins.py
-def get_local_version(
-    repo_path: Path,
-) -> str | None:
-    """
-    Return the version string from the pyproject.toml file in a local repository path, or None if not found.
-        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
-
-    :param repo_path: Path to the local repository
-    :type repo_path: Path
-    :return: Version string, or None if not found
-    :rtype: str | None
-    """
-    try:
-        version = load_toml(repo_path / "pyproject.toml")["project"]["version"]
-        if not check_version(version):
-            raise ValueError
-        return version
-    except Exception:
-        return None
 
 
 # TODO: Keep?

@@ -78,7 +78,7 @@ repos:
 - repo: local
   hooks:
   - id: bump-version
-    name: Bump version in pyproject.toml
+    name: Bump pyproject.toml versions
     entry: python3 .github/scripts/bump_versions.py
     language: python
     require_serial: true

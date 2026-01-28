@@ -49,17 +49,16 @@ def main(argv, prog, description):
                 except ModuleNotFoundError:
                     pass
 
-                # Remove any existing invalid plugin if --replace is given
-                if args.replace:
-                    try:
-                        remove_plugin(plugin_name)
-                        logger.warning(
-                            f"Existing invalid plugin '{plugin_name}' removed."
-                        )
-                    except ModuleNotFoundError:
-                        logger.debug(
-                            f"No existing invalid plugin '{plugin_name}' to remove."
-                        )
+                # Remove any existing invalid plugin
+                try:
+                    remove_plugin(plugin_name)
+                    logger.warning(
+                        f"Existing invalid plugin '{plugin_name}' removed."
+                    )
+                except ModuleNotFoundError:
+                    logger.debug(
+                        f"No existing invalid plugin '{plugin_name}' to remove."
+                    )
 
                 # Pull plugin
                 source = plugin_entry["remote"]
@@ -137,7 +136,7 @@ def main(argv, prog, description):
 
             # Pull plugins
             for source in parsed_sources:
-                if args.remove:
+                if args.replace:
                     # Remove existing plugin (if any)
                     try:
                         remove_plugin(source)

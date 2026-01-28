@@ -6,78 +6,35 @@ PLUGIN_FOLDER_PREFIX = "src/gurk/plugins/"
 DEFAULT_BRANCH = "main"
 
 
-def get_changed_plugin_folder_names() -> set[str]:
+def get_git_diff(
+    path: str | Path | None = None,
+    name_only: bool = False,
+    staged: bool = True,
+) -> str:
     """
-    Get the set of changed plugin folder names under PLUGIN_FOLDER_PREFIX.
+    Get the git diff between the default branch and the current HEAD.
 
-    :return: Set of changed plugin folder names
-    :rtype: set[str]
+    :param path: Optional path to get the diff for/under.
+    :type path: str | Path | None
+    :param name_only: Whether to return only the names of changed files
+    :type name_only: bool
+    :param staged: Whether to include staged changes
+    :type staged: bool
+    :return: The git diff as a string
+    :rtype: str
     """
-    # Get list of changed files under PLUGIN_FOLDER_PREFIX
-    diff_output = subprocess.check_output(
-        [
-            "git",
-            "diff",
-            "--name-only",
-            f"{DEFAULT_BRANCH}..HEAD",
-            "--",
-            PLUGIN_FOLDER_PREFIX,
-        ],
-        text=True,
-    ).strip()
-    if not diff_output:
-        return set()
+    diff_cmd = [
+        "git",
+        "diff",
+        "--unified=0",
+        "--ignore-space-change",
+        DEFAULT_BRANCH,
+    ]
+    if path:
+        diff_cmd.extend(["--", str(path)])
+    if name_only:
+        diff_cmd.insert(2, "--name-only")
+    if staged:
+        diff_cmd.insert(2, "--staged")
 
-    # Extract unique plugin folder names
-    plugins = set()
-    for path in diff_output.splitlines():
-        if not path.startswith(PLUGIN_FOLDER_PREFIX):
-            continue
-
-        remainder = path[len(PLUGIN_FOLDER_PREFIX) :]
-        parts = remainder.split("/", 1)
-
-        if len(parts) > 1 and parts[0] not in ("gurk", "template"):
-            print(parts)
-            plugins.add(parts[0])
-
-    # Return prefixed with PLUGIN_FOLDER_PREFIX
-    return plugins
-
-
-def get_changed_plugin_folders() -> set[Path]:
-    """
-    Get the set of changed plugin folders under PLUGIN_FOLDER_PREFIX.
-
-    :return: Set of changed plugin folder paths
-    :rtype: set[Path]
-    """
-    return {
-        REPO_ROOT / PLUGIN_FOLDER_PREFIX / p
-        for p in get_changed_plugin_folder_names()
-    }
-
-
-def get_changed_plugin_names() -> set[str]:
-    """
-    Get the set of changed plugin names under PLUGIN_FOLDER_PREFIX.
-
-    :return: Set of changed plugin names
-    :rtype: set[str]
-    """
-    from ruamel.yaml import YAML
-
-    # Load registry.yaml
-    registry_path = REPO_ROOT / PLUGIN_FOLDER_PREFIX / "registry.yaml"
-    with registry_path.open("r", encoding="utf-8") as f:
-        registry_data: dict[str, dict[str, str]] = YAML().load(f)
-
-    # Get list of changed plugin folder names
-    changed_plugin_names = get_changed_plugin_folder_names()
-
-    # Map folder names to plugin names using registry
-    return {
-        k
-        for k, v in registry_data.items()
-        if v.get("local") in changed_plugin_names
-    }
+    return subprocess.check_output(diff_cmd, text=True)

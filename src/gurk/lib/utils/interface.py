@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
 
@@ -6,7 +7,7 @@ from gurk.lib.utils.common import (
     PACKAGE_SRC_PATH,
     PIPX_PYTHON_PATH,
     CommandKind,
-    FilePath,
+    PathLike,
 )
 from gurk.lib.utils.scripts import Command
 
@@ -16,11 +17,12 @@ PACKAGE_BASH_HELPERS_PATH = (
 
 
 def run_script_function(
-    script: FilePath,
+    script: PathLike,
     function: str | None = None,
     args: list[str] = [],
     run: bool = True,
     capture_output: bool = False,
+    venv: PathLike | None = None,
     sudo: bool = False,
     check: bool = True,
 ) -> str | subprocess.CompletedProcess[str]:
@@ -28,7 +30,7 @@ def run_script_function(
     Build a wrapper script string for the specified command kind and optionally execute it.
 
     :param script: The path to the script to source or execute.
-    :type script: FilePath
+    :type script: PathLike
     :param function: The function within the script to call. If None, the script is executed directly.
     :type function: str | None
     :param args: Arguments to pass to the function or script
@@ -37,6 +39,8 @@ def run_script_function(
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
     :type capture_output: bool
+    :param venv: Optional path to a virtual environment to use when running the script. If one, the current venv is used.
+    :type venv: PathLike | None
     :param sudo: If True, runs python scripts with sudo privileges.
     :type sudo: bool
     :param check: If True, checks if the script and function exist before running. Usually set to False if e.g. the function is sourced from another script (e.g. with a bash helper).
@@ -48,14 +52,18 @@ def run_script_function(
         # Check existence of script & function fields
         command = Command(script, function, check)
 
+        # Check venv existence
+        if venv and not venv.exists():
+            raise FileNotFoundError(f"Virtual environment not found: {venv}")
+
         # Run respective command
         if command.kind == CommandKind.PYTHON:
             return _run_python_script_function(
-                script, function, args, run, capture_output, sudo
+                script, function, args, run, capture_output, venv, sudo
             )
         else:
             return _run_bash_script_function(
-                script, function, args, run, capture_output
+                script, function, args, run, capture_output, venv
             )
     except Exception as e:
         # Return a failed CompletedProcess instead of None
@@ -68,17 +76,18 @@ def run_script_function(
 
 
 def _run_bash_script_function(
-    script: FilePath,
+    script: PathLike,
     function: str | None,
     args: list[str],
     run: bool,
     capture_output: bool,
+    venv: PathLike | None,
 ) -> str | subprocess.CompletedProcess[str]:
     """
     Build a bash wrapper script string and optionally execute it.
 
     :param script: The path to the script to source or execute.
-    :type script: FilePath
+    :type script: PathLike
     :param function: The function within the script to call. If None, the script is executed directly.
     :type function: str | None
     :param args: Arguments to pass to the function or script
@@ -87,13 +96,16 @@ def _run_bash_script_function(
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
     :type capture_output: bool
+    :param venv: Optional path to a virtual environment to use when running the script. If one, the current venv is used.
+    :type venv: PathLike | None
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
     """
     # Source pipx venv and helpers
+    venv = Path(venv or PIPX_PYTHON_PATH.parents[1])
     sourcing = dedent(
         f"""\
-        source {PIPX_PYTHON_PATH.parent / 'activate'}
+        source {venv / 'bin' / 'activate'}
         source {PACKAGE_BASH_HELPERS_PATH}
     """
     )
@@ -145,18 +157,19 @@ def _run_bash_script_function(
 
 
 def _run_python_script_function(
-    script: FilePath,
+    script: PathLike,
     function: str | None,
     args: list[str],
     run: bool,
     capture_output: bool,
+    venv: PathLike | None,
     sudo: bool,
 ) -> str | subprocess.CompletedProcess[str]:
     """
     Build a Python wrapper script string and optionally execute it.
 
     :param script: The path to the script to source or execute.
-    :type script: FilePath
+    :type script: PathLike
     :param function: The function within the script to call. If None, the script is executed directly.
     :type function: str | None
     :param args: Arguments to pass to the function or script
@@ -165,6 +178,8 @@ def _run_python_script_function(
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
     :type capture_output: bool
+    :param venv: Optional path to a virtual environment to use when running the script. If one, the current venv is used.
+    :type venv: PathLike | None
     :param sudo: If True, runs python scripts with sudo privileges.
     :type sudo: bool
     :return: The generated script string (if run=False)
@@ -202,8 +217,13 @@ def _run_python_script_function(
 
     if run:
         sudo_prefix = ["sudo", "-E"] if sudo else []
+        exe = (
+            CommandKind.PYTHON.exe
+            if not venv
+            else str(Path(venv) / "bin" / "python3")
+        )
         return subprocess.run(
-            [*sudo_prefix, CommandKind.PYTHON.exe, "-c", wrapper_src],
+            [*sudo_prefix, exe, "-c", wrapper_src],
             capture_output=capture_output,
             text=True,
         )
@@ -211,12 +231,12 @@ def _run_python_script_function(
     return wrapper_src
 
 
-def revert_sudo_permissions(path: FilePath) -> None:
+def revert_sudo_permissions(path: PathLike) -> None:
     """
     Revert sudo permissions on the specified path using bash helper.
 
     :param path: Path to revert permissions on
-    :type path: FilePath
+    :type path: PathLike
     """
     run_script_function(
         script=PACKAGE_BASH_HELPERS_PATH,
