@@ -201,7 +201,7 @@ class Command:
     """Represents a command to be executed, including its script and optional function."""
 
     # fmt: off
-    script:     str           = field()
+    script:     PathLike      = field()
     function:   str | None    = field(default=None)
     check_func: bool          = field(default=True)
     # fmt: on

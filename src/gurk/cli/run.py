@@ -1,10 +1,7 @@
 from argparse import ArgumentTypeError
 
-from ruamel.yaml import YAML
-
 from gurk.lib.core import core
 from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.common import generate_random_path
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
     check_local_plugin,
@@ -158,11 +155,6 @@ def main(argv, prog, description):
                     if field not in raw_task and field in task:
                         del task[field]
 
-        # Generate mock config file
-        tmp_yaml = generate_random_path(suffix=".yaml")
-        with open(tmp_yaml, "w") as f:
-            YAML().dump(option, f)
-
         # Generate task argparser base
         task_parser_base = GurkArgumentParser(
             prog=f"{prog} --{run_type} {task_name or plugin}",
@@ -176,8 +168,8 @@ def main(argv, prog, description):
 
         # Run task(s)
         core.main(
-            cli_args=remaining,
             option=option,
+            cli_args=remaining,
             parser_base=task_parser_base,
         )
 

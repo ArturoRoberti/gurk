@@ -3,6 +3,7 @@ import click
 from gurk.cli import check, help, pull, remove, run, setup, template, upgrade
 from gurk.cli.utils import (
     GROUP_CONTEXT_SETTINGS,
+    IS_GITHUB_RUNNER,
     SUBCOMMAND_CONTEXT_SETTINGS,
     VERSION,
     OrderedGroup,
@@ -135,7 +136,17 @@ for cmd in ["check", "template"]:
 @main.command(name="pytest", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def pytest_cmd(ctx: click.Context):
-    """Run pytest (able to import this package). Use as you would the normal 'pytest' command."""
+    """
+    \b
+    Run pytest (able to import this package). Use as you would the normal 'pytest' command.
+      Currently only available for automated workflow testing.
+    """
+    if not IS_GITHUB_RUNNER:
+        raise RuntimeError(
+            "For now, the 'pytest' command is only available "
+            "when running inside a GitHub Actions runner."
+        )
+
     try:
         import pytest
     except ImportError:
@@ -143,6 +154,7 @@ def pytest_cmd(ctx: click.Context):
             "'pytest' is not installed. Please install this package with the "
             "'dev' extras to use this command via: 'pipx install -e .[dev]'"
         )
+
     raise SystemExit(pytest.main(ctx.args))
 
 

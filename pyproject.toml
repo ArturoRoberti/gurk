@@ -24,7 +24,7 @@ Issues = "https://github.com/ArturoRoberti/gurk/issues"
 Documentation = "https://github.com/ArturoRoberti/gurk#readme"
 
 [project.optional-dependencies]
-dev = [ "pytest",]
+dev = [ "pytest", "commentjson",]
 gurk = ["requests", "packaging",]
 
 [project.scripts]

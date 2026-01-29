@@ -1,3 +1,4 @@
+import os
 import sys
 from collections import OrderedDict
 from importlib.metadata import version
@@ -16,6 +17,7 @@ SUBCOMMAND_CONTEXT_SETTINGS = {
     "help_option_names": [],
 }
 VERSION = version("gurk")
+IS_GITHUB_RUNNER = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 class OrderedGroup(Group):

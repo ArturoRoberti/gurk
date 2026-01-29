@@ -82,8 +82,10 @@ def main(
         # Save failed tasks (pytest usage)
         if _captured is not None:
             _captured.extend(scheduler.get_results())
+
     except Exception as e:
         raise e
+
     finally:
         # Remove temporary sudo askpass file
         if askpass_path is not None and Path(askpass_path).is_file():

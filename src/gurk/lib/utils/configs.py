@@ -5,19 +5,19 @@ from typing import Any
 import tomllib
 from ruamel.yaml import YAML
 
-from gurk.lib.utils.common import resolve_package_path
+from gurk.lib.utils.common import PathLike, resolve_package_path
 
 
-def load_toml(toml_file: Path) -> dict[str, Any] | None:
+def load_toml(toml_file: PathLike) -> dict[str, Any] | None:
     """
     Load a TOML file.
 
     :param toml_file: Path to the TOML file to load
-    :type toml_file: Path
+    :type toml_file: PathLike
     :return: Content of the TOML file, or None if loading fails
     :rtype: dict[str, Any] | None
     """
-    if not toml_file.is_file():
+    if not Path(toml_file).is_file():
         return None
 
     with open(toml_file, "rb") as f:
@@ -27,12 +27,12 @@ def load_toml(toml_file: Path) -> dict[str, Any] | None:
             return None
 
 
-def load_yaml(yaml_file: Path) -> dict[str, Any] | None:
+def load_yaml(yaml_file: PathLike) -> dict[str, Any] | None:
     """
     Load a YAML file and normalize its content.
 
     :param yaml_file: Path to the YAML file to load
-    :type yaml_file: Path
+    :type yaml_file: PathLike
     :return: Normalized content of the YAML file, or None if loading fails
     :rtype: dict[str, Any] | None
     """
@@ -84,7 +84,7 @@ def load_yaml(yaml_file: Path) -> dict[str, Any] | None:
             # Should not happen
             pass
 
-    if not yaml_file.is_file():
+    if not Path(yaml_file).is_file():
         return None
 
     yaml = YAML(typ="safe")

@@ -140,7 +140,9 @@ class Processor:
             resolved_task = ResolvedTask(
                 name=task_name,
                 command=Command(task["script"], task["function"]),
-                config_file=task["config_file"],
+                config_file=str(task["config_file"])
+                if task["config_file"]
+                else None,
                 depends_on=tuple(task["depends_on"]),
                 privileged=task["privileged"],
                 args=tuple(task["args"]),

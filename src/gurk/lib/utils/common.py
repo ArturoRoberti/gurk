@@ -109,21 +109,6 @@ def resolve_package_path(raw_script: PathLike) -> PathLike | None:
         return resolved_str
 
 
-def stream_print(text: str, stderr: bool = False) -> None:
-    """
-    Print text to stdout or stderr.
-
-    :param text: Text to be printed
-    :type text: str
-    :param stderr: Whether to print to stderr instead of stdout
-    :type stderr: bool
-    """
-    if stderr:
-        print(text, file=sys.stderr)
-    else:
-        print(text)
-
-
 class ScriptExtension(Enum):
     """Enumeration of supported script file extensions."""
 
