@@ -1,5 +1,5 @@
 check_install_fzf() {
-	: '
+	: "
 	Check if fzf is installed.
 
 	Args:
@@ -8,7 +8,7 @@ check_install_fzf() {
 	  Path to the fzf executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local fzf_path=$(bash -ic 'command -v fzf || true')
 	if [ -n "$fzf_path" ]; then
 		echo "$fzf_path"
@@ -19,7 +19,7 @@ check_install_fzf() {
 }
 
 check_install_loki_shell() {
-	: '
+	: "
 	Check if Loki Shell Docker container is running.
 
 	Args:
@@ -28,7 +28,7 @@ check_install_loki_shell() {
 	  Docker container info if running.
 	Returns:
 	  0 if running, 1 otherwise
-	'
+	"
 	local loki_container=$(docker ps -a | grep loki)
 	if [ -n "$loki_container" ]; then
 		echo "$loki_container"

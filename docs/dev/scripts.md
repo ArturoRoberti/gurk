@@ -61,9 +61,9 @@ def my_task_function(*args: list[str]) -> None:
 # Helper is automatically sourced by scheduler
 ...
 my_task_function() {
-    : '
+    : "
     Task function description.
-    '
+    "
     # Parse task args
 	parse_task_args "$@"
 

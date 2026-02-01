@@ -1,5 +1,5 @@
 _gurk_marker() {
-	: '
+	: "
 	Generate a GURK marker string.
 
 	Args:
@@ -8,7 +8,7 @@ _gurk_marker() {
 	  None
 	Returns:
 	  Marker string
-	'
+	"
 	local type="$1"
 	if [[ "$type" == "START" ]]; then
 		local n_hashes=20
@@ -24,7 +24,7 @@ _gurk_marker() {
 }
 
 _marker_exists() {
-	: '
+	: "
 	Check if a marker exists in a file.
 
 	Args:
@@ -34,7 +34,7 @@ _marker_exists() {
 	  Number of occurrences of the marker
 	Returns:
 	  0 if exactly one marker is found, 1 otherwise
-	'
+	"
 	local file="$1"
 	local marker="$2"
 	if [ ! -f "$file" ]; then
@@ -48,7 +48,7 @@ _marker_exists() {
 }
 
 markers_exist() {
-	: '
+	: "
 	Check if both start and end markers exist in a file.
 
 	Args:
@@ -59,7 +59,7 @@ markers_exist() {
 	  None
 	Returns:
 	  0 if both markers are found exactly once, 1 otherwise
-	'
+	"
 	local file="$1"
 	local start_marker="${2:-$(_gurk_marker 'START')}"
 	local end_marker="${3:-$(_gurk_marker 'END')}"
@@ -68,7 +68,7 @@ markers_exist() {
 }
 
 _insert_around_marker() {
-	: '
+	: "
 	Write a message around a specific marker in a file.
 
 	Args:
@@ -80,7 +80,7 @@ _insert_around_marker() {
 	  None
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local message="$1"
 	local file="$2"
 	local marker="$3"
@@ -102,7 +102,7 @@ _insert_around_marker() {
 }
 
 _insert_missing_markers() {
-	: '
+	: "
 	Ensure that both start and end markers exist in a file.
 
 	Args:
@@ -113,7 +113,7 @@ _insert_missing_markers() {
 	  None
 	Returns:
 	  1 if an incompatible marker state is found, 0 otherwise
-	'
+	"
 	local file="$1"
 	if [ ! -f "$file" ]; then
 		log_step "(_insert_missing_markers) File not found: $file" true
@@ -147,7 +147,7 @@ _insert_missing_markers() {
 }
 
 write_marked() {
-	: '
+	: "
 	Log a message or file content to a file, wrapped with GURK start and end markers.
 
 	Args:
@@ -158,7 +158,7 @@ write_marked() {
 	  None
 	Returns:
 	  0, unless the file does not exist or has incompatible marker state
-	'
+	"
 	local message="$1"
 	local file="$2"
 	if [ ! -f "$file" ]; then
@@ -200,7 +200,7 @@ write_marked() {
 }
 
 remove_markers() {
-	: '
+	: "
 	Remove all sections wrapped by the GURK markers from a file.
 
 	Args:
@@ -212,7 +212,7 @@ remove_markers() {
 	  None
 	Returns:
 	  0, unless the file does not exist or has incompatible marker state
-	'
+	"
 	local file="$1"
 	if [ ! -f "$file" ]; then
 		return 1

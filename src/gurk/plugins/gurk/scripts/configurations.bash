@@ -1,9 +1,16 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 configure_bashrc() {
-	: '
+	: "
 	Add custom lines to ~/.bashrc.
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and configuration outputs
+	Returns:
+	  0 if successful (or already configured), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

@@ -1,5 +1,5 @@
 check_install_vscode() {
-	: '
+	: "
 	Check if Visual Studio Code is installed.
 
 	Args:
@@ -8,7 +8,7 @@ check_install_vscode() {
 	  Path to the VSCode executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local vscode_path=$(command -v code)
 	if [ -n "$vscode_path" ]; then
 		echo "$vscode_path"

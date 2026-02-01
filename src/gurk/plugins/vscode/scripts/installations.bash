@@ -1,9 +1,16 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 install_vscode() {
-	: '
+	: "
 	Install VSCode from source
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

@@ -1,5 +1,5 @@
 check_install_conda() {
-	: '
+	: "
 	Check if Conda (Miniconda/Anaconda) is installed.
 
 	Args:
@@ -8,7 +8,7 @@ check_install_conda() {
 	  Path to the Conda executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local conda_path=$(bash -ic 'echo $CONDA_EXE')
 	if [ -n "$conda_path" ]; then
 		echo "$conda_path"
@@ -19,7 +19,7 @@ check_install_conda() {
 }
 
 check_install_mamba() {
-	: '
+	: "
 	Check if Mamba (Micromamba/Mamba) is installed.
 
 	Args:
@@ -28,7 +28,7 @@ check_install_mamba() {
 	  Path to the Mamba executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local mamba_path=$(bash -ic 'echo $MAMBA_EXE')
 	if [ -n "$mamba_path" ]; then
 		echo "$mamba_path"

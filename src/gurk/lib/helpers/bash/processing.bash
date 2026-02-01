@@ -51,7 +51,7 @@ _txt_read() {
 
 # Get file extension
 get_file_extension() {
-	: '
+	: "
 	Get the file extension from a filename.
 
 	Args:
@@ -60,7 +60,7 @@ get_file_extension() {
 	  File extension (lowercase)
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local file=$1
 	local ext="${file##*.}"
 	echo "${ext,,}"
@@ -69,7 +69,7 @@ get_file_extension() {
 # Interfaces
 _lines() {
 	: '
-	Read lines/elements from a file based on its extension (together with '_read' function).
+	Read lines/elements from a file based on its extension (together with _read function).
 
 	Usage:
 	```bash
@@ -99,7 +99,7 @@ _lines() {
 }
 _read() {
 	: '
-	Read lines/elements from a file based on its extension (together with '_read' function).
+	Read lines/elements from a file based on its extension (together with _read function).
 
 	Usage:
 	```bash
@@ -131,7 +131,7 @@ _read() {
 #################################################################################################################
 
 remove_dots() {
-	: '
+	: "
 	Remove all dots from a string.
 
 	Args:
@@ -140,7 +140,7 @@ remove_dots() {
 	  String without dots.
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local input="$1"
 	echo "${input//./}"
 }
@@ -195,7 +195,7 @@ _contains() {
 }
 
 _wait_dpkg() {
-	: '
+	: "
 	Install packages with dpkg lock waiting to avoid conflicts.
 
 	Args:
@@ -204,12 +204,12 @@ _wait_dpkg() {
 	  None
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	sudo flock /var/lib/dpkg/lock-frontend "$@"
 }
 
 dpkg_install() {
-	: '
+	: "
 	Install debian packages safely
 
 	Args:
@@ -218,12 +218,12 @@ dpkg_install() {
 	  None
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	_wait_dpkg sudo dpkg -i "$@"
 }
 
 apt_install() {
-	: '
+	: "
 	Install apt packages safely
 
 	Args:
@@ -232,12 +232,12 @@ apt_install() {
 	  None
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	_wait_dpkg sudo apt-get install -y "$@"
 }
 
 revert_sudo_permissions() {
-	: '
+	: "
 	Revert ownership and permissions of folders/files created with sudo to the original user.
 
 	Args:
@@ -246,7 +246,7 @@ revert_sudo_permissions() {
 	  None
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local target="$1"
 
 	# Change ownership

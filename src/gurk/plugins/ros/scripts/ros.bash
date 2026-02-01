@@ -1,7 +1,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 _get_supported_ros_distros() {
-	: '
+	: "
 	Get a list of supported ROS distros for the current OS.
 	Returns an array of supported ROS distro codenames.
 
@@ -11,14 +11,14 @@ _get_supported_ros_distros() {
 	  List of supported ROS distro codenames
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local supported_ros_distros
 	supported_ros_distros=($(apt-cache search ros- | grep -E '^ros-[a-z]+-desktop-full' | awk '{print $1}' | sed 's/^ros-//;s/-desktop-full$//' | tr '\n' ' '))
 	printf "%s\n" "${supported_ros_distros[@]}"
 }
 
 _get_latest_ros_distro() {
-	: '
+	: "
 	Get the latest ROS distro codename from the official ROS releases page.
 	If --ros-include-future is provided, future distros will also be considered.
 
@@ -28,7 +28,7 @@ _get_latest_ros_distro() {
 	  Latest ROS distro codename
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local url="https://docs.ros.org/en/rolling/Releases.html"
 	local rows best_name best_ts ts eol name cls codename lc_eol
 
@@ -105,14 +105,21 @@ _get_latest_ros_distro() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-	: '
+	: "
 	Install ROS distros.
 
 	NOTE: This can only install ROS distros officially supported by the host OS.
 		  If any other distros are needed, consider using ROS docker images.
 		  See 'install-docker-images' task for more details on ROS docker images.
 		  You can (usually) find more info about supported OSs at https://docs.ros.org/en/<distro>/Installation.html
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

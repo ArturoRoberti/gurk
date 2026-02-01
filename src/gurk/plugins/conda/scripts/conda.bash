@@ -1,9 +1,16 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 install_conda() {
-	: '
+	: "
 	Install Conda (Miniconda/Anaconda)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 
@@ -79,16 +86,16 @@ install_conda() {
 
 # NOTE: To uninstall run "micromamba shell deinit" and then remove "~/.micromamba" and "~/.local/bin/micromamba" folders
 _install_micromamba() {
-	: '
+	: "
 	Install Micromamba
 
 	Args:
-	  - Configuration Args
+	  - Task Args
 	Outputs:
 	  Log messages indicating the current progress and installation outputs
 	Returns:
 	  0 if successful (or already installed), 1 otherwise
-	'
+	"
 	# Check if micromamba is already installed
 	if check_install_mamba && [[ "$FORCE" == false ]]; then
 		log_step "Micromamba is already installed - Exiting"
@@ -109,16 +116,16 @@ _install_micromamba() {
 
 # NOTE: To uninstall run "mamba shell deinit" and then "conda remove -y mamba"
 _install_mamba() {
-	: '
+	: "
 	Install Mamba
 
 	Args:
-	  - Configuration Args
+	  - Task Args
 	Outputs:
 	  Log messages indicating the current progress and installation outputs
 	Returns:
 	  0 if successful (or already installed), 1 otherwise
-	'
+	"
 	# Check if mamba is already installed
 	if check_install_mamba && [[ "$FORCE" == false ]]; then
 		log_step "Mamba is already installed - Exiting"
@@ -141,9 +148,16 @@ _install_mamba() {
 }
 
 install_mamba() {
-	: '
+	: "
 	Install (Micro)Mamba - Micromamba prioritized over Mamba (if both specified)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# TODO: ToS acceptance for mamba required?
 
 	# Parse task args

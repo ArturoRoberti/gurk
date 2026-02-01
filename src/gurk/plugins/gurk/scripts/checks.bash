@@ -1,5 +1,5 @@
 check_configure_bashrc() {
-	: '
+	: "
 	Check if the ~/.bashrc has been configured with the custom lines.
 
 	Args:
@@ -8,7 +8,7 @@ check_configure_bashrc() {
 	  Log messages indicating the current progress
 	Returns:
 	  0 if configured, 1 otherwise
-	'
+	"
 	if markers_exist "$HOME/.bashrc"; then
 		log_step "~/.bashrc is already configured"
 		return 0

@@ -1,5 +1,5 @@
 log_step() {
-	: '
+	: "
 	Log a step message without advancing progress.
 
 	Args:
@@ -9,7 +9,7 @@ log_step() {
 	  Log messages indicating the current progress
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local message="$1"
 	local warning="${2:-false}"
 
@@ -21,7 +21,7 @@ log_step() {
 }
 
 run_script_function() {
-	: '
+	: "
 	Runs a script (Bash or Python), optionally invoking a specific function within it.
 		NOTE: This mirrors the Python function of the same name in 'lib/utils/interface.py', with bash limitations considered.
 
@@ -34,7 +34,7 @@ run_script_function() {
 	  Output from the script or function.
 	Returns:
 	  0 if executed successfully, 1 otherwise
-	'
+	"
 	local script="$1"
 	local function="${2:-}"
 	local venv="${3:-}"
@@ -56,7 +56,7 @@ run_script_function() {
 }
 
 run_bash_script_function() {
-	: '
+	: "
 	Runs a Bash script, optionally invoking a specific function within it.
 
 	Args:
@@ -68,7 +68,7 @@ run_bash_script_function() {
 	  Output from the script or function.
 	Returns:
 	  0 if executed successfully, 1 otherwise
-	'
+	"
 	local script="$1"
 	local function="${2:-}"
 	local venv="${3:-}"
@@ -89,7 +89,7 @@ run_bash_script_function() {
 }
 
 run_python_script_function() {
-	: '
+	: "
 	Runs a Python script, optionally invoking a specific function within it.
 
 	Args:
@@ -102,7 +102,7 @@ run_python_script_function() {
 	  Output from the script or function.
 	Returns:
 	  0 if executed successfully, 1 otherwise
-	'
+	"
 	if [[ $# -lt 1 ]]; then
 		echo "Error: missing required argument 'script'" >&2
 		return 1

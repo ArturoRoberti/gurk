@@ -1,7 +1,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 _get_latest_isaacsim_version() {
-	: '
+	: "
 	Function to get the latest Isaac Sim version from release notes
 
 	Args:
@@ -10,7 +10,7 @@ _get_latest_isaacsim_version() {
 	  Latest Isaac Sim version string
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local URL="https://docs.isaacsim.omniverse.nvidia.com/latest/overview/release_notes.html"
 	curl -s "$URL" |
 		awk '/<section id="release-notes">/,/<\/section>/' |
@@ -20,9 +20,16 @@ _get_latest_isaacsim_version() {
 
 # TODO: Test (looks good, at least for newest version)
 install_isaacsim() {
-	: '
+	: "
 	Install Isaac Sim (only officially supported versions)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 
@@ -102,7 +109,7 @@ install_isaacsim() {
 }
 
 _find_best_isaaclab() {
-	: '
+	: "
 	Function to find the best matching IsaacLab version for a given IsaacSim version
 
 	Args:
@@ -111,7 +118,7 @@ _find_best_isaaclab() {
 	  Best matching IsaacLab version string (e.g. "v2.3.0")
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local isaacsim_version="$1"
 
 	# Get IsaacLab version mappings
@@ -156,7 +163,7 @@ _find_best_isaaclab() {
 }
 
 _get_latest_isaaclab_version() {
-	: '
+	: "
 	Function to get the latest IsaacLab version from the version dropdown
 
 	Args:
@@ -165,7 +172,7 @@ _get_latest_isaaclab_version() {
 	  Latest Isaac Lab version string
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local URL="https://isaac-sim.github.io/IsaacLab/main/index.html"
 	curl -s "$URL" |
 		grep -Eo '>[v]?[0-9]+\.[0-9]+\.[0-9]+<' |
@@ -176,9 +183,16 @@ _get_latest_isaaclab_version() {
 
 # TODO: Test
 install_isaaclab() {
-	: '
+	: "
 	Install Isaac Lab (only officially supported versions)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

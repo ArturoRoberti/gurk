@@ -5,7 +5,7 @@
 # MIT License - Copyright (c) 2015 Noah Hoffman
 
 parse_task_args() {
-	: '
+	: "
     Parse task arguments using the GurkArgumentParser from Python.
 
 	Args:
@@ -15,7 +15,7 @@ parse_task_args() {
 	  None
 	Returns:
 	  0 if successfully parsed, 1 otherwise
-	'
+	"
 	local task_name="$1"
 	local args=("${@:2}")
 

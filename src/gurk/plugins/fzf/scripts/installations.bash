@@ -1,9 +1,16 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 install_fzf() {
-	: '
+	: "
 	Install fzf (fuzzy finder)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 
@@ -25,9 +32,16 @@ install_fzf() {
 }
 
 install_loki_shell() {
-	: '
+	: "
 	Install loki-shell (fzf support over docker containers)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

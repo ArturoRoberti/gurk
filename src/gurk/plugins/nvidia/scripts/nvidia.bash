@@ -3,7 +3,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 # TODO: Use "SYSTEM_INFO['simulate_hardware']" flag
 
 _extract_table_rows() {
-	: '
+	: "
 	Extract table rows from NVIDIA CUDA compatibility HTML page
 
 	Args:
@@ -12,7 +12,7 @@ _extract_table_rows() {
 	  Table rows as a string
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local html="$1"
 
 	# Extract table info - NOTE: Title may change over time
@@ -23,7 +23,7 @@ _extract_table_rows() {
 }
 
 _parse_cuda_driver_map() {
-	: '
+	: "
 	Parse table rows into a simple CUDA -> driver mapping
 
 	Args:
@@ -32,7 +32,7 @@ _parse_cuda_driver_map() {
 	  CUDA to driver version mapping as "CUDA_version:driver_version" per line
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local rows="$1"
 	awk -F'|' '{
 		gsub(/^ +| +$/,"",$1); gsub(/^ +| +$/,"",$2);
@@ -41,7 +41,7 @@ _parse_cuda_driver_map() {
 }
 
 _ver2num() {
-	: '
+	: "
 	Convert version string "X.Y.Z" to a comparable number by padding each component.
 
 	Args:
@@ -53,7 +53,7 @@ _ver2num() {
 	  Comparable version number as a string
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local v="$1"
 	local max_major="$2"
 	local max_minor="$3"
@@ -70,16 +70,16 @@ _ver2num() {
 }
 
 _clean_version() {
-	: '
+	: "
 	Clean version string by removing comparison operators and padding missing patch.
 
 	Args:
-	  - v:	Version string (e.g. ">=535.54", "<=460.32.03")
+	  - v:	Version string (e.g. '>=535.54', '<=460.32.03')
 	Outputs:
-	  Cleaned version string (e.g. "535.54.0", "460.32.03")
+	  Cleaned version string (e.g. '535.54.0', '460.32.03')
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local v="$1"
 	v="${v//>=/}"
 	v="${v//>/}"
@@ -90,7 +90,7 @@ _clean_version() {
 }
 
 _get_max_version_widths() {
-	: '
+	: "
 	Determine the maximum width of major, minor, patch in a list of versions
 
 	Args:
@@ -99,7 +99,7 @@ _get_max_version_widths() {
 	  Maximum widths of major, minor, patch as three space-separated numbers
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local versions="$1"
 	local max_major=0 max_minor=0 max_patch=0
 	local major minor patch
@@ -119,7 +119,7 @@ _get_max_version_widths() {
 }
 
 _find_best_cuda() {
-	: '
+	: "
 	Find the newest compatible CUDA for a given driver
 
 	Args:
@@ -129,7 +129,7 @@ _find_best_cuda() {
 	  Best matching CUDA and driver version as "CUDA_version:driver_version"
 	Returns:
 	  0 if found, 1 otherwise
-	'
+	"
 	local drv_ver="$1"
 	local map="$2"
 	local best=""
@@ -156,7 +156,7 @@ _find_best_cuda() {
 }
 
 _detect_recommended_driver() {
-	: '
+	: "
 	Detect the recommended NVIDIA driver using ubuntu-drivers.
 
 	Args:
@@ -165,7 +165,7 @@ _detect_recommended_driver() {
 	  Recommended NVIDIA driver package name (e.g. "nvidia-driver-535")
 	Returns:
 	  0 if found, 1 otherwise
-	'
+	"
 	local drv
 	drv=$(ubuntu-drivers devices 2>/dev/null | awk '/recommended/ {print $3; exit}')
 	[[ -z "$drv" ]] && return 1
@@ -174,7 +174,7 @@ _detect_recommended_driver() {
 }
 
 _get_candidate_driver_version() {
-	: '
+	: "
 	Get the driver version from a given NVIDIA driver package name.
 
 	Args:
@@ -183,7 +183,7 @@ _get_candidate_driver_version() {
 	  Driver version string (e.g. "535.54.03")
 	Returns:
 	  0 if found, 1 otherwise
-	'
+	"
 	local driver_pkg="$1"
 	local version
 	version=$(apt show "$driver_pkg" 2>/dev/null | awk -F': ' '/^Version:/ {print $2; exit}')
@@ -197,7 +197,7 @@ _get_candidate_driver_version() {
 }
 
 _add_graphics_drivers_ppa() {
-	: '
+	: "
 	Add graphics-drivers PPA for latest NVIDIA drivers. Optionally prioritize it above NVIDIA driver packages.
 
 	Args:
@@ -206,7 +206,7 @@ _add_graphics_drivers_ppa() {
 	  Log messages indicating the current progress
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	local prime_select="${1:-false}"
 
 	if ! grep -R "graphics-drivers/ppa" /etc/apt/sources.list /etc/apt/sources.list.d/ >/dev/null; then
@@ -230,7 +230,7 @@ _add_graphics_drivers_ppa() {
 }
 
 _install_nvidia_driver() {
-	: '
+	: "
 	(Internal) Install NVIDIA Driver
 
 	Args:
@@ -240,7 +240,7 @@ _install_nvidia_driver() {
 	  Log messages indicating the current progress and installation outputs
 	Returns:
 	  0 if successful, 1 otherwise
-	'
+	"
 	local driver_version="$1"
 	local prime_select="${2:-false}"
 
@@ -269,12 +269,19 @@ _install_nvidia_driver() {
 }
 
 install_nvidia_driver() {
-	: '
+	: "
 	Manager NVIDIA Driver PPAs and install NVIDIA Driver.
 
 	WARNING: This will install the requested or recommended NVIDIA driver,
 			 replacing any existing (cuda-repository) driver installation.
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 
@@ -320,7 +327,7 @@ install_nvidia_driver() {
 }
 
 _configure_apt_repositories_cuda() {
-	: '
+	: "
 	Configure apt repositories for CUDA installation.
 
 	Args:
@@ -329,7 +336,7 @@ _configure_apt_repositories_cuda() {
 	  Log messages indicating the current progress
 	Returns:
 	  0 (unless an unexpected error occurs)
-	'
+	"
 	# Remove graphics-drivers PPA prioritization (if previously added via "install-nvidia-driver" task)
 	if [[ -f "/etc/apt/preferences.d/gurk-nvidia-driver-pin" ]]; then
 		sudo rm -f /etc/apt/preferences.d/gurk-nvidia-driver-pin
@@ -362,7 +369,7 @@ _configure_apt_repositories_cuda() {
 }
 
 _install_cuda() {
-	: '
+	: "
 	(Internal) Install CUDA Toolkit
 
 	Args:
@@ -371,7 +378,7 @@ _install_cuda() {
 	  Log messages indicating the current progress and installation outputs
 	Returns:
 	  0 if successful, 1 otherwise
-	'
+	"
 	local cuda_name="$1"
 	local cuda_major_minor=$(echo "$cuda_name" | grep -oP '\d+\.\d+')
 	local cuda_major=$(echo "$cuda_major_minor" | cut -d. -f1)
@@ -385,13 +392,20 @@ _install_cuda() {
 }
 
 install_cuda() {
-	: '
+	: "
 	Install NVIDIA Driver and CUDA Toolkit.
 
 	WARNING: This will install the recommended NVIDIA driver from the CUDA repository,
 			 replacing any existing driver installation and removing any prime-select
 			 configuration that may exist on systems with hybrid graphics (e.g. most laptops).
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

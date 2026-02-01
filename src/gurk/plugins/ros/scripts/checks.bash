@@ -1,5 +1,5 @@
 check_install_ros() {
-	: '
+	: "
 	Check if ROS (ROS1 or ROS2) is installed.
 
 	Args:
@@ -8,7 +8,7 @@ check_install_ros() {
 	  Path to the roscore or ros2 executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local setup_script=""
 	if [[ -d "/opt/ros/" ]]; then
 		setup_script=$(sudo find /opt/ros/ -name "setup.bash" | head -n1)

@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+from getpass import getuser
 from typing import TypedDict
 
 import distro
@@ -12,6 +13,7 @@ class SystemInfo(TypedDict):
     # fmt: off
     type:              str
     kernel:            str
+    username:          str
     simulate_hardware: bool
     name:              str
     codename:          str
@@ -77,6 +79,8 @@ def get_system_info() -> SystemInfo:
     system_info["type"] = platform.system().lower()
     ## x86_64, aarch64, etc.
     system_info["kernel"] = platform.machine()
+    ## username
+    system_info["username"] = getuser()
     ## Simulate Hardware (e.g. GPU) in CI
     system_info["simulate_hardware"] = os.getenv("GITHUB_ACTIONS") == "true"
 

@@ -1,9 +1,16 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 uninstall_fzf() {
-	: '
+	: "
 	Uninstall fzf (fuzzy finder)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and uninstallation outputs
+	Returns:
+	  0 if successful (or already uninstalled), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 
@@ -26,9 +33,16 @@ uninstall_fzf() {
 }
 
 uninstall_loki_shell() {
-	: '
+	: "
 	Uninstall loki-shell (fzf support over docker containers)
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and uninstallation outputs
+	Returns:
+	  0 if successful (or already uninstalled), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 

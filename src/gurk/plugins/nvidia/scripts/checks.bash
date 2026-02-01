@@ -1,5 +1,5 @@
 check_install_nvidia_driver() {
-	: '
+	: "
 	Check if NVIDIA driver is installed.
 
 	Args:
@@ -8,7 +8,7 @@ check_install_nvidia_driver() {
 	  Path to the nvidia-smi executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	# Ensure kernel module is loaded
 	sudo modprobe nvidia
 
@@ -23,7 +23,7 @@ check_install_nvidia_driver() {
 }
 
 check_install_cuda() {
-	: '
+	: "
 	Check if CUDA toolkit is installed.
 
 	Args:
@@ -32,7 +32,7 @@ check_install_cuda() {
 	  Path to the nvcc executable if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local nvcc_path=$(command -v nvcc)
 	if [ -n "$nvcc_path" ]; then
 		echo "$nvcc_path"
@@ -44,7 +44,7 @@ check_install_cuda() {
 
 # TODO (test install without starting window etc. - maybe import isaacsim as a module?)
 check_install_isaacsim() {
-	: '
+	: "
 	Check if NVIDIA Isaac Sim is installed.
 
 	Args:
@@ -53,7 +53,7 @@ check_install_isaacsim() {
 	  Path to the Isaac Sim installation if installed.
 	Returns:
 	  0 if installed, 1 otherwise
-	'
+	"
 	local isaacsim_path=$(bash -ic 'echo ${ISAACSIM_PATH}')
 	local isaacsim_python_exe=$(bash -ic 'echo ${ISAACSIM_PYTHON_EXE}')
 	if [ -d "$isaacsim_path" ] && [ -f "$isaacsim_python_exe" ]; then
@@ -69,7 +69,7 @@ check_install_isaacsim() {
 # TODO: (test install without starting window etc.)
 # TODO: Maybe return path to env (given by conda cmd) or somehow path to installation directory?
 check_install_isaaclab() {
-	: '
+	: "
 	Check if NVIDIA Isaac Lab is installed.
 
 	Args:
@@ -78,7 +78,7 @@ check_install_isaaclab() {
 	  None
 	Returns:
 	  0 if installed (with conda), 1 otherwise
-	'
+	"
 	if bash -ic "conda env list" | grep isaaclab; then
 		return 0
 	else
@@ -87,7 +87,7 @@ check_install_isaaclab() {
 }
 
 check_gcc_version() {
-	: '
+	: "
 	Check if the default GCC version is compatible with the kernel compiler version.
 
 	Args:
@@ -96,7 +96,7 @@ check_gcc_version() {
 	  Compatibility message.
 	Returns:
 	  0 if compatible, 1 otherwise
-	'
+	"
 	# Get kernel compiler version
 	local kernel_cc=$(grep "CONFIG_CC_VERSION_TEXT" /boot/config-$(uname -r) | cut -d'"' -f2)
 	local kernel_major=$(echo "$kernel_cc" | grep -oP '\bgcc-\K[0-9]+')

@@ -1,7 +1,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/checks.bash"
 
 _install_container_toolkit() {
-	: '
+	: "
 	Install NVIDIA Container Toolkit for use with Docker.
 
 	Args:
@@ -10,7 +10,7 @@ _install_container_toolkit() {
 	  Log messages indicating the current progress and installation outputs
 	Returns:
 	  0 if successful (or already installed), 1 otherwise
-	'
+	"
 	# Check if NVIDIA Container Toolkit is already installed
 	if check_install_container_toolkit && [[ "$FORCE" == false ]]; then
 		log_step "NVIDIA Container Toolkit is already installed - Skipping"
@@ -44,9 +44,16 @@ _install_container_toolkit() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-	: '
+	: "
 	Install Docker and related packages.
-	'
+
+	Args:
+	  - Task Args
+	Outputs:
+	  Log messages indicating the current progress and installation outputs
+	Returns:
+	  0 if successful (or already installed), 1 otherwise
+	"
 	# Parse task args
 	parse_task_args "$@"
 
