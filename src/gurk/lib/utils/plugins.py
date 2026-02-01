@@ -757,14 +757,13 @@ def _create_wildcard_validator(patterns: list[str]) -> tuple:
     return validate, metavar
 
 
-def check_args_dict(args_dict: ArgsDefinitionCollection) -> bool:
+def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
     """
     Extend the parser with arguments defined in a plugin.
 
     :param args_dict: Dictionary of argument definitions
     :type args_dict: ArgsDefinitionCollection
-    :return: True if arguments are valid, False otherwise
-    :rtype: bool
+    :raises ArgumentTypeError: If argument definitions are invalid
     """
     # Validate structure
     if not (
@@ -775,7 +774,7 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> bool:
             for arg_spec in args_dict.values()
         )
     ):
-        return False
+        raise ArgumentTypeError("Invalid argument definitions structure")
 
     # Validate mutually exclusive groups
     mutex_groups = defaultdict(list)
@@ -785,41 +784,69 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> bool:
             mutex_groups[mutex].append(name)
     for members in mutex_groups.values():
         if len(members) < 2:
-            return False
+            raise ArgumentTypeError(
+                "Mutually exclusive group must have at least two members"
+            )
 
     # Validate arguments
     for name, spec in args_dict.items():
         # nargs
         nargs = spec.get("nargs")
         if nargs and not (isinstance(nargs, int) or nargs in ("?", "*", "+")):
-            return False
+            raise ArgumentTypeError(
+                f"Invalid nargs value for argument '{name}'"
+            )
 
-        # Choices
+        # Boolean flags - Validate nothing else is set
         default = spec.get("default")
+        if isinstance(default, bool) and any(
+            k not in ("help", "default", "mutex")
+            for k, v in spec.items()
+            if v is not None
+        ):
+            raise ArgumentTypeError(
+                f"Invalid boolean flag argument definition for '{name}'"
+            )
+
+        # choices
         choices = spec.get("choices")
         if choices is not None:
-            validator, _ = _create_wildcard_validator(choices)
+            # Validate choices structure
+            if (
+                not isinstance(choices, list)
+                or not choices
+                or not all(isinstance(c, str) for c in choices)
+            ):
+                raise ArgumentTypeError(
+                    f"Invalid choices structure for argument '{name}'"
+                )
 
             # Validate default(s) against choices
             if default is not None:
                 if not isinstance(default, list):
                     default = [default]
+
+                # Validate default structure
+                if not default or not all(isinstance(d, str) for d in default):
+                    raise ArgumentTypeError(
+                        f"Invalid default structure for argument '{name}'"
+                    )
+
+                # Validate that all defaults are in choices
+                validator, _ = _create_wildcard_validator(choices)
                 for d in default:
                     try:
                         validator(d)
                     except ArgumentTypeError:
-                        return False
-            # Validate nargs
+                        raise ArgumentTypeError(
+                            f"Default value {d!r} for argument '{name}' is not in choices"
+                        )
+
+            # Validate nargs if no default is given
             elif nargs in ("?", "*"):
-                return False
-
-        # Boolean flags
-        elif isinstance(default, bool):
-            # Validate nargs
-            if nargs is not None:
-                return False
-
-    return True
+                raise ArgumentTypeError(
+                    f"Invalid nargs value for argument '{name}' when no default is given"
+                )
 
 
 class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
@@ -978,8 +1005,12 @@ class GurkArgumentParser(ArgumentParser):
         :type args_dict: ArgsDefinitionCollection
         :raises ArgumentTypeError: If argument definitions are invalid
         """
-        if not check_args_dict(args_dict):
-            raise ArgumentTypeError("Invalid argument definitions")
+        try:
+            check_args_dict(args_dict)
+        except ArgumentTypeError as e:
+            raise ArgumentTypeError(
+                f"Invalid argument definitions: {e}"
+            ) from e
 
         # Collect mutually exclusive groups
         mutex_groups = defaultdict(list)
@@ -999,18 +1030,18 @@ class GurkArgumentParser(ArgumentParser):
             nargs = spec.get("nargs")
             choices = spec.get("choices")
 
-            # Choices
-            if choices is not None:
-                validator, metavar = _create_wildcard_validator(choices)
-                kwargs["type"] = validator
-                kwargs["metavar"] = metavar
-
             # Boolean flags
-            elif isinstance(default, bool):
+            if isinstance(default, bool):
                 kwargs["action"] = "store_false" if default else "store_true"
 
-            # Other argument types (str, list[str])
             else:
+                # Choices
+                if choices is not None:
+                    validator, metavar = _create_wildcard_validator(choices)
+                    kwargs["type"] = validator
+                    kwargs["metavar"] = metavar
+
+                # All non-boolean argument types
                 if default is not None:
                     # optional argument
                     kwargs["default"] = default
@@ -1247,8 +1278,12 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             task_args = task.get("args")
             if task_args:
                 # Validate structure
-                if not check_args_dict(task_args):
-                    error(f"Task '{task_name}' has invalid 'args' definition.")
+                try:
+                    check_args_dict(task_args)
+                except ArgumentTypeError as e:
+                    error(
+                        f"Task '{task_name}' has invalid 'args' definition: {e}"
+                    )
                     return False
 
                 # Validate arg names
@@ -1437,12 +1472,136 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
     return _check_local_plugin(Path(plugin_path))
 
 
-def pull_plugin(plugin: GitRef) -> bool:
+def pull_local_plugin(
+    plugin_path: PathLike, pull_imports: bool = True
+) -> bool:
+    """
+    Import a plugin from a local directory.
+
+    :param plugin_path: Path to the local plugin directory
+    :type plugin_path: PathLike
+    :param pull_imports: Whether to also pull imported plugins recursively
+    :type pull_imports: bool
+    :return: True if the plugin was imported successfully, False otherwise
+    :rtype: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    # Check validity of local plugin
+    if not check_local_plugin(plugin_path):
+        logger.error(
+            f"Plugin at '{plugin_path}' is not a valid gurk plugin.",
+        )
+        return False
+
+    # Get plugin manifest
+    plugin_path = Path(plugin_path)
+    manifest_data: PluginManifest = load_yaml(
+        plugin_path / GURK_MANIFEST_FILENAME
+    )
+    if not manifest_data:
+        logger.error(
+            f"Plugin at '{plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is invalid YAML",
+        )
+        return False
+
+    # Get plugin metadata
+    metadata = load_toml(plugin_path / "pyproject.toml")
+    if not metadata:
+        logger.error(
+            f"Plugin at '{plugin_path}' has an invalid or missing 'pyproject.toml' file",
+        )
+        return False
+
+    # Extract relevant metadata
+    try:
+        plugin_name: str = metadata["project"]["name"]
+    except KeyError as e:
+        logger.error(
+            f"Plugin at '{plugin_path}' has an invalid 'pyproject.toml' file: missing key {e}",
+        )
+        return False
+    dependencies: list[str] = (
+        metadata["project"].get("optional-dependencies", {}).get("gurk", [])
+    )
+
+    # Check if plugin with same name already exists
+    if _get_plugin_registration(plugin_name):
+        logger.error(
+            f"Plugin with name '{plugin_name}' already exists. Please "
+            f"remove it via 'gurk remove {plugin_name}' first."
+        )
+        return False
+
+    # Add plugin registry entry
+    if _get_possible_plugin_entries(plugin_name, home_registry=False)[0]:
+        # Remote package plugin
+        dest_path = PACKAGE_SRC_PATH / "plugins" / plugin_name
+
+        registry_file = PACKAGE_SRC_PATH / "plugins" / "registry.yaml"
+        registry = load_yaml(registry_file)
+        registry[plugin_name]["local"] = str(dest_path)
+        registry[plugin_name]["remote"] = None
+        with registry_file.open("w") as f:
+            YAML().dump(registry, f)
+    else:
+        # Regular plugin
+        dest_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
+
+        add_plugin_entry(
+            plugin_name,
+            PluginRegistryEntry(
+                local=str(dest_path),
+                remote=None,
+            ),
+        )
+
+    # Add plugin folder
+    shutil.copytree(plugin_path, dest_path)
+
+    # Install plugin dependencies in the plugin venv
+    venv_dir = PACKAGE_VENVS_PATH / plugin_name
+    logger.debug(
+        f"Installing optional dependencies for plugin '{plugin_name}' in {venv_dir}: {dependencies}"
+    )
+    venv.EnvBuilder(with_pip=True).create(venv_dir)
+    pip_bin = str(venv_dir / "bin" / "pip")
+    all_dependencies = dependencies + [PACKAGE_SRC_PATH.parents[1].as_posix()]
+    subprocess.check_call([pip_bin, "install", *all_dependencies])
+
+    # Pull imported plugins recursively
+    if pull_imports:
+        for imp in manifest_data.get("imports", []):
+            if not is_git_repo(imp):
+                # Ignore local imports
+                continue
+
+            logger.info(f"Pulling imported plugin '{imp}'...")
+            if not pull_plugin(imp, pull_imports):
+                logger.error(
+                    f"Failed to pull imported plugin '{imp}' for plugin '{plugin_path}'",
+                )
+                return False
+
+    # Verify by getting plugin data
+    try:
+        get_plugin_data(plugin_path)
+    except ModuleNotFoundError as e:
+        logger.error(str(e))
+        return False
+
+    return True
+
+
+def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
     """
     Import a plugin from a remote Git repository.
 
     :param plugin: GitRef of the plugin to import
     :type plugin: GitRef
+    :param pull_imports: Whether to also pull imported plugins recursively
+    :type pull_imports: bool
     :return: True if the plugin was imported successfully, False otherwise
     :rtype: bool
     """
@@ -1574,75 +1733,18 @@ def pull_plugin(plugin: GitRef) -> bool:
             )
             return False
 
-    # Get plugin metadata
-    metadata = load_toml(temp_plugin_path / "pyproject.toml")
-    if not metadata:
+    # Pull local plugin from temporary directory
+    if not pull_local_plugin(temp_plugin_path, pull_imports):
         error(
-            f"Remote plugin repository '{plugin}' has an invalid or missing 'pyproject.toml' file",
+            f"Failed to import plugin from remote repository '{plugin}'",
             temp_plugin_path,
         )
         return False
 
-    # Extract relevant metadata
-    try:
-        plugin_name: str = metadata["project"]["name"]
-    except KeyError as e:
-        error(
-            f"Remote plugin repository '{plugin}' has an invalid 'pyproject.toml' file: missing key {e}",
-            temp_plugin_path,
-        )
-        return False
-    dependencies: list[str] = (
-        metadata["project"].get("optional-dependencies", {}).get("gurk", [])
-    )
+    # Clean up temporary plugin path
+    shutil.rmtree(temp_plugin_path)
 
-    # Add plugin registry entry
-    plugin_remote = (
-        extract_url(plugin)
-        + "?version="
-        + get_local_plugin_version(temp_plugin_path)
-    )
-    if _get_possible_plugin_entries(plugin, home_registry=False)[0]:
-        # Remote package plugin
-        plugin_path = PACKAGE_SRC_PATH / "plugins" / plugin_name
-
-        registry_file = PACKAGE_SRC_PATH / "plugins" / "registry.yaml"
-        registry = load_yaml(registry_file)
-        registry[plugin_name]["local"] = str(plugin_path)
-        registry[plugin_name]["remote"] = plugin_remote
-        with registry_file.open("w") as f:
-            YAML().dump(registry, f)
-    else:
-        # Regular plugin
-        plugin_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
-
-        add_plugin_entry(
-            plugin_name,
-            PluginRegistryEntry(
-                local=str(plugin_path),
-                remote=plugin_remote,
-            ),
-        )
-
-    # Add plugin folder
-    shutil.move(temp_plugin_path, plugin_path)
-
-    # Install plugin dependencies in the plugin venv
-    venv_dir = PACKAGE_VENVS_PATH / plugin_name
-    logger.debug(
-        f"Installing optional dependencies for plugin '{plugin_name}' in {venv_dir}: {dependencies}"
-    )
-    venv.EnvBuilder(with_pip=True).create(venv_dir)
-    pip_bin = str(venv_dir / "bin" / "pip")
-    all_dependencies = dependencies + [PACKAGE_SRC_PATH.parents[1].as_posix()]
-    subprocess.check_call([pip_bin, "install", *all_dependencies])
-
-    # Verify by getting plugin data
-    try:
-        get_plugin_data(temp_plugin_path)
-    except ModuleNotFoundError as e:
-        error(str(e), temp_plugin_path)
-        return False
+    return True
 
 
 def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:

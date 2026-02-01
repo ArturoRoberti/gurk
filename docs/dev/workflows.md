@@ -1,8 +1,9 @@
 # Overview
-There are three main GitHub workflows used in this repository:
+There are four main GitHub workflows used in this repository:
 1. [CI (Continuous Integration)](#ci)
 2. [Workflow CI](#workflow-ci)
-3. [PyPI Publishing](#pypi-publishing)
+3. [Version Bumping](#version-bumping)
+4. [PyPI Publishing](#pypi-publishing)
 
 # CI
 On every PR, the [CI](../../.github/workflows/ci.yml) performs:
@@ -21,6 +22,9 @@ On every issue and PR, the [Workflow CI](../../.github/workflows/workflow_ci.yml
 - (On PRs) Checks the branch name. The branch name must match the following patterns:
 	- `<fix|feature>/<short-description>` for most users
 	- `dev/<codeowner_lowercase>` for permanent branches of [CODEOWNERS](../../.github/CODEOWNERS)
+
+# Version Bumping
+At a daily interval, the [Version Bumping](../../.github/workflows/versioning.yml) workflow checks if any package plugin has a new release. If so, the package version is bumped to the remote version, and a PR is created with the changes (on which the CI runs).
 
 # PyPI Publishing
 On every push to main, the new package code is automatically published to PyPI using the [PyPI Publishing](../../.github/workflows/pypi_publish.yml) workflow. If necessary, a version bump is automatically performed as well.

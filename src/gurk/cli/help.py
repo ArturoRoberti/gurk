@@ -75,9 +75,7 @@ def main(argv, prog, description):
 
             # Dictionary linking to gurk help
             gurk_help = {
-                "Documentation": PACKAGE_SRC_PATH.parents[1]
-                / "docs"
-                / "knowledge",
+                "Documentation": PACKAGE_SRC_PATH.parents[1] / "docs",
                 "Homepage": gurk_toml["project"]["urls"]["Homepage"],
             }
 

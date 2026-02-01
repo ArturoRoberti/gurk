@@ -25,14 +25,12 @@ log_step "Some step with warning" true
 # Helpers and checks
 Script helpers include functions for file processing, logging steps, and more. Check functions verify if a task is already completed and should be used to either skip tasks at the start or verify its success at the end.
 
-All bash script helpers in `src/gurk/scripts/bash/helpers/` are sourced automatically by the scheduler before running any script or function. On the other hand, all python script helpers must be imported explicitly. Similarly, all bash check functions in `src/gurk/scripts/bash/<command>/checks.bash` are also sourced automatically and python check functions must be imported explicitly.
+All bash script helpers in `lib/helpers/bash/` are sourced automatically by the scheduler before running any script or function. On the other hand, all python script helpers must be imported explicitly. The helper `run_script_function` (Bash & Python) may be used to run a check function or helper from the other language.
 
-The helper `run_script_function` (Bash & Python) may be used to run a check function or helper from the other language.
-
-To add a new helper, add it to any file in `src/gurk/scripts/bash/helpers/` (Bash) resp. anywhere in this package (ideally in `src/gurk/scripts/python/helpers/`) (Python). To add a new check function, add it to `src/gurk/scripts/<language>/<command>/checks.py`.
+To add a new helper, add it to any file in `lib/helpers/bash/` (Bash) resp. anywhere in this package (ideally in `lib/helpers/python/`) (Python).
 
 # Argument passing
-Each script can get access to the args passed by the scheduler via the `get_task_args` helper function. This returns a system info dictionary, the task's config file path, the `--force` flag (True/False), and any remaining task-specific arguments from its plugin definition.
+Each script can get access to the args passed by the scheduler via the `parse_task_args` helper function. This returns a system info dictionary, the task's config file path, the `--force` flag (True/False), and any remaining task-specific arguments from its plugin definition.
 
 ## Python
 ```python

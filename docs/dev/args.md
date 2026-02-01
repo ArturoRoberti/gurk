@@ -1,199 +1,74 @@
----
-
-# Custom ArgParser YAML/Dict Schema
-
-This document explains the structure and semantics of the `args` dictionary for defining command-line arguments. Users can define their own argument specifications using this schema.
-
-## Top-Level Structure
-
+# Argument structure
+Each `args` section of a task definition has to have the following structure:
 ```yaml
 args:
   <argument_name>:
-    help: <string>
-    default: <value | null>
+    help: <string> (required)
+    default: <str | bool | null>
     nargs: <nargs-spec>
     choices: <list of strings>
     mutex: <group_name>
 ```
 
-* `args` is a mapping from argument names to their specification.
-* All fields under each argument are optional unless specified.
+# Final argument types in scripts
 
----
+The following describes the resulting argument types as seen in the scripts using the arguments defined via the `args` dictionary. Not that gurk bash/python type equivalents are as follows:
+| Python Equivalent | Bash Equivalent             |
+|-------------------| ----------------------------|
+| `str`             | string                      |
+| `list[str]`       | array of strings            |
+| `bool`            | string (`"true"`/`"false"`) |
+| `None`            | empty string (`""`)         |
 
-## Argument Fields
+If a boolean default is given, the argument becomes an optional flag and the resulting type is `bool`.
 
-### `help` (string)
+Otherwise, the following tables summarize the resulting types based on `default`, `nargs` and if the argument is passed or not:
 
-Human-readable description shown in the `--help` output.
+## Table 1: Resulting Type based on `default` and `nargs`
+|                                  | `default` given                                                                                       | No `default` given / `default: null` |
+|---------------------------------:|:------------------------------------------------------------------------------------------------------|:-------------------------------------|
+| `nargs` given                    | if the argument is not passed:<br>&nbsp;&nbsp; `type(<default>)`<br>else:<br>&nbsp;&nbsp; See table 2 | See table 2                          |
+| No `nargs` given / `nargs: null` | if the argument is not passed:<br>&nbsp;&nbsp; `type(<default>)`<br>else:<br>&nbsp;&nbsp; `str`       |  `str`                               |
 
-Example:
+## Table 2: Resulting Type based on `nargs` and if the argument is passed
+| Is the argument passed? | `nargs="?"` | `nargs="*"` | `nargs=<"+" \| N>` |
+|:-----------------------:|:-----------:|:-----------:|:------------------:|
+| Yes                     | `str`       | `list[str]` | `list[str]`        |
+| No                      | `None`      | empty list  | /                  |
 
-```yaml
-help: Input file to process
-```
+> **NOTE:** If no default is given or nargs is `"+"` / N (int), the argument becomes required.
 
-### `default` (string | bool | null)
+Further independently available fields are:
+- `help` (REQUIRED): Help text for the argument. Resulting type is unaffected
+- `mutex`: Mutually exclusive group name to assign the argument to. Resulting type is unaffected
+- `choices`: Available choices for the argument (supports wildcards). This limits `default` and resulting types to `str` or `list[str]` and `nargs` to ones with at least one value.
 
-Specifies the default value if the argument is not provided.
+# Forbidden values/combinations summary
+- An argument name is not a `str` beginning with `--<plugin>-` or is not unique in the plugin's entire argument set.
+- An argument definition contains any extra/unknown keys.
+- An argument is the sole member of a `mutex` group.
+- `nargs` is neither an `int` nor one of the symbols `"?"`, `"*"`, `"+"`.
+- `choices`
+  - is not a non-empty list of strings.
+  - contains a `default` value that is not `null`, a `str` or non-empty `list[str]`.
+  - contains a `default` value (not `null`) that does not match any choice (including wildcards).
+  - Has no default (resp. `default: null`) **and** `nargs` is `"?"` or `"*"`.
+- A boolean flag argument (`default` is a `bool`) has fields other than `help`, `default` and `mutex`.
 
-* **No `default` field** → the argument is required.
-* **`default: null`** → the argument is optional and will use `None` if not provided.
-* **Boolean (`true`/`false`)** → treated as a flag (`store_true` / `store_false`).
+# Allowed examples
 
-Examples:
+**Boolean flags** (→ Resulting Type: `bool`)
+| Args Dict | Equivalent Argparse  |
+| --------- | -------------------- |
+| <pre lang="yaml">--p-flag:&#13;  help: "help_text"&#13;  default: true</pre>  | <pre lang="python">parser.add_argument(&#13;  "--p-flag",&#13;  help="help_text",&#13;  action="store_false"&#13;)</pre> |
+| <pre lang="yaml">--p-flag:&#13;  help: "help_text"&#13;  default: false</pre> | <pre lang="python">parser.add_argument(&#13;  "--p-flag",&#13;  help="help_text",&#13;  action="store_true"&#13;)</pre>  |
 
-```yaml
-# Required argument (no default)
-config:
-  help: Path to config file
-
-# Optional argument with default
-mode:
-  help: Run mode
-  default: train
-
-# Boolean flag
-verbose:
-  help: Enable verbose logging
-  default: false
-```
-
-### `nargs` (string | integer)
-
-Specifies how many command-line tokens the argument consumes.
-
-Supported values:
-
-| Value          | Meaning      | Result                |
-| -------------- | ------------ | --------------------- |
-| None / omitted | exactly one  | str                   |
-| 1              | exactly one  | str in list ([value]) |
-| `?`            | zero or one  | str or None           |
-| `*`            | zero or more | list[str]             |
-| `+`            | one or more  | list[str]             |
-| N > 1          | exactly N    | list[str]             |
-
-Notes:
-
-* Scalars are always strings.
-* Lists are always `list[str]`.
-* Boolean flags cannot have `nargs`.
-
-### `choices` (list of strings)
-
-Specifies a set of valid values.
-
-Example:
-
-```yaml
-mode:
-  help: Run mode
-  choices: [train, eval]
-```
-
-* Only values in the `choices` list are accepted.
-* Works for scalar and list arguments.
-
-### `mutex` (string)
-
-Specifies a mutually exclusive group.
-
-* Arguments with the same `mutex` value cannot take effect simultaneously.
-* Optional arguments only.
-* Example:
-
-```yaml
-cpu:
-  help: Use CPU
-  default: false
-  mutex: device
-
-gpu:
-  help: Use GPU
-  default: false
-  mutex: device
-```
-
-* Argparse enforces mutual exclusion based on **values differing from defaults**, not mere presence.
-
----
-
-## Type System
-
-* Scalars: `str`
-* Lists: `list[str]`
-* Boolean flags: `bool` (inferred from default)
-* Type is inferred from `default` or `nargs`.
-
----
-
-## Argument Requirement Semantics
-
-| YAML Setting       | Meaning                                                     |
-| ------------------ | ----------------------------------------------------------- |
-| No `default`       | Required argument. Parser enforces presence.                |
-| `default: None`    | Optional argument. Value is `None` if flag not provided.    |
-| `default: <value>` | Optional argument. Uses provided default if flag not given. |
-
-* Required flags must be validated post-parse.
-* Optional flags with default allow presence with or without specifying a value (via `nargs="?"`).
-
----
-
-## Complete Example
-
-```yaml
-args:
-  --input:
-    help: Input file
-    nargs: ?
-    default: input.txt
-    mutex: filemutex
-
-  --output:
-    help: Output file
-    default: output.txt
-    mutex: filemutex
-
-  --files:
-    help: Extra files
-    nargs: +
-
-  --mode:
-    help: Run mode
-    choices: [train, eval]
-    default: train
-
-  --verbose:
-    help: Verbose logging
-    default: false
-
-  --cpu:
-    help: Use CPU
-    default: false
-    mutex: device
-
-  --gpu:
-    help: Use GPU
-    default: false
-    mutex: device
-```
-
-* `--input` and `--output` are in the same mutex group `filemutex`.
-* `--cpu` and `--gpu` are in `device` mutex group.
-* `--files` requires at least one value.
-* `--verbose` is a boolean flag.
-* `--mode` has a default and a set of allowed choices.
-
----
-
-## Notes for Users
-
-* All scalars are strings; numeric conversion must be handled separately if needed.
-* Boolean flags are inferred automatically from `default: true/false`.
-* `nargs` determines whether the argument is scalar or a list.
-* `choices` restricts valid input values.
-* `mutex` groups ensure mutually exclusive options, enforced on values differing from defaults.
-* Arguments without `default` are required and enforced by argparse.
-* Arguments with `default` but no value provided are optional and use the default.
+**Options**
+| Args Dict | Equivalent Argparse  | Resulting Type |
+| --------- | -------------------- | -------------- |
+| <pre lang="yaml">--p-name:&#13;  help: "help_text"</pre>                                                        | <pre lang="python">parser.add_argument(&#13;  "--p-name",&#13;  help="help_text",&#13;  required=True,&#13;)</pre>                          | `str`                                                                                                                |
+| <pre lang="yaml">--p-name:&#13;  help: "help_text"&#13;  default: \<default\></pre>                             | <pre lang="python">parser.add_argument(&#13;  "--p-name",&#13;  help="help_text",&#13;  default=\<default\>,&#13;)</pre>                    | if a value is passed:<br>&nbsp;&nbsp; `str`<br>else:<br>&nbsp;&nbsp; `type(<default>)`                               |
+| <pre lang="yaml">--p-opt:&#13;  help: "help_text"&#13;  nargs: "?"&#13;</pre>                                   | <pre lang="python">parser.add_argument(&#13;  "--p-opt",&#13;  help="help_text",&#13;  nargs="?",&#13;)</pre>                               | if a value is passed:<br>&nbsp;&nbsp;`str`<br>else:<br>&nbsp;&nbsp;`None`                                            |
+| <pre lang="yaml">--p-opt:&#13;  help: "help_text"&#13;  nargs: "\*"&#13;</pre>                                  | <pre lang="python">parser.add_argument(&#13;  "--p-opt",&#13;  help="help_text",&#13;  nargs="\*",&#13;)</pre>                              | if values are passed:<br>&nbsp;&nbsp; `list[str]`<br>else:<br>&nbsp;&nbsp; `[]`                                      |
+| <pre lang="yaml">--p-opt:&#13;  help: "help_text"&#13;  nargs: \<"+" \| N\>&#13;</pre>                          | <pre lang="python">parser.add_argument(&#13;  "--p-opt",&#13;  help="help_text",&#13;  nargs=\<"+" \| N\>&#13;  required=True&#13;)</pre>   | `list[str]`                                                                                                          |
+| <pre lang="yaml">--p-opt:&#13;  help: "help_text"&#13;  default: \<default\>&#13;  nargs: \<spec\>&#13;</pre>   | <pre lang="python">parser.add_argument(&#13;  "--p-opt",&#13;  help="help_text",&#13;  default=\<default\>&#13;  nargs=\<spec\>&#13;)</pre> | if values are passed:<br>&nbsp;&nbsp; [see above for narg-dependent type]<br>else:<br>&nbsp;&nbsp; `type(<default>)` |

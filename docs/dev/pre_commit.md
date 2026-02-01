@@ -4,7 +4,7 @@ This package uses pre-commit hooks that
 - Format code
 - Format config files
 - Scan code for security secrets
-- Checks that the package version is higher than the latest PyPI version
+- Checks that the package version and plugin versions are updated
 
 Please install these pre-commit hooks when contributing to the project; via:
 ```bash

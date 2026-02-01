@@ -4,7 +4,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/gurk)
 
 
-# gurk
+# gurk - The user-friendly, customizable package manager
 
 Contains anything related to setting up a new computer (desktop) system.
 

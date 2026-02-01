@@ -1,13 +1,52 @@
-from gurk.lib.logger import ActiveLogger, Logger
+from pathlib import Path
+
+from gurk.lib.logger import ActiveLogger, Logger, get_logger
 from gurk.lib.utils.common import check_version
+from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
+    PluginSpec,
     get_combined_plugin_registry,
     get_plugin_data,
+    pull_local_plugin,
     pull_plugin,
     remove_plugin,
 )
 from gurk.lib.utils.remotes import edit_url, is_git_repo, parse_git_ref
+
+
+def maybe_remove_existing_plugin(
+    plugin_spec: PluginSpec, replace: bool
+) -> None:
+    """
+    Remove existing plugin if it exists.
+
+    :param plugin_spec: Specification of the plugin to remove.
+    :type plugin_spec: PluginSpec
+    :param replace: Whether to replace existing plugins.
+    :type replace: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    if replace:
+        # Remove existing plugin (if any)
+        try:
+            remove_plugin(plugin_spec)
+            logger.warning(f"Existing plugin '{plugin_spec}' removed.")
+        except ModuleNotFoundError:
+            logger.debug(f"No existing plugin '{plugin_spec}' to remove.")
+    else:
+        # Check if plugin already exists
+        try:
+            get_plugin_data(plugin_spec)
+            logger.error(
+                f"Plugin '{plugin_spec}' already exists. "
+                "Use --replace to replace existing plugins."
+            )
+            return
+        except ModuleNotFoundError:
+            pass
 
 
 def main(argv, prog, description):
@@ -23,6 +62,12 @@ def main(argv, prog, description):
         "--replace",
         action="store_true",
         help="Replace existing plugins if they already exist.",
+    )
+    parser.add_argument(
+        "-i",
+        "--ignore-imports",
+        action="store_true",
+        help="Do not pull imported plugins.",
     )
     args = parser.parse_args(argv)
 
@@ -50,19 +95,11 @@ def main(argv, prog, description):
                     pass
 
                 # Remove any existing invalid plugin
-                try:
-                    remove_plugin(plugin_name)
-                    logger.warning(
-                        f"Existing invalid plugin '{plugin_name}' removed."
-                    )
-                except ModuleNotFoundError:
-                    logger.debug(
-                        f"No existing invalid plugin '{plugin_name}' to remove."
-                    )
+                maybe_remove_existing_plugin(plugin_name, True)
 
                 # Pull plugin
                 source = plugin_entry["remote"]
-                if not pull_plugin(source):
+                if not pull_plugin(source, not args.ignore_imports):
                     logger.error(
                         f"Failed to pull plugin '{plugin_name}' from '{source}'."
                     )
@@ -148,38 +185,53 @@ def main(argv, prog, description):
                 except ModuleNotFoundError:
                     pass
 
-                if args.replace:
-                    # Remove existing plugin (if any)
+                # Handle source type
+                if Path(source).is_dir():  # Local plugin directory
+                    # Get plugin name
                     try:
-                        remove_plugin(source)
-                        logger.warning(
-                            f"Existing plugin from source '{source}' removed."
+                        plugin_metadata = load_toml(
+                            Path(source) / "pyproject.toml"
                         )
-                    except ModuleNotFoundError:
-                        logger.debug(
-                            f"No existing plugin from source '{source}' to remove."
-                        )
-                else:
-                    # Check if plugin already exists
-                    try:
-                        get_plugin_data(source)
+                        plugin_name = plugin_metadata["project"]["name"]
+                    except Exception as e:
                         logger.error(
-                            f"Plugin from source '{source}' already exists. "
-                            "Use --replace to replace existing plugins."
+                            f"Failed to load plugin name from local path '{source}': {str(e)}. Skipping..."
                         )
                         continue
-                    except ModuleNotFoundError:
-                        pass
 
-                # Pull specified plugin
-                if not pull_plugin(source):
+                    # Remove existing plugin (if any, and if '--replace' specified)
+                    maybe_remove_existing_plugin(plugin_name, args.replace)
+
+                    # Pull specified local plugin
+                    if not pull_local_plugin(source, not args.ignore_imports):
+                        logger.error(
+                            f"Failed to pull local plugin from path '{source}'."
+                        )
+                        continue
+                    else:
+                        logger.info(
+                            f"Successfully pulled local plugin from path '{source}'."
+                        )
+
+                elif is_git_repo(source):  # GitRef source
+                    # Remove existing plugin (if any, and if '--replace' specified)
+                    maybe_remove_existing_plugin(source, args.replace)
+
+                    # Pull specified plugin
+                    if not pull_plugin(source, not args.ignore_imports):
+                        logger.error(
+                            f"Failed to pull plugin from source '{source}'."
+                        )
+                        continue
+                    else:
+                        logger.info(
+                            f"Successfully pulled plugin from source '{source}'."
+                        )
+
+                else:
                     logger.error(
-                        f"Failed to pull plugin from source '{source}'."
+                        f"'{source}' is either not a GitRef or points to an inexistent repository. Skipping..."
                     )
                     continue
-                else:
-                    logger.info(
-                        f"Successfully pulled plugin from source '{source}'."
-                    )
 
         logger.done("Plugin pulling complete.")
