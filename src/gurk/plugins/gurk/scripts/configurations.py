@@ -41,7 +41,7 @@ def configure_pinned_apps(*args: list[str]) -> None:
 
 
 # TODO: Expand any "[/].../.../..." paths to dicts. Pay attention not to merge with existing dicts.
-#       This could also be used together with getent_passwd(task_args.system_info["username"], "home")
+#       This could also be used together with getent_passwd(os.getenv("SUDO_USER"), "home")
 #           to ge the home directory of the user and thus remove the need to use HOME and ROOT.
 def configure_filestructure(*args: list[str]) -> None:
     """

@@ -20,11 +20,10 @@ from gurk.lib.utils.common import (
 from gurk.lib.utils.configs import dump_yaml, load_toml, load_yaml
 from gurk.lib.utils.typed_dict import fill_typed_dict, validate_typed_dict
 
-PACKAGE_GIT_CACHE_PATH = PACKAGE_CACHE_PATH / "git"
-MIRRORS_DIR = PACKAGE_GIT_CACHE_PATH / "mirrors"
-MIRRORS_DIR.mkdir(parents=True, exist_ok=True)
+GIT_MIRRORS_DIR = PACKAGE_CACHE_PATH / "git_mirrors"
+GIT_MIRRORS_DIR.mkdir(parents=True, exist_ok=True)
 
-PACKAGE_GIT_CACHE_METADATA_PATH = PACKAGE_GIT_CACHE_PATH / "registry.yaml"
+PACKAGE_GIT_CACHE_METADATA_PATH = GIT_MIRRORS_DIR / "registry.yaml"
 PACKAGE_GIT_CACHE_METADATA_PATH.touch(exist_ok=True)
 
 
@@ -203,7 +202,8 @@ def _register_mirror(url: str) -> Path:
     """
     # Create mirror
     mirror = (
-        MIRRORS_DIR / generate_random_path(prefix=Path(url).stem + "_").stem
+        GIT_MIRRORS_DIR
+        / generate_random_path(prefix=Path(url).stem + "_").stem
     )
     mirror.mkdir(parents=True)
     result = _git_run(
@@ -218,7 +218,7 @@ def _register_mirror(url: str) -> Path:
         )
 
     # Update metadata
-    metadata_lock = PACKAGE_GIT_CACHE_PATH / ".metadata_lock"
+    metadata_lock = GIT_MIRRORS_DIR / ".metadata_lock"
     with FileLock(metadata_lock):
         meta = load_yaml(PACKAGE_GIT_CACHE_METADATA_PATH) or {}
         meta[url] = str(mirror)
@@ -250,6 +250,7 @@ def version2commit(
     """
     Return the commit hash where a specified version change was made
     in the pyproject.toml file of a git repo, or None if not found.
+
         NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
 
     :param repo: Git repository URL or GitRef (in which case only the URL is used)
@@ -270,12 +271,7 @@ def version2commit(
     mirror = _get_mirror(extract_url(repo))
     with _repo_lock(mirror):
         # Fetch updates
-        _git_run(
-            ["git", "fetch", "--prune", "--all"],
-            cwd=mirror,
-            check=True,
-            capture_output=True,
-        )
+        _git_fetch(mirror)
 
         # Get commits that touched the versioning file, newest first
         version_file = "pyproject.toml"
@@ -286,13 +282,13 @@ def version2commit(
             text=True,
             check=True,
         )
-        revs = result.stdout.splitlines()
+        revisions = result.stdout.splitlines()
 
         # Search for version addition in diffs
         version_re = re.compile(
             rf'^\+version\s*=\s*"{re.escape(version)}"\s*$'
         )
-        for commit in revs:
+        for commit in revisions:
             result = _git_run(
                 ["git", "show", commit, "--", version_file],
                 cwd=mirror,
@@ -557,3 +553,40 @@ def get_latest_version(
     finally:
         tmp_file.unlink()
         return version
+
+
+def commit_exists(
+    repo: str | GitRef,
+    commit: str,
+) -> bool:
+    """
+    Check if a specific commit exists in the given Git repository.
+
+    :param repo: Git repository URL or GitRef (in which case only the URL is used)
+    :type repo: str | GitRef
+    :param commit: Commit hash to check
+    :type commit: str
+    :return: True if the commit exists, False otherwise
+    :rtype: bool
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that the repo exists
+    if not is_git_repo(repo):
+        raise ValueError(
+            f"Repository {repo} does not exist or is not accessible."
+        )
+
+    mirror = _get_mirror(extract_url(repo))
+    with _repo_lock(mirror):
+        # Fetch updates
+        _git_fetch(mirror)
+
+        # Check for commit existence
+        result = _git_run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0

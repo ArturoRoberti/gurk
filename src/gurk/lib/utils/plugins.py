@@ -10,6 +10,7 @@ from argparse import (
     ArgumentParser,
     ArgumentTypeError,
     Namespace,
+    RawTextHelpFormatter,
     _ArgumentGroup,
 )
 from collections import defaultdict
@@ -731,7 +732,7 @@ def update_plugin_entry(
     return False
 
 
-def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
+def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> bool:
     """
     Remove a plugin from the home plugin registry.
 
@@ -739,6 +740,8 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
     :type plugin: PluginSpec
     :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
     :type purge: bool
+    :return: True if the plugin was removed successfully, False otherwise
+    :rtype: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
     # Check if the plugin exists
@@ -753,7 +756,7 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
     # Remove plugin entries
     def _remove_single_plugin_entry(
         registry_file: Path, allow_purge: bool = False
-    ) -> None:
+    ) -> bool:
         """
         Remove a plugin entry from a specific registry file.
 
@@ -761,6 +764,8 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
         :type registry_file: Path
         :param allow_purge: Whether purging is allowed for this registry
         :type allow_purge: bool
+        :return: True if the plugin entry was removed, False otherwise
+        :rtype: bool
         """
         # Get registry
         registry: dict[str, PluginRegistryEntry] = (
@@ -772,19 +777,31 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
             # Remove whole entry
             if plugin_name in registry:
                 del registry[plugin_name]
+            else:
+                return False
         else:
             # Set local path to None
             if plugin_name in registry:
-                registry[plugin_name]["local"] = None
+                local = registry[plugin_name].get("local")
+                if not local:
+                    return False
+                else:
+                    registry[plugin_name]["local"] = None
+            else:
+                return False
 
         # Save registry
         dump_yaml(registry, registry_file)
+        return True
 
+    was_removed = False
     for registry_file, allow_purge in zip(
         _get_plugin_registries(),
         [True, False],
     ):
-        _remove_single_plugin_entry(registry_file, allow_purge)
+        was_removed |= _remove_single_plugin_entry(registry_file, allow_purge)
+
+    return was_removed
 
 
 def _create_wildcard_validator(patterns: list[str]) -> tuple:
@@ -907,9 +924,10 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
                 )
 
 
-class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
+class CleanHelpFormatter(RawTextHelpFormatter, ArgumentDefaultsHelpFormatter):
     """
     Custom formatter that:
+      - preserves newlines in help text
       - hides default=None and default=False for boolean flags
       - annotates mutually exclusive args automatically
       - respects max_help_position
@@ -921,7 +939,7 @@ class CleanHelpFormatter(ArgumentDefaultsHelpFormatter):
     def _get_help_string(self, action):
         if action.default not in (None, SUPPRESS):
             # A default is specified and is not purposefully suppressed
-            # NOTE: Inludes boolean flags ("store_true"/"store_false")
+            # NOTE: Includes boolean flags ("store_true" / "store_false")
             default_suffix = f"(default: {action.default!s})"
             if not action.help:
                 return default_suffix
@@ -1573,9 +1591,6 @@ def create_plugin_venv(plugin_name: str, dependencies: list[str]) -> bool:
     # Install dependencies
     pip_bin = str(venv_dir / "bin" / "pip")
     all_dependencies = dependencies + [PACKAGE_SRC_PATH.parents[1].as_posix()]
-    logger.debug(
-        f"Installing dependencies for plugin '{plugin_name}' in {venv_dir}: {dependencies}"
-    )
     try:
         subprocess.check_call(
             [pip_bin, "install", "--upgrade", "pip"], stdout=subprocess.DEVNULL
@@ -1658,7 +1673,7 @@ def pull_local_plugin(
     if all(
         _get_plugin_registration(
             plugin_name, home_registry=False, require_local=False
-        )[0]
+        )
     ):
         # Remote package plugin
         dest_path = PACKAGE_SRC_PATH / "plugins" / plugin_name
@@ -1908,7 +1923,9 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
     return True
 
 
-def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
+def remove_plugin(
+    plugin: PluginSpec, purge: bool = False, verbose: bool = False
+) -> None:
     """
     Remove a locally installed plugin.
 
@@ -1916,6 +1933,8 @@ def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
     :type plugin: PluginSpec
     :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
     :type purge: bool
+    :param verbose: Whether to print info messages
+    :type verbose: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
     # Get logger
@@ -1927,12 +1946,14 @@ def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
         plugin, require_local=False
     )
     if not (plugin_name and plugin_entry):
-        raise ModuleNotFoundError(f"No such local plugin found: {plugin}")
+        raise ModuleNotFoundError(
+            f"No installed plugin called '{plugin}' found"
+        )
     local = plugin_entry["local"]
 
     # Remove plugin registry entry
-    _remove_plugin_entry(plugin, purge)
-    remove_msg.append("registry entry")
+    if _remove_plugin_entry(plugin, purge):
+        remove_msg.append("registry entry")
 
     # Remove plugin folder
     if local:
@@ -1947,6 +1968,12 @@ def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
         shutil.rmtree(venv_path)
         remove_msg.append("virtual environment")
 
-    logger.info(
-        f"Successfully removed {' and '.join(remove_msg)} for plugin '{plugin_name}'"
-    )
+    if verbose:
+        if remove_msg:
+            logger.info(
+                f"Successfully removed {' and '.join(remove_msg)} for plugin '{plugin_name}'"
+            )
+        else:
+            logger.info(
+                f"Nothing to remove for (package) plugin '{plugin_name}'"
+            )

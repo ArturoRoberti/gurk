@@ -20,7 +20,8 @@ We recommend installing `pipx` via `pip`:
 ```bash
 sudo apt update && sudo apt install python3 python3-pip && python3 -m pip install --user pipx
 ```
-> **NOTE**: The installation of `pipx` via `pip` (as opposed to `apt`) is recommended on older versions, as the `apt` version is often outdated.
+> [!NOTE]
+> The installation of `pipx` via `pip` (as opposed to `apt`) is recommended on older versions, as the `apt` version is often outdated.
 
 ### MacOS
 Not supported yet.
@@ -32,10 +33,23 @@ Not supported yet.
 Then, install `gurk` via `pipx`:
 ```bash
 pipx install gurk
+gurk init
 ```
 
 # Usage
-Please have a brief look at the [documentation](https://github.com/ArturoRoberti/gurk/blob/main/docs/knowledge/).
+Using gurk you can run various plugins via
+```bash
+gurk run <plugin> [args...]
+```
+
+where `<plugin>` is a plugin's git URL or the name of a locally installed plugin to run. For example:
+```bash
+gurk run 'git@github.com:ArturoRoberti/example_gurk_plugin.git'
+```
+> [!WARNING]
+> Make sure to wrap git URLs in quotes to avoid shell interpretation issues with special characters (e.g. `&`)
+
+Please have a brief look at the [documentation](https://github.com/ArturoRoberti/gurk/blob/main/docs/knowledge/) for more information.
 
 # Contributing
 Please see [CONTRIBUTING.md](https://github.com/ArturoRoberti/gurk/blob/main/.github/CONTRIBUTING.md) for contribution guidelines.

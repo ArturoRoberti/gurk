@@ -36,8 +36,7 @@ def main(argv, prog, description):
 
             # Remove any existing invalid plugin
             try:
-                remove_plugin(plugin_name)
-                logger.warning(f"Existing plugin '{plugin_name}' removed.")
+                remove_plugin(plugin_name, verbose=args.verbose)
             except ModuleNotFoundError:
                 logger.debug(f"No existing plugin '{plugin_name}' to remove.")
 

@@ -167,7 +167,7 @@ NO_ANSWERS = ["n", "no", "false", "0"]
 
 def check_version(version: str) -> bool:
     """
-    Check if the given version string is a valid version.
+    Check if the given version string conforms to semantic versioning.
 
     :param version: The version string to check.
     :type version: str

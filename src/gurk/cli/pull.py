@@ -1,4 +1,7 @@
 from pathlib import Path
+from textwrap import dedent
+
+from termcolor import colored
 
 from gurk.lib.logger import ActiveLogger, Logger, get_logger
 from gurk.lib.utils.common import check_version
@@ -11,7 +14,15 @@ from gurk.lib.utils.plugins import (
     pull_plugin,
     remove_plugin,
 )
-from gurk.lib.utils.remotes import edit_url, is_git_repo, parse_git_ref
+from gurk.lib.utils.remotes import (
+    GitRefInfo,
+    commit_exists,
+    edit_url,
+    extract_url,
+    is_git_repo,
+    parse_git_ref,
+    version2commit,
+)
 
 
 def maybe_remove_existing_plugin(
@@ -31,16 +42,16 @@ def maybe_remove_existing_plugin(
     if replace:
         # Remove existing plugin (if any)
         try:
-            remove_plugin(plugin_spec)
+            remove_plugin(plugin_spec, verbose=True)
         except ModuleNotFoundError:
-            logger.debug(f"No existing plugin '{plugin_spec}' to remove.")
+            pass
     else:
         # Check if plugin already exists
         try:
             get_plugin_data(plugin_spec)
             logger.error(
-                f"Plugin '{plugin_spec}' already exists. "
-                "Use --replace to replace existing plugins."
+                f"Some version of plugin '{extract_url(plugin_spec)}' already "
+                "exists. Use '--replace' to replace existing plugins."
             )
             return False
         except ModuleNotFoundError:
@@ -55,7 +66,14 @@ def main(argv, prog, description):
         "sources",
         type=str,
         nargs="+",
-        help="GitRefs of the plugin sources to pull. Specify desired versions using GitRef syntax (commit/version) or via '<plugin_name>=<version>'. If empty, pull all plugins with remotes that are not installed.",
+        help=dedent(
+            f"""\
+            Local paths or partial GitRefs of the plugin sources to pull. Specify desired versions using either of:
+            - CLI syntax   : <url>=<version>
+            - GitRef syntax: <url>?commit=... OR <url>?version=...
+            {colored("WARNING:", "yellow", attrs=["bold"])} Do not use '&' in GitRefs unless quoted, as they will be misinterpreted by the shell.
+        """
+        ),
     )
     parser.add_argument(
         "-r",
@@ -79,13 +97,33 @@ def main(argv, prog, description):
         for source in args.sources:
             count = source.count("=")
             if count == 1:
-                # Get plugin version via CLI syntax
-                plugin_spec, version = (source.split("=", 1) + [None])[:2]
-                if version and not check_version(version):
+                # Get plugin version
+                ## GitRef syntax
+                parsed = parse_git_ref(source)
+                if parsed["version"]:
+                    version = parsed["version"]
+                    commit = None
+                    plugin_spec = parsed["url"]
+                elif parsed["commit"]:
+                    version = None
+                    commit = parsed["commit"]
+                    plugin_spec = parsed["url"]
+                elif any(
+                    [
+                        parsed[k]
+                        for k in GitRefInfo.__annotations__.keys()
+                        if k not in ("url", "version", "commit")
+                    ]
+                ):
                     logger.error(
-                        f"Invalid version '{version}' for plugin '{plugin_spec}'. Skipping..."
+                        "Cannot specify other GitRef parameters while specifying"
+                        "any other than 'version' or 'commit'. Skipping..."
                     )
                     continue
+                ## CLI syntax
+                else:
+                    commit = None
+                    plugin_spec, version = parsed["url"].split("=")
 
                 # Check that an actual GitRef is given
                 if not is_git_repo(plugin_spec):
@@ -95,34 +133,39 @@ def main(argv, prog, description):
                     )
                     continue
 
-                # Get plugin version via GitRef syntax
-                parsed = parse_git_ref(source)
-                if parsed["version"] and not check_version(parsed["version"]):
-                    logger.error(
-                        f"Invalid version '{parsed['version']}' for "
-                        f"plugin '{source}' in GitRef. Skipping..."
-                    )
-                    continue
-
-                # Check for version mismatches
-                if (
-                    parsed["version"]
-                    and version
-                    and parsed["version"] != version
-                ):
-                    logger.error(
-                        f"Version mismatch for plugin '{source}': GitRef "
-                        f"version '{parsed['version']}' does not match "
-                        f"specified version '{version}'. Skipping..."
-                    )
-                    continue
-                else:
-                    # Same version - append plugin with specified version
-                    parsed_sources.append(
-                        edit_url(
-                            source, version=(parsed["version"] or version)
+                if version:
+                    # Check that the version conforms to semantic versioning
+                    if not check_version(version):
+                        logger.error(
+                            f"Invalid version '{version}' for plugin "
+                            f"'{source}' in GitRef. Skipping..."
                         )
-                    )
+                        continue
+
+                    # Check that the specified version exists
+                    if not version2commit(plugin_spec, version):
+                        logger.error(
+                            f"Version '{version}' for plugin "
+                            f"'{plugin_spec}' does not exist. Skipping..."
+                        )
+                        continue
+
+                    # Edit plugin spec to include version
+                    plugin_spec = edit_url(plugin_spec, version=version)
+                elif commit:
+                    # Check that the commit exists
+                    if not commit_exists(plugin_spec, commit):
+                        logger.error(
+                            f"Commit '{commit}' for plugin "
+                            f"'{plugin_spec}' does not exist. Skipping..."
+                        )
+                        continue
+
+                    # Edit plugin spec to include commit
+                    plugin_spec = edit_url(plugin_spec, commit=commit)
+
+                # Append plugin with specified version/commit
+                parsed_sources.append(plugin_spec)
 
             elif count > 1:
                 logger.error(
@@ -130,7 +173,8 @@ def main(argv, prog, description):
                     "'=' is allowed to specify version. Skipping..."
                 )
             else:
-                # Append plugin as-is
+                # No version specified - Append plugin as-is.
+                #   Existence is checked later.
                 parsed_sources.append(source)
 
         # Pull plugins
@@ -186,7 +230,7 @@ def main(argv, prog, description):
 
             else:
                 logger.error(
-                    f"'{source}' is either not a GitRef or points to an inexistent repository. Skipping..."
+                    f"'{source}' points to an inexistent repository. Skipping..."
                 )
                 continue
 

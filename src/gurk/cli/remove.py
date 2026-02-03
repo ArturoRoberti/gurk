@@ -51,11 +51,9 @@ def main(argv, prog, description):
 
             # Attempt removal
             try:
-                remove_plugin(plugin_name, purge=args.purge)
-            except ModuleNotFoundError:
-                logger.warning(
-                    f"Plugin '{plugin_name}' is not (validly) installed. Ignoring..."
-                )
+                remove_plugin(plugin_name, purge=args.purge, verbose=True)
+            except ModuleNotFoundError as e:
+                logger.error(str(e))
 
         # Prompt to remove invalid plugins if any exist
         if not args.non_interactive:
