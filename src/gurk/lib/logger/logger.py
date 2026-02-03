@@ -469,8 +469,6 @@ class Logger:
         live: Live | None = getattr(self._progress, "live", None)
         if live and live.is_started:
             live.stop()
-            # ANSI: Move cursor up one line to counteract stop() newline
-            self._console_out.file.write("\033[F")
             try:
                 yield
             finally:

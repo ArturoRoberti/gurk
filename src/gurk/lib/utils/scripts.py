@@ -227,7 +227,7 @@ class Command:
                 if b["type"] == ScriptBlockTypes.FUNCTION
             ]
             if self.function not in available_functions:
-                raise ValueError(
+                raise FileNotFoundError(
                     f"'{self.function}' function not found in script "
                     f"{self.script}\nAvailable functions: {available_functions}",
                 )

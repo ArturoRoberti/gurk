@@ -105,7 +105,6 @@ def main(argv, prog, description):
                 )
             else:
                 # Attempt to pull
-                logger.info(f"{msg} Pulling...")
                 if not pull_plugin(plugin):
                     logger.fatal(f"Failed to pull plugin '{plugin}'.")
 

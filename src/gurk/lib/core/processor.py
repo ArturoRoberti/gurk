@@ -4,7 +4,7 @@ from textwrap import dedent
 import networkx as nx
 
 from gurk.lib.logger import get_logger
-from gurk.lib.utils.common import generate_random_path
+from gurk.lib.utils.common import PACKAGE_VENVS_PATH, generate_random_path
 from gurk.lib.utils.configs import overlay_dicts
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
@@ -53,6 +53,20 @@ class Processor:
 
         # Enable dependencies of enabled tasks
         tasks = self.enable_dependencies(tasks)
+
+        # Disable tasks whose venvs do not exist
+        for task_name, task in tasks.items():
+            plugin = task_name.split("/")[0]
+            if (
+                plugin != "gurk"
+                and task["enabled"]
+                and not (PACKAGE_VENVS_PATH / plugin).exists()
+            ):
+                task["enabled"] = False
+                logger.warning(
+                    f"Disabling task '{task_name}' as its plugin venv "
+                    "does not exist. Did you forget to run 'gurk init'?"
+                )
 
         # Filter only enabled tasks
         tasks = {

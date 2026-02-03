@@ -5,6 +5,8 @@ from typing import IO
 
 import commentjson
 import pytest
+import tomllib
+from ruamel.yaml import YAML
 
 from gurk.lib.core import core
 from gurk.lib.logger import (
@@ -14,7 +16,6 @@ from gurk.lib.logger import (
     allow_missing_logger,
 )
 from gurk.lib.utils.common import IS_GITHUB_RUNNER
-from gurk.lib.utils.configs import load_yaml
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
     get_combined_plugin_tasks,
@@ -46,7 +47,7 @@ def test_task(task: str) -> None:
             pytest.fail(
                 f"Config file '{config_file}' for task '{task}' does not exist"
             )
-        elif str(config_file).endswith((".json", ".jsonc")):
+        elif config_file.suffix in (".json", ".jsonc"):
             try:
                 with config_file.open("r") as f:
                     commentjson.load(f)
@@ -54,14 +55,22 @@ def test_task(task: str) -> None:
                 pytest.fail(
                     f"Failed to load JSON config file '{config_file}' for task '{task}': {ex}"
                 )
-        elif str(config_file).endswith((".yml", ".yaml")):
+        elif config_file.suffix in (".yml", ".yaml"):
             try:
-                load_yaml(config_file)
+                YAML().load(config_file)
             except Exception as ex:
                 pytest.fail(
                     f"Failed to load YAML config file '{config_file}' for task '{task}': {ex}"
                 )
-        elif str(config_file).endswith(".bash"):
+        elif config_file.suffix == ".toml":
+            try:
+                with open(config_file, "rb") as f:
+                    tomllib.load(f)
+            except Exception as ex:
+                pytest.fail(
+                    f"Failed to load TOML config file '{config_file}' for task '{task}': {ex}"
+                )
+        elif config_file.suffix == ".bash":
             # Basic syntax check for bash scripts
             result = subprocess.run(
                 ["bash", "-n", str(config_file)],

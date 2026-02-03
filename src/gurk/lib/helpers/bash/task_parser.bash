@@ -35,8 +35,8 @@ for arg in [a for a in dir(args) if not a.startswith('_')]:
     if isinstance(value, dict):
         print(f"declare -gA \"{key}\"")
 
-	if value is None:
-		print('{0}="";'.format(key))
+    if value is None:
+        print('{0}="";'.format(key))
     elif isinstance(value, bool):
         print('{0}="{1}";'.format(key, 'true' if value else 'false'))
     elif isinstance(value, list):

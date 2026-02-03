@@ -1,5 +1,6 @@
 try:
     from gurk.lib.logger import allow_missing_logger
+    from gurk.lib.utils.configs import load_yaml
     from gurk.lib.utils.plugins import (
         get_combined_plugin_tasks,
         iter_configs,
@@ -32,7 +33,6 @@ def _get_changed_remote_plugin_sources() -> set[str]:
     :rtype: set[str]
     """
     from packaging.version import Version
-    from ruamel.yaml import YAML
 
     RegistryData: TypeAlias = dict[str, dict[str, str]]
 
@@ -45,15 +45,16 @@ def _get_changed_remote_plugin_sources() -> set[str]:
 
     # Load current registry.yaml
     registry_path = REPO_ROOT / PLUGIN_FOLDER_PREFIX / "registry.yaml"
-    with registry_path.open("r", encoding="utf-8") as f:
-        curr_registry_data = filter_remote_plugins(YAML().load(f))
+    curr_registry_data = load_yaml(registry_path)
+    curr_registry_data = filter_remote_plugins(curr_registry_data)
 
-    # Load default branch registry.yaml
+    # # Load default branch registry.yaml
     # default_registry = subprocess.check_output(
     #     ["git", "show", f"{DEFAULT_BRANCH}:{registry_path}"],
     #     text=True,
     # )
-    # default_registry_data = filter_remote_plugins(YAML().load(default_registry))
+    # default_registry_data = load_yaml(default_registry)
+    # default_registry_data = filter_remote_plugins(default_registry_data)
 
     # TODO: Only temporary until the default registry exists on main. Replace with above ASAP
     default_registry_data: RegistryData = {}

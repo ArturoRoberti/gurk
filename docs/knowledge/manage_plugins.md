@@ -1,5 +1,3 @@
-TODO: Mention 'remove', 'pull' and 'upgrade' commands here
-
 # Overview
 Plugins are managed via the `gurk pull`, `gurk upgrade`, and `gurk remove` commands.
 - `pull`: Download and install plugins from remote repositories. This also supports specifying specific git branches, commits or versions to pull. Alternatively, install plugins from local directories to a discoverable location.

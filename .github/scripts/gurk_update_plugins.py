@@ -1,5 +1,6 @@
 try:
     from gurk.lib.utils.common import PACKAGE_SRC_PATH, check_version
+    from gurk.lib.utils.configs import dump_yaml, load_yaml
     from gurk.lib.utils.remotes import (
         edit_url,
         get_latest_version,
@@ -11,24 +12,11 @@ except ImportError:
     )
 
 from packaging.version import Version
-from ruamel.yaml import YAML
 
 if __name__ == "__main__":
-    # Setup YAML handler
-    yaml = YAML()
-    yaml.preserve_quotes = True
-    yaml.indent(mapping=2, sequence=2, offset=0)
-    yaml.Representer.add_representer(
-        type(None),
-        lambda self, data: self.represent_scalar(
-            "tag:yaml.org,2002:null", "null"
-        ),
-    )  # conserve 'null'
-
     # Load package registry
     registry_path = PACKAGE_SRC_PATH / "plugins" / "registry.yaml"
-    with registry_path.open("r", encoding="utf-8") as f:
-        registry = yaml.load(f)
+    registry = load_yaml(registry_path)
 
     # Check for new remote plugin versions
     errors_found = False
@@ -66,7 +54,5 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     # Save updated registry
-    with registry_path.open("w", encoding="utf-8") as f:
-        yaml.dump(registry, f)
-
+    dump_yaml(registry, registry_path)
     print("Plugin registry updated successfully.")

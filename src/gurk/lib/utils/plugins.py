@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Iterator, NotRequired, Sequence, TypeAlias, TypedDict
 
 import networkx as nx
-from ruamel.yaml import YAML
 
 from gurk.lib.logger import get_logger
 from gurk.lib.utils.common import (
@@ -29,7 +28,7 @@ from gurk.lib.utils.common import (
     check_version,
     generate_random_path,
 )
-from gurk.lib.utils.configs import load_toml, load_yaml
+from gurk.lib.utils.configs import dump_yaml, load_toml, load_yaml
 from gurk.lib.utils.remotes import (
     GitRef,
     edit_url,
@@ -261,7 +260,7 @@ def _get_possible_plugin_entries(
     home_registry: bool = True,
     package_registry: bool = True,
     require_local: bool = True,
-) -> tuple[PluginRegistryEntry | None, ...]:
+) -> tuple[tuple[str | None, PluginRegistryEntry | None], ...]:
     """
     Get possible plugin registry entries for a given plugin name.
         NOTE: This does not check the validity of the plugin yaml file.
@@ -275,61 +274,79 @@ def _get_possible_plugin_entries(
     :param require_local: Whether to only return entries with a local path
     :type require_local: bool
     :return: Tuple of possible PluginRegistryEntry objects for the plugin, or None if not found
-    :rtype: tuple[PluginRegistryEntry | None, ...]
+    :rtype: tuple[tuple[str | None, PluginRegistryEntry | None], ...]
     """
     plugin = str(plugin)
 
-    def _load_plugin(registry_file: Path) -> PluginRegistryEntry | None:
+    def _load_plugin(
+        registry_file: Path,
+    ) -> tuple[str | None, PluginRegistryEntry | None]:
         registry: dict[str, PluginRegistryEntry] = (
             load_yaml(registry_file) or {}
         )
 
         # Get plugin entry
-        remote_entry = next(
+        name_via_remote = next(
             (
-                v
-                for v in registry.values()
+                k
+                for k, v in registry.items()
                 if v.get("remote")
                 and extract_url(plugin) == extract_url(v["remote"])
             ),
             None,
         )
-        if remote_entry:
-            # Access plugin by remote
-            entry = remote_entry
-        elif plugin in registry:
+        name_via_local = next(
+            (
+                k
+                for k, v in registry.items()
+                if v.get("local")
+                and registry_file.parent / v["local"]
+                == registry_file.parent / Path(plugin).expanduser()
+            ),
+            None,
+        )
+        if plugin in registry:
             # Access plugin by name
-            entry = registry[plugin]
+            name = plugin
+        elif name_via_remote:
+            # Access plugin by remote
+            name = name_via_remote
+        elif name_via_local:
+            # Access plugin by local path
+            name = name_via_local
         else:
             # Plugin not found
-            return None
+            return None, None
+        entry = registry[name]
 
         # Validate structure
         if not validate_typed_dict(entry, PluginRegistryEntry):
-            return None
+            return None, None
 
         # Validate that it has a local path
         if require_local and not entry["local"]:
-            return None
+            return None, None
 
         # Resolve local path
-        local_path = registry_file.parent / entry["local"]
-        if (
-            not local_path.is_dir()
-            or not (local_path / GURK_MANIFEST_FILENAME).is_file()
-        ):
-            return None
-        entry["local"] = str(local_path)
+        if entry["local"] is not None:
+            local_path = registry_file.parent / entry["local"]
+            if (
+                not local_path.is_dir()
+                or not (local_path / GURK_MANIFEST_FILENAME).is_file()
+            ):
+                return None, None
+            entry["local"] = str(local_path)
 
-        return entry
+        return name, entry
 
     plugin_registries = _get_plugin_registries(home_registry, package_registry)
-    if len(plugin_registries) == 1:
-        return (_load_plugin(plugin_registries[0]),)
-    else:
-        return tuple(
-            _load_plugin(registry_file) for registry_file in plugin_registries
-        )
+    plugin_entries = []
+    for registry_file in plugin_registries:
+        name, entry = _load_plugin(registry_file)
+        if name and entry:
+            plugin_entries.append((name, entry))
+
+    return tuple(plugin_entries)
 
 
 def _get_plugin_registration(
@@ -337,7 +354,7 @@ def _get_plugin_registration(
     home_registry: bool = True,
     package_registry: bool = True,
     require_local: bool = True,
-) -> PluginRegistryEntry | None:
+) -> tuple[str | None, PluginRegistryEntry | None]:
     """
     Get the registry entry of a plugin (path, remote) if it exists locally.
 
@@ -346,27 +363,27 @@ def _get_plugin_registration(
     :param home_registry: Whether to check the home plugin registry
     :type home_registry: bool
     :param package_registry: Whether to check the package plugin registry
-    :type package_registry: bool#
+    :type package_registry: bool
     :param require_local: Whether to only return entries with a local path
     :type require_local: bool
     :return: Registry entry if the plugin exists locally, None otherwise
-    :rtype: PluginRegistryEntry | None
+    :rtype: tuple[str | None, PluginRegistryEntry | None]
     """
-    possible_plugin_data = _get_possible_plugin_entries(
+    possible_plugin_entries = _get_possible_plugin_entries(
         plugin, home_registry, package_registry, require_local
     )
-    plugin_data = tuple(p for p in possible_plugin_data if p is not None)
+    plugin_entries = tuple(p for p in possible_plugin_entries if all(p))
 
     # Logging
     logger = get_logger()
-    if not plugin_data:
-        return None
-    elif len(plugin_data) > 1:
+    if not plugin_entries:
+        return (None, None)
+    elif len(plugin_entries) > 1:
         logger.debug(
             f"WARNING: Multiple registry entries found for plugin '{plugin}'. Using the home one."
         )
 
-    return plugin_data[0]
+    return plugin_entries[0]
 
 
 def plugin_exists_locally(plugin: PluginSpec) -> bool:
@@ -378,7 +395,7 @@ def plugin_exists_locally(plugin: PluginSpec) -> bool:
     :return: True if the plugin exists locally, False otherwise
     :rtype: bool
     """
-    return _get_plugin_registration(plugin) is not None
+    return all(_get_plugin_registration(plugin, require_local=True))
 
 
 def plugin_exists_remotely(plugin: GitRef) -> bool:
@@ -414,8 +431,8 @@ def load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
     :return: Plugin manifest if the plugin exists locally, None otherwise
     :rtype: PluginManifest | None
     """
-    plugin_registration = _get_plugin_registration(plugin)
-    if not plugin_registration:
+    plugin_name, plugin_registration = _get_plugin_registration(plugin)
+    if not (plugin_name and plugin_registration):
         return None
 
     if not check_local_plugin(plugin_registration["local"]):
@@ -424,7 +441,7 @@ def load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
     raw_plugin_yaml = load_yaml(
         Path(plugin_registration["local"]) / GURK_MANIFEST_FILENAME
     )
-    if not raw_plugin_yaml:
+    if raw_plugin_yaml is None:
         return None
 
     return raw_plugin_yaml
@@ -453,14 +470,22 @@ def _load_resolved_plugin_manifest(
     )
 
     # Expand task paths
-    plugin_path = _get_plugin_registration(plugin)["local"]
+    _, plugin_registration = _get_plugin_registration(plugin)
+    plugin_path = Path(plugin_registration["local"])
     for _, task in plugin_manifest["tasks"].items():
         # Expand script path
-        task["script"] = Path(plugin_path) / task["script"]
+        task["script"] = plugin_path / task["script"]
 
         # Expand config_file path (if applicable)
         if task["config_file"] is not None:
-            task["config_file"] = Path(plugin_path) / task["config_file"]
+            task["config_file"] = plugin_path / task["config_file"]
+
+    # Expand option task paths
+    for _, option in plugin_manifest["options"].items():
+        for _, task in option.items():
+            # Expand config_file path (if applicable)
+            if task["config_file"] is not None:
+                task["config_file"] = plugin_path / task["config_file"]
 
     return plugin_manifest
 
@@ -474,8 +499,8 @@ def _load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     :return: Plugin metadata if the plugin exists locally, None otherwise
     :rtype: FilteredPluginMetadata | None
     """
-    plugin_registration = _get_plugin_registration(plugin)
-    if not plugin_registration:
+    plugin_name, plugin_registration = _get_plugin_registration(plugin)
+    if not (plugin_name and plugin_registration):
         return None
 
     if not check_local_plugin(plugin_registration["local"]):
@@ -504,8 +529,8 @@ def get_plugin_data(plugin: PluginSpec) -> PluginData:
     def error_msg(message: str) -> str:
         return f"ERROR loading plugin data for {plugin}: {message}"
 
-    plugin_registration = _get_plugin_registration(plugin)
-    if not plugin_registration:
+    plugin_name, plugin_registration = _get_plugin_registration(plugin)
+    if not (plugin_name and plugin_registration):
         raise ModuleNotFoundError(
             error_msg("Could not load a (valid) plugin entry")
         )
@@ -543,7 +568,9 @@ def installed_plugin_path(plugin: PluginSpec) -> Path | None:
     :rtype: Path | None
     """
     plugin_registration = _get_plugin_registration(plugin)
-    return plugin_registration["local"] if plugin_registration else None
+    return (
+        plugin_registration[1]["local"] if all(plugin_registration) else None
+    )
 
 
 def get_available_plugin_names() -> list[str]:
@@ -636,7 +663,7 @@ def add_plugin_entry(
     logger = get_logger()
 
     # Check if the plugin already exists
-    plugin_registration = _get_plugin_registration(plugin_name)
+    _, plugin_registration = _get_plugin_registration(plugin_name)
     if plugin_registration:
         logger.error(
             f"Plugin '{plugin_name}' already exists in some registry."
@@ -652,10 +679,56 @@ def add_plugin_entry(
         "local": plugins_entry["local"],
         "remote": plugins_entry["remote"],
     }
-    with open(registry_file, "w") as f:
-        YAML().dump(registry, f)
+    dump_yaml(registry, registry_file)
 
     return True
+
+
+def update_plugin_entry(
+    plugin_name: str, local: str | None = None, remote: GitRef | None = None
+) -> bool:
+    """
+    Update a plugin entry in any of the plugin registries.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :param local: New local path of the plugin
+    :type local: str | None
+    :param remote: New remote GitRef of the plugin
+    :type remote: GitRef | None
+    :return: True if the plugin was updated successfully, False otherwise
+    :rtype: bool
+    :raises ValueError: If neither local nor remote is provided
+    """
+    # Check args
+    if local is None and remote is None:
+        raise ValueError(
+            "At least one of 'local' or 'remote' must be provided"
+        )
+
+    # Load registry files and update entry
+    registry_files = _get_plugin_registries()
+    for registry_file in registry_files:
+        registry: dict[str, PluginRegistryEntry] = (
+            load_yaml(registry_file) or {}
+        )
+
+        # Check if plugin exists
+        if plugin_name not in registry:
+            continue
+
+        # Update plugin entry
+        if local is not None:
+            registry[plugin_name]["local"] = local
+        if remote is not None:
+            registry[plugin_name]["remote"] = remote
+
+        # Save registry
+        dump_yaml(registry, registry_file)
+
+        return True
+
+    return False
 
 
 def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
@@ -668,28 +741,14 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
     :type purge: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
-    # Get logger
-    logger = get_logger()
-
     # Check if the plugin exists
-    plugin_registration = _get_plugin_registration(plugin, require_local=False)
-    if not plugin_registration:
+    plugin_name, plugin_registration = _get_plugin_registration(
+        plugin, require_local=False
+    )
+    if not (plugin_name and plugin_registration):
         raise ModuleNotFoundError(
             f"Could not find plugin '{plugin}' in any registry."
         )
-
-    # Get plugin name
-    plugin_name = (
-        [
-            k
-            for k, v in get_combined_plugin_registry().items()
-            if v == plugin_registration
-        ]
-        + [None]
-    )[0]
-    if not plugin_name:
-        logger.error(f"Could not determine plugin name for '{plugin}'.")
-        return
 
     # Remove plugin entries
     def _remove_single_plugin_entry(
@@ -719,8 +778,7 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> None:
                 registry[plugin_name]["local"] = None
 
         # Save registry
-        with open(registry_file, "w") as f:
-            YAML().dump(registry, f)
+        dump_yaml(registry, registry_file)
 
     for registry_file, allow_purge in zip(
         _get_plugin_registries(),
@@ -1182,7 +1240,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
         ## Unique plugin name
         plugin_name = project_metadata["name"]
-        existing_plugin = _get_plugin_registration(plugin_name)
+        _, existing_plugin = _get_plugin_registration(plugin_name)
         if (
             existing_plugin
             and Path(existing_plugin["local"]) != _plugin_path.resolve()
@@ -1196,7 +1254,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         plugin: PluginManifest = load_yaml(
             _plugin_path / GURK_MANIFEST_FILENAME
         )
-        if not plugin:
+        if plugin is None:
             error(
                 f"Plugin source '{_plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is invalid YAML."
             )
@@ -1352,7 +1410,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
             # Check imported plugin
             if not _check_local_plugin(
-                Path(_get_plugin_registration(imp)["local"])
+                Path(_get_plugin_registration(imp)[1]["local"])
             ):
                 error(f"Imported plugin '{imp}' is invalid.")
                 return False
@@ -1418,6 +1476,18 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                     )
                     return False
 
+            # Check 'config_file' fields
+            for task_name, task_spec in option.items():
+                config_file = task_spec.get("config_file")
+                if config_file:
+                    config_file = _plugin_path / task_spec["config_file"]
+                    if not config_file.is_file():
+                        error(
+                            f"Task '{task_name}' in option '{option_name}' "
+                            f"config file '{config_file}' does not exist."
+                        )
+                        return False
+
             # Check that all args in the option are defined
             for task_name, option_spec in option.items():
                 # Create a temporary parser to validate args
@@ -1472,6 +1542,56 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
     return _check_local_plugin(Path(plugin_path))
 
 
+def create_plugin_venv(plugin_name: str, dependencies: list[str]) -> bool:
+    """
+    Create a virtual environment for a plugin and install its dependencies.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :param dependencies: List of dependencies to install
+    :type dependencies: list[str]
+    :return: True if the virtual environment was created successfully, False otherwise
+    :rtype: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    # Check if venv already exists
+    venv_dir = PACKAGE_VENVS_PATH / plugin_name
+    if venv_dir.is_dir():
+        logger.error(
+            f"Virtual environment for plugin '{plugin_name}' already exists at {venv_dir}"
+        )
+        return False
+
+    # Create venv
+    logger.info(
+        f"Creating virtual environment for plugin '{plugin_name}' in {venv_dir}"
+    )
+    venv.EnvBuilder(with_pip=True).create(venv_dir)
+
+    # Install dependencies
+    pip_bin = str(venv_dir / "bin" / "pip")
+    all_dependencies = dependencies + [PACKAGE_SRC_PATH.parents[1].as_posix()]
+    logger.debug(
+        f"Installing dependencies for plugin '{plugin_name}' in {venv_dir}: {dependencies}"
+    )
+    try:
+        subprocess.check_call(
+            [pip_bin, "install", "--upgrade", "pip"], stdout=subprocess.DEVNULL
+        )
+        subprocess.check_call(
+            [pip_bin, "install", *all_dependencies], stdout=subprocess.DEVNULL
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(
+            f"Failed to install dependencies for plugin '{plugin_name}': {e}"
+        )
+        return False
+
+    return True
+
+
 def pull_local_plugin(
     plugin_path: PathLike, pull_imports: bool = True
 ) -> bool:
@@ -1488,13 +1608,6 @@ def pull_local_plugin(
     # Get logger
     logger = get_logger()
 
-    # Check validity of local plugin
-    if not check_local_plugin(plugin_path):
-        logger.error(
-            f"Plugin at '{plugin_path}' is not a valid gurk plugin.",
-        )
-        return False
-
     # Get plugin manifest
     plugin_path = Path(plugin_path)
     manifest_data: PluginManifest = load_yaml(
@@ -1502,7 +1615,7 @@ def pull_local_plugin(
     )
     if not manifest_data:
         logger.error(
-            f"Plugin at '{plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is invalid YAML",
+            f"Plugin at '{plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is empty/invalid YAML",
         )
         return False
 
@@ -1527,24 +1640,35 @@ def pull_local_plugin(
     )
 
     # Check if plugin with same name already exists
-    if _get_plugin_registration(plugin_name):
+    if all(_get_plugin_registration(plugin_name)):
         logger.error(
             f"Plugin with name '{plugin_name}' already exists. Please "
             f"remove it via 'gurk remove {plugin_name}' first."
         )
         return False
 
+    # Check validity of local plugin
+    if not check_local_plugin(plugin_path, verbose=True):
+        logger.error(
+            f"Plugin at '{plugin_path}' is not a valid gurk plugin.",
+        )
+        return False
+
     # Add plugin registry entry
-    if _get_possible_plugin_entries(plugin_name, home_registry=False)[0]:
+    if all(
+        _get_plugin_registration(
+            plugin_name, home_registry=False, require_local=False
+        )[0]
+    ):
         # Remote package plugin
         dest_path = PACKAGE_SRC_PATH / "plugins" / plugin_name
 
         registry_file = PACKAGE_SRC_PATH / "plugins" / "registry.yaml"
         registry = load_yaml(registry_file)
+        registry[plugin_name] = {}
         registry[plugin_name]["local"] = str(dest_path)
         registry[plugin_name]["remote"] = None
-        with registry_file.open("w") as f:
-            YAML().dump(registry, f)
+        dump_yaml(registry, registry_file)
     else:
         # Regular plugin
         dest_path = PACKAGE_HOME_PATH / "plugins" / plugin_name
@@ -1561,14 +1685,11 @@ def pull_local_plugin(
     shutil.copytree(plugin_path, dest_path)
 
     # Install plugin dependencies in the plugin venv
-    venv_dir = PACKAGE_VENVS_PATH / plugin_name
-    logger.debug(
-        f"Installing optional dependencies for plugin '{plugin_name}' in {venv_dir}: {dependencies}"
-    )
-    venv.EnvBuilder(with_pip=True).create(venv_dir)
-    pip_bin = str(venv_dir / "bin" / "pip")
-    all_dependencies = dependencies + [PACKAGE_SRC_PATH.parents[1].as_posix()]
-    subprocess.check_call([pip_bin, "install", *all_dependencies])
+    if not create_plugin_venv(plugin_name, dependencies):
+        logger.error(
+            f"Failed to create virtual environment for plugin '{plugin_name}'",
+        )
+        return False
 
     # Pull imported plugins recursively
     if pull_imports:
@@ -1586,7 +1707,7 @@ def pull_local_plugin(
 
     # Verify by getting plugin data
     try:
-        get_plugin_data(plugin_path)
+        get_plugin_data(plugin_name)
     except ModuleNotFoundError as e:
         logger.error(str(e))
         return False
@@ -1607,25 +1728,57 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
     """
     # Get logger
     logger = get_logger()
+    logger.info(f"Pulling plugin from remote source '{plugin}'...")
 
-    def error(message: str, _temp_plugin_path: Path | None = None):
+    def error(message: str, _temp_path: Path | None = None):
         """
         Log an error message and clean up temporary plugin path if provided.
 
         :param message: Error message to log
         :type message: str
-        :param _temp_plugin_path: Temporary plugin path to clean up
-        :type _temp_plugin_path: Path | None
+        :param _temp_path: Temporary plugin path to clean up
+        :type _temp_path: Path | None
         """
         logger.error(message + ". Skipping...")
-        if _temp_plugin_path is not None:
-            shutil.rmtree(_temp_plugin_path)
+        if _temp_path is not None and _temp_path.exists():
+            if _temp_path.is_dir():
+                shutil.rmtree(_temp_path)
+            else:
+                _temp_path.unlink()
 
-    # Check if plugin with same remote already exists
-    if installed_plugin_path(plugin):
+    # Import metadata to random file
+    temp_metadata = generate_random_path(suffix=".toml", create=False)
+    try:
+        git_clone(edit_url(plugin, path="pyproject.toml"), temp_metadata)
+    except subprocess.CalledProcessError as e:
+        error(
+            f"Failed to clone 'pyproject.toml' from "
+            f"remote plugin repository '{plugin}': {e}",
+            temp_metadata,
+        )
+        return False
+    except ValueError as e:
+        error(str(e), temp_metadata)
+        return False
+
+    # Get relevant metadata
+    try:
+        metadata = load_toml(temp_metadata)
+        plugin_name: str = metadata["project"]["name"]
+        plugin_version: str = metadata["project"]["version"]
+        if not check_version(plugin_version):
+            raise ValueError(f"Invalid version string: {plugin_version}")
+    except KeyError as e:
+        logger.error(
+            f"Plugin '{plugin}' has an invalid 'pyproject.toml' file: invalid key {e}",
+        )
+        return False
+
+    # Check if plugin already exists
+    if installed_plugin_path(plugin_name):
         error(
             f"Plugin with remote '{plugin}' already exists locally. Please remove it "
-            f"via 'gurk remove {plugin}' first or update it via 'gurk update {plugin}'"
+            f"via 'gurk remove {plugin_name}' first or update it via 'gurk update {plugin_name}'"
         )
         return False
 
@@ -1639,10 +1792,11 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
     # Import manifest to random file
     temp_manifest = generate_random_path(suffix=".yaml", create=False)
     try:
-        git_clone(plugin, temp_manifest)
-    except subprocess.CalledProcessError:
+        git_clone(edit_url(plugin, path=GURK_MANIFEST_FILENAME), temp_manifest)
+    except subprocess.CalledProcessError as e:
         error(
-            f"Failed to clone remote plugin repository '{plugin}'",
+            f"Failed to clone '{GURK_MANIFEST_FILENAME}' "
+            f"from remote plugin repository '{plugin}': {e}",
             temp_manifest,
         )
         return False
@@ -1723,7 +1877,7 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
         prefix="gurk_plugin_import_", create=False
     )
     for file in relevant_files:
-        pullfile = edit_url(plugin, "path", file)
+        pullfile = edit_url(plugin, path=file)
         try:
             git_clone(pullfile, dest=temp_plugin_path / file)
         except subprocess.CalledProcessError:
@@ -1741,9 +1895,16 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
         )
         return False
 
+    # Upate plugin registry entry to include remote
+    update_plugin_entry(
+        plugin_name,
+        remote=edit_url(extract_url(plugin), version=plugin_version),
+    )
+
     # Clean up temporary plugin path
     shutil.rmtree(temp_plugin_path)
 
+    logger.info(f"Successfully pulled plugin '{plugin_name}' from '{plugin}'")
     return True
 
 
@@ -1757,15 +1918,35 @@ def remove_plugin(plugin: PluginSpec, purge: bool = False) -> None:
     :type purge: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
+    # Get logger
+    logger = get_logger()
+    remove_msg = []
+
     # Get plugin data
-    plugin_entry = _get_plugin_registration(plugin, require_local=False)
-    if not plugin_entry:
+    plugin_name, plugin_entry = _get_plugin_registration(
+        plugin, require_local=False
+    )
+    if not (plugin_name and plugin_entry):
         raise ModuleNotFoundError(f"No such local plugin found: {plugin}")
-    elif plugin_entry["local"]:
-        # Remove plugin folder
-        plugin_path = Path(plugin_entry["local"])
-        if plugin_path.is_dir():
-            shutil.rmtree(plugin_path)
+    local = plugin_entry["local"]
 
     # Remove plugin registry entry
     _remove_plugin_entry(plugin, purge)
+    remove_msg.append("registry entry")
+
+    # Remove plugin folder
+    if local:
+        plugin_path = Path(local)
+        if plugin_path.is_dir():
+            shutil.rmtree(plugin_path)
+        remove_msg.append("plugin files")
+
+    # Remove plugin venv
+    venv_path = PACKAGE_VENVS_PATH / plugin_name
+    if venv_path.is_dir():
+        shutil.rmtree(venv_path)
+        remove_msg.append("virtual environment")
+
+    logger.info(
+        f"Successfully removed {' and '.join(remove_msg)} for plugin '{plugin_name}'"
+    )

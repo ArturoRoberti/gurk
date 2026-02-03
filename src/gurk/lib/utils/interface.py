@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
+from typing import Any, Literal, overload
 
 from gurk.lib.utils.common import (
     PACKAGE_SRC_PATH,
@@ -16,10 +17,29 @@ PACKAGE_BASH_HELPERS_PATH = (
 )
 
 
+@overload
+def run_script_function(
+    run: Literal[True],
+    *args: Any,
+    **kwargs: Any,
+) -> subprocess.CompletedProcess[str]:
+    ...
+
+
+@overload
+def run_script_function(
+    run: Literal[False],
+    *args: Any,
+    **kwargs: Any,
+) -> str:
+    ...
+
+
 def run_script_function(
     script: PathLike,
     function: str | None = None,
-    args: list[str] = [],
+    args: list[str] | None = None,
+    *,
     run: bool = True,
     capture_output: bool = False,
     venv: PathLike | None = None,
@@ -34,7 +54,7 @@ def run_script_function(
     :param function: The function within the script to call. If None, the script is executed directly.
     :type function: str | None
     :param args: Arguments to pass to the function or script
-    :type args: list[str]
+    :type args: list[str] | None
     :param run: If True, executes the script. Otherwise, returns the string.
     :type run: bool
     :param capture_output: If True, captures the output of the script. Ignored if run=False.
@@ -47,31 +67,27 @@ def run_script_function(
     :type check: bool
     :return: The generated script string (if run=False)
     :rtype: str | CompletedProcess
+    :raises FileNotFoundError: If the script or function do not exist and check=True, or if the specified venv does not exist.
+    :raises ValueError: If the script extension is not supported.
     """
-    try:
-        # Check existence of script & function fields
-        command = Command(script, function, check)
+    if args is None:
+        args = []
 
-        # Check venv existence
-        if venv and not venv.exists():
-            raise FileNotFoundError(f"Virtual environment not found: {venv}")
+    # Check existence of script & function fields
+    command = Command(script, function, check)
 
-        # Run respective command
-        if command.kind == CommandKind.PYTHON:
-            return _run_python_script_function(
-                script, function, args, run, capture_output, venv, sudo
-            )
-        else:
-            return _run_bash_script_function(
-                script, function, args, run, capture_output, venv
-            )
-    except Exception as e:
-        # Return a failed CompletedProcess instead of None
-        return subprocess.CompletedProcess(
-            args=[str(script)] + ([function] if function else []),
-            returncode=1,
-            stdout=b"",
-            stderr=str(e).encode(),
+    # Check venv existence
+    if venv and not venv.exists():
+        raise FileNotFoundError(f"Virtual environment not found: {venv}")
+
+    # Run respective command
+    if command.kind == CommandKind.PYTHON:
+        return _run_python_script_function(
+            script, function, args, run, capture_output, venv, sudo
+        )
+    else:
+        return _run_bash_script_function(
+            script, function, args, run, capture_output, venv
         )
 
 

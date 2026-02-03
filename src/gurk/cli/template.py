@@ -1,12 +1,9 @@
 import shutil
 from pathlib import Path
 
-import tomli_w
-from ruamel.yaml import YAML
-
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
-from gurk.lib.utils.configs import load_toml
+from gurk.lib.utils.configs import dump_toml, dump_yaml, load_toml, load_yaml
 from gurk.lib.utils.plugins import GURK_MANIFEST_FILENAME, GurkArgumentParser
 
 
@@ -57,25 +54,12 @@ def main(argv, prog, description):
         versioning_file = dest / "pyproject.toml"
         metadata = load_toml(versioning_file)
         metadata["project"]["name"] = args.name
-        with versioning_file.open("wb") as f:
-            f.write(tomli_w.dumps(metadata).encode("utf-8"))
+        dump_toml(versioning_file, metadata)
 
         # Rename manifest names
-        ## Setup YAML handler
-        yaml = YAML()
-        yaml.preserve_quotes = True
-        yaml.indent(mapping=2, sequence=2, offset=0)
-        yaml.Representer.add_representer(
-            type(None),
-            lambda self, data: self.represent_scalar(
-                "tag:yaml.org,2002:null", "null"
-            ),
-        )  # conserve 'null'
-
         ## Read data
         manifest_file = dest / GURK_MANIFEST_FILENAME
-        with manifest_file.open("r") as f:
-            data = yaml.load(f)
+        data = load_yaml(manifest_file)
 
         ## Modify data
         seen_task_maps: set[int] = set()
@@ -100,6 +84,5 @@ def main(argv, prog, description):
         for option in data["options"].values():
             rename_tasks_in_mapping(option)
 
-        # Write back
-        with manifest_file.open("w") as f:
-            yaml.dump(data, f)
+        ## Write back
+        dump_yaml(data, manifest_file)

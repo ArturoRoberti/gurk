@@ -184,10 +184,11 @@ def configure_filestructure(*args: list[str]) -> None:
             False,
         )
     if config_data.get("ROOT"):
-        if not task_args.root:
+        if not task_args.gurk_configure_root_filestructure:
             Logger.logrichprint(
                 LoggerSeverity.WARNING,
-                "Skipping root (/) file structure configuration, as '--root' flag is not provided.",
+                "Skipping root (/) file structure configuration, as "
+                "'--gurk-configure-root-filestructure' flag is not provided.",
             )
         else:
             recursive_create_structure(

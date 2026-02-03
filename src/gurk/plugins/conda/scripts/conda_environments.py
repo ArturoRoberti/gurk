@@ -5,9 +5,8 @@ from tempfile import NamedTemporaryFile
 from typing import NotRequired, TypedDict
 
 import commentjson
-from ruamel.yaml import YAML
 
-from gurk import Logger, parse_task_args, run_script_function
+from gurk import Logger, dump_yaml, parse_task_args, run_script_function
 
 
 def install_conda_environments(*args: list[str]) -> None:
@@ -93,18 +92,17 @@ def install_conda_environments(*args: list[str]) -> None:
         channels = env_spec.get("channels", [])
 
         # Environment config file
-        env_file = {
+        env_spec = {
             "name": env_name,
             "channels": channels,
             "dependencies": conda_packages,
         }
         if pip_packages:
-            env_file["dependencies"].append("pip")
-            env_file["dependencies"].append({"pip": pip_packages})
+            env_spec["dependencies"].append("pip")
+            env_spec["dependencies"].append({"pip": pip_packages})
 
-        env_yaml_path = NamedTemporaryFile(delete=False, suffix=".yaml").name
-        with open(env_yaml_path, "w") as f:
-            YAML().dump(env_file, f)
+        env_file = NamedTemporaryFile(delete=False, suffix=".yaml").name
+        dump_yaml(env_file, env_spec)
 
         # Executable command
         conda_cmd = [
@@ -113,7 +111,7 @@ def install_conda_environments(*args: list[str]) -> None:
             "create",
             "-y",
             "-f",
-            env_yaml_path,
+            env_file,
         ]
 
         # Check if environment already exists
@@ -177,4 +175,4 @@ def install_conda_environments(*args: list[str]) -> None:
             Logger.step(f"Successfully created environment '{env_name}'")
 
         # Cleanup
-        os.remove(env_yaml_path)
+        os.remove(env_file)

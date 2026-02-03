@@ -6,7 +6,6 @@ from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.plugins import (
     GurkArgumentParser,
     PluginSpec,
-    get_combined_plugin_registry,
     get_plugin_data,
     pull_local_plugin,
     pull_plugin,
@@ -17,7 +16,7 @@ from gurk.lib.utils.remotes import edit_url, is_git_repo, parse_git_ref
 
 def maybe_remove_existing_plugin(
     plugin_spec: PluginSpec, replace: bool
-) -> None:
+) -> bool:
     """
     Remove existing plugin if it exists.
 
@@ -33,7 +32,6 @@ def maybe_remove_existing_plugin(
         # Remove existing plugin (if any)
         try:
             remove_plugin(plugin_spec)
-            logger.warning(f"Existing plugin '{plugin_spec}' removed.")
         except ModuleNotFoundError:
             logger.debug(f"No existing plugin '{plugin_spec}' to remove.")
     else:
@@ -44,9 +42,11 @@ def maybe_remove_existing_plugin(
                 f"Plugin '{plugin_spec}' already exists. "
                 "Use --replace to replace existing plugins."
             )
-            return
+            return False
         except ModuleNotFoundError:
             pass
+
+    return True
 
 
 def main(argv, prog, description):
@@ -54,7 +54,7 @@ def main(argv, prog, description):
     parser.add_argument(
         "sources",
         type=str,
-        nargs="*",
+        nargs="+",
         help="GitRefs of the plugin sources to pull. Specify desired versions using GitRef syntax (commit/version) or via '<plugin_name>=<version>'. If empty, pull all plugins with remotes that are not installed.",
     )
     parser.add_argument(
@@ -74,164 +74,120 @@ def main(argv, prog, description):
     # Execute with active logger
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
-        if not args.sources:
-            # No sources specified, pull all plugins with remotes that are not installed
-            logger.debug(
-                "No specific plugins to pull specified. Pulling all uninstalled plugins with remotes..."
-            )
-            combined_registry = get_combined_plugin_registry()
-            for plugin_name, plugin_entry in combined_registry.items():
-                if not plugin_entry.get("remote"):
-                    continue  # No remote to pull from
-
-                # Check if plugin is already validly installed
-                try:
-                    get_plugin_data(plugin_name)
-                    logger.debug(
-                        f"Plugin '{plugin_name}' is already installed. Skipping..."
+        # Extract versions from specified plugins
+        parsed_sources = []
+        for source in args.sources:
+            count = source.count("=")
+            if count == 1:
+                # Get plugin version via CLI syntax
+                plugin_spec, version = (source.split("=", 1) + [None])[:2]
+                if version and not check_version(version):
+                    logger.error(
+                        f"Invalid version '{version}' for plugin '{plugin_spec}'. Skipping..."
                     )
                     continue
-                except ModuleNotFoundError:
-                    pass
 
-                # Remove any existing invalid plugin
-                maybe_remove_existing_plugin(plugin_name, True)
+                # Check that an actual GitRef is given
+                if not is_git_repo(plugin_spec):
+                    logger.error(
+                        f"'{plugin_spec}' is either not a GitRef or "
+                        "points to an inexistent repository. Skipping..."
+                    )
+                    continue
 
-                # Pull plugin
-                source = plugin_entry["remote"]
+                # Get plugin version via GitRef syntax
+                parsed = parse_git_ref(source)
+                if parsed["version"] and not check_version(parsed["version"]):
+                    logger.error(
+                        f"Invalid version '{parsed['version']}' for "
+                        f"plugin '{source}' in GitRef. Skipping..."
+                    )
+                    continue
+
+                # Check for version mismatches
+                if (
+                    parsed["version"]
+                    and version
+                    and parsed["version"] != version
+                ):
+                    logger.error(
+                        f"Version mismatch for plugin '{source}': GitRef "
+                        f"version '{parsed['version']}' does not match "
+                        f"specified version '{version}'. Skipping..."
+                    )
+                    continue
+                else:
+                    # Same version - append plugin with specified version
+                    parsed_sources.append(
+                        edit_url(
+                            source, version=(parsed["version"] or version)
+                        )
+                    )
+
+            elif count > 1:
+                logger.error(
+                    f"Invalid plugin specification '{source}'. Only one "
+                    "'=' is allowed to specify version. Skipping..."
+                )
+            else:
+                # Append plugin as-is
+                parsed_sources.append(source)
+
+        # Pull plugins
+        for source in parsed_sources:
+            # Exclude gurk plugin, as it should be managed via pipx
+            try:
+                plugin_data = get_plugin_data(source)
+                plugin_name = plugin_data["metadata"]["name"]
+                if plugin_name == "gurk":
+                    logger.info(
+                        "Skipping pull of core 'gurk' plugin. Please upgrade 'gurk' separately via 'pipx upgrade gurk'."
+                    )
+                    continue
+            except ModuleNotFoundError:
+                pass
+
+            # Handle source type
+            if Path(source).is_dir():  # Local plugin directory
+                # Get plugin name
+                try:
+                    plugin_metadata = load_toml(
+                        Path(source) / "pyproject.toml"
+                    )
+                    plugin_name = plugin_metadata["project"]["name"]
+                except Exception as e:
+                    logger.error(
+                        f"Failed to load plugin name from local path '{source}': {str(e)}. Skipping..."
+                    )
+                    continue
+
+                # Remove existing plugin (if any, and if '--replace' specified)
+                if not maybe_remove_existing_plugin(plugin_name, args.replace):
+                    continue
+
+                # Pull specified local plugin
+                if not pull_local_plugin(source, not args.ignore_imports):
+                    logger.error(
+                        f"Failed to pull local plugin from path '{source}'."
+                    )
+                    continue
+
+            elif is_git_repo(source):  # GitRef source
+                # Remove existing plugin (if any, and if '--replace' specified)
+                if not maybe_remove_existing_plugin(source, args.replace):
+                    continue
+
+                # Pull specified plugin
                 if not pull_plugin(source, not args.ignore_imports):
                     logger.error(
-                        f"Failed to pull plugin '{plugin_name}' from '{source}'."
+                        f"Failed to pull plugin from source '{source}'."
                     )
                     continue
-                else:
-                    logger.info(
-                        f"Successfully pulled plugin '{plugin_name}' from '{source}'."
-                    )
-        else:
-            # Extract versions from specified plugins
-            logger.debug("Pulling specified plugins...")
-            parsed_sources = []
-            for source in args.sources:
-                count = source.count("=")
-                if count == 1:
-                    # Get plugin version via CLI syntax
-                    plugin_spec, version = (source.split("=", 1) + [None])[:2]
-                    if version and not check_version(version):
-                        logger.error(
-                            f"Invalid version '{version}' for plugin '{plugin_spec}'. Skipping..."
-                        )
-                        continue
 
-                    # Check that an actual GitRef is given
-                    if not is_git_repo(plugin_spec):
-                        logger.error(
-                            f"'{plugin_spec}' is either not a GitRef or "
-                            "points to an inexistent repository. Skipping..."
-                        )
-                        continue
-
-                    # Get plugin version via GitRef syntax
-                    parsed = parse_git_ref(source)
-                    if parsed["version"] and not check_version(
-                        parsed["version"]
-                    ):
-                        logger.error(
-                            f"Invalid version '{parsed['version']}' for "
-                            f"plugin '{source}' in GitRef. Skipping..."
-                        )
-                        continue
-
-                    # Check for version mismatches
-                    if (
-                        parsed["version"]
-                        and version
-                        and parsed["version"] != version
-                    ):
-                        logger.error(
-                            f"Version mismatch for plugin '{source}': GitRef "
-                            f"version '{parsed['version']}' does not match "
-                            f"specified version '{version}'. Skipping..."
-                        )
-                        continue
-                    else:
-                        # Same version - append plugin with specified version
-                        parsed_sources.append(
-                            edit_url(
-                                source, "version", parsed["version"] or version
-                            )
-                        )
-
-                elif count > 1:
-                    logger.error(
-                        f"Invalid plugin specification '{source}'. Only one "
-                        "'=' is allowed to specify version. Skipping..."
-                    )
-                else:
-                    # Append plugin as-is
-                    parsed_sources.append(source)
-
-            # Pull plugins
-            for source in parsed_sources:
-                # Exclude gurk plugin, as it should be managed via pipx
-                try:
-                    plugin_data = get_plugin_data(source)
-                    plugin_name = plugin_data["metadata"]["name"]
-                    if plugin_name == "gurk":
-                        logger.info(
-                            "Skipping pull of core 'gurk' plugin. Please upgrade 'gurk' separately via 'pipx upgrade gurk'."
-                        )
-                        continue
-                except ModuleNotFoundError:
-                    pass
-
-                # Handle source type
-                if Path(source).is_dir():  # Local plugin directory
-                    # Get plugin name
-                    try:
-                        plugin_metadata = load_toml(
-                            Path(source) / "pyproject.toml"
-                        )
-                        plugin_name = plugin_metadata["project"]["name"]
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to load plugin name from local path '{source}': {str(e)}. Skipping..."
-                        )
-                        continue
-
-                    # Remove existing plugin (if any, and if '--replace' specified)
-                    maybe_remove_existing_plugin(plugin_name, args.replace)
-
-                    # Pull specified local plugin
-                    if not pull_local_plugin(source, not args.ignore_imports):
-                        logger.error(
-                            f"Failed to pull local plugin from path '{source}'."
-                        )
-                        continue
-                    else:
-                        logger.info(
-                            f"Successfully pulled local plugin from path '{source}'."
-                        )
-
-                elif is_git_repo(source):  # GitRef source
-                    # Remove existing plugin (if any, and if '--replace' specified)
-                    maybe_remove_existing_plugin(source, args.replace)
-
-                    # Pull specified plugin
-                    if not pull_plugin(source, not args.ignore_imports):
-                        logger.error(
-                            f"Failed to pull plugin from source '{source}'."
-                        )
-                        continue
-                    else:
-                        logger.info(
-                            f"Successfully pulled plugin from source '{source}'."
-                        )
-
-                else:
-                    logger.error(
-                        f"'{source}' is either not a GitRef or points to an inexistent repository. Skipping..."
-                    )
-                    continue
+            else:
+                logger.error(
+                    f"'{source}' is either not a GitRef or points to an inexistent repository. Skipping..."
+                )
+                continue
 
         logger.done("Plugin pulling complete.")
