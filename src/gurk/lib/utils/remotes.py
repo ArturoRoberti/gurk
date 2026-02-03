@@ -3,9 +3,8 @@ import re
 import shutil
 import subprocess
 from contextlib import contextmanager
-from functools import wraps
+from functools import cache, wraps
 from pathlib import Path
-from threading import Lock
 from typing import Any, TypeAlias, TypedDict
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -14,6 +13,7 @@ from filelock import FileLock
 
 from gurk.lib.utils.common import (
     PACKAGE_CACHE_PATH,
+    PathLike,
     check_version,
     generate_random_path,
 )
@@ -147,7 +147,22 @@ def edit_url(url: str, **kwargs: dict[str, str | None]) -> str:
     return urlunparse(parts)
 
 
-_is_git_repo_lock = Lock()
+@cache
+def _is_git_repo(url: str) -> bool:
+    """
+    Check if the repository at the given URL exists.
+
+    :param url: Git repository URL
+    :type url: str
+    :return: True if the string is a valid Git repository, False otherwise
+    :rtype: bool
+    """
+    result = _git_run(
+        ["git", "ls-remote", extract_url(url)],
+        timeout=30,
+        capture_output=True,
+    )
+    return result.returncode == 0
 
 
 def is_git_repo(repo: str | GitRef) -> bool:
@@ -159,87 +174,21 @@ def is_git_repo(repo: str | GitRef) -> bool:
     :return: True if the string is a valid Git repository, False otherwise
     :rtype: bool
     """
-
-    def _add_git_repo(exists: bool) -> None:
-        with _is_git_repo_lock:
-            if not getattr(is_git_repo, "_git_repos", False):
-                is_git_repo._git_repos = dict[str, bool]()
-            is_git_repo._git_repos[repo] = exists
-
-    def _get_cached_git_repo() -> bool | None:
-        with _is_git_repo_lock:
-            if (
-                not getattr(is_git_repo, "_git_repos", False)
-                or repo not in is_git_repo._git_repos
-            ):
-                return None
-            else:
-                return is_git_repo._git_repos[repo]
-
-    cached_is_git_repo = _get_cached_git_repo()
-    if cached_is_git_repo is not None:
-        return cached_is_git_repo
-    else:
-        result = _git_run(
-            ["git", "ls-remote", extract_url(repo)],
-            timeout=30,
-            capture_output=True,
-        )
-        if result.returncode == 0:
-            _add_git_repo(True)
-            return True
-        else:
-            _add_git_repo(False)
-            return False
+    return _is_git_repo(extract_url(repo))
 
 
-_is_url_lock = Lock()
-
-
-def is_url(url: str, check: bool = True) -> bool:
+@cache
+def is_url(url: str) -> bool:
     """
     Check if a string is a valid URL and (optionally) if the URL exists.
 
     :param url: String to check
     :type url: str
-    :param check: Whether to check if the URL exists (default: True)
-    :type check: bool
     :return: True if the string is a valid URL, False otherwise
     :rtype: bool
     """
-
-    def _add_url(exists: bool) -> None:
-        with _is_url_lock:
-            if not getattr(is_url, "_urls", False):
-                is_url._urls = dict[str, bool]()
-            is_url._urls[url] = exists
-
-    def _get_cached_url() -> bool | None:
-        with _is_url_lock:
-            if not getattr(is_url, "_urls", False) or url not in is_url._urls:
-                return None
-            else:
-                return is_url._urls[url]
-
-    cached_is_url = _get_cached_url()
-    if cached_is_url is not None:
-        return cached_is_url
-    else:
-        parsed = urlparse(url)
-        if not all([parsed.scheme, parsed.netloc]):
-            _add_url(False)
-            return False
-
-        if check:
-            response = requests.get(
-                url, timeout=30, headers={"Accept-Encoding": "*"}
-            )
-            if not response.status_code == 200:
-                _add_url(False)
-                return False
-
-        _add_url(True)
-        return True
+    response = requests.get(url, timeout=30, headers={"Accept-Encoding": "*"})
+    return response.status_code == 200
 
 
 def _register_mirror(url: str) -> Path:
@@ -361,9 +310,7 @@ def version2commit(
     return None
 
 
-_get_default_branch_lock = Lock()
-
-
+@cache
 def get_default_branch(
     url: str,
 ) -> str:
@@ -378,54 +325,40 @@ def get_default_branch(
     :raises CalledProcessError: If git commands fail for various reasons
     :raises RuntimeError: If the default branch cannot be determined
     """
+    # Get remote info
+    result = _git_run(
+        ["git", "remote", "show", "origin"],
+        cwd=_get_mirror(url),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    origin = result.stdout.splitlines()
+    head_line = next(
+        (line for line in origin if line.strip().startswith("HEAD branch:")),
+        None,
+    )
+    if head_line is None:
+        raise RuntimeError("Could not determine remote HEAD branch")
 
-    def _add_default_branch(branch: str) -> None:
-        with _get_default_branch_lock:
-            if not getattr(get_default_branch, "_default_branches", False):
-                get_default_branch._default_branches = dict[str, str]()
-            get_default_branch._default_branches[url] = branch
-
-    def _get_cached_default_branch() -> str | None:
-        with _get_default_branch_lock:
-            if (
-                not getattr(get_default_branch, "_default_branches", False)
-                or url not in get_default_branch._default_branches
-            ):
-                return None
-            else:
-                return get_default_branch._default_branches[url]
-
-    cached_default_branch = _get_cached_default_branch()
-    if cached_default_branch is not None:
-        return cached_default_branch
-    else:
-        # Get remote info
-        result = _git_run(
-            ["git", "remote", "show", "origin"],
-            cwd=_get_mirror(url),
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        origin = result.stdout.splitlines()
-        head_line = next(
-            (
-                line
-                for line in origin
-                if line.strip().startswith("HEAD branch:")
-            ),
-            None,
-        )
-        if head_line is None:
-            raise RuntimeError("Could not determine remote HEAD branch")
-
-        # Cache and return default branch
-        default_branch = head_line.split(":", 1)[1].strip()
-        _add_default_branch(default_branch)
-        return default_branch
+    # Return default branch
+    return head_line.split(":", 1)[1].strip()
 
 
-_git_clone_fetched_lock = Lock()
+@cache
+def _git_fetch(repo_path: PathLike) -> None:
+    """
+    Fetch updates for the Git repository at the specified path.
+
+    :param repo_path: Path to the Git repository
+    :type repo_path: PathLike
+    """
+    _git_run(
+        ["git", "fetch", "--prune", "--all"],
+        cwd=str(repo_path),
+        check=True,
+        capture_output=True,
+    )
 
 
 def git_clone(
@@ -527,31 +460,11 @@ def git_clone(
         # Get default branch
         ref = get_default_branch(parsed["url"])
 
-    def _add_fetched(url: str) -> None:
-        with _git_clone_fetched_lock:
-            if not getattr(git_clone, "_fetched", False):
-                git_clone._fetched = set()
-            git_clone._fetched.add(url)
-
-    def _was_fetched(url: str) -> bool:
-        with _git_clone_fetched_lock:
-            if not getattr(git_clone, "_fetched", False):
-                return False
-            else:
-                return url in git_clone._fetched
-
     # Update mirror with requested ref
     mirror = _get_mirror(parsed["url"])
     with _repo_lock(mirror):
         # Fetch updates
-        if not _was_fetched(parsed["url"]):
-            _git_run(
-                ["git", "fetch", "--prune", "--all"],
-                cwd=mirror,
-                check=True,
-                capture_output=True,
-            )
-            _add_fetched(parsed["url"])
+        _git_fetch(mirror)
 
         # Pull file(s)
         _git_run(
