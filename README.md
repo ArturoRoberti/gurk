@@ -4,9 +4,9 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-brown?logo=github)](https://github.com/ArturoRoberti/gurk)
 
 
-# gurk - The user-friendly, customizable package manager
+![title image](./docs/assets/title_image.png)
 
-Contains anything related to setting up a new computer (desktop) system.
+🖥️ gurk 🥒 - The user-friendly package manager allowing customizable and repeatable computer setup
 
 # Installation
 ## Prerequisites
