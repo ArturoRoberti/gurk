@@ -124,10 +124,14 @@ def main(argv, prog, description):
             # Check that the task exists in the plugin
             plugin_tasks = plugin_data["manifest"]["tasks"]
             if full_task_name not in plugin_tasks:
-                logger.fatal(
-                    f"Plugin '{plugin_name}' does not have a task named '{full_task_name}'. "
-                    f"Available tasks are: {list(plugin_tasks.keys())}."
-                )
+                msg = f"Plugin '{plugin_name}' does not have a task named '{full_task_name}'."
+                if not plugin_tasks:
+                    msg += " This plugin defines no tasks."
+                else:
+                    msg += (
+                        f" Available tasks are: {list(plugin_tasks.keys())}."
+                    )
+                logger.fatal(msg)
 
             # Define mock option with the specific task enabled
             option = {full_task_name: {"enabled": True}}

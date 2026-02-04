@@ -52,12 +52,12 @@ def get_sudo_askpass() -> Path:
     return askpass_path
 
 
-def prompt_setup(answer: str | bool = None) -> None:
+def prompt_setup(answer: str | bool | None = None) -> None:
     """
     Prompt the user to run setup if it has never been run before.
 
     :param answer: Predefined answer for non-interactive mode (True/False for 'y'/'n').
-    :type answer: bool | None
+    :type answer: str | bool | None
     """
     # Get logger
     logger = get_logger()

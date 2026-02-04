@@ -1,6 +1,5 @@
 from collections import defaultdict
 from copy import deepcopy
-from pprint import pprint
 
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
@@ -83,7 +82,7 @@ def main(argv, prog, description):
             logger.richprint(
                 "For detailed help, visit the Gurk documentation:", "green"
             )
-            logger.pprint_simple_dict(gurk_help, color="yellow", indent=2)
+            logger.pprint_dict(gurk_help, color="yellow", indent=2)
 
         # Show help for specific plugins
         elif args.plugins:
@@ -108,7 +107,7 @@ def main(argv, prog, description):
                     or plugin_data["registration"]["local"]
                 )
 
-                logger.pprint_simple_dict(
+                logger.pprint_dict(
                     general_info, color="yellow", capitalize=True
                 )
                 logger.newline()
@@ -121,7 +120,7 @@ def main(argv, prog, description):
                         "tasks"
                     ].items():
                         logger.richprint(f"- {task_name}:", "yellow")
-                        pprint(task_info)
+                        logger.pprint_dict(task_info, color="cyan")
                         logger.newline()
 
                 # Print imported plugins
@@ -142,7 +141,7 @@ def main(argv, prog, description):
                         )
 
                     logger.padded_print("Imported Plugins", "cyan")
-                    logger.pprint_simple_dict(imports, color="yellow")
+                    logger.pprint_dict(imports, color="yellow")
                     logger.newline()
 
                 # Print 'options' section
@@ -154,7 +153,7 @@ def main(argv, prog, description):
                         else f"={option_name}"
                     )
                     logger.richprint(f"- {key}: ", "yellow")
-                    pprint(option)
+                    logger.pprint_dict(option, color="cyan")
                     logger.newline()
 
         # Show help for specific tasks
@@ -172,7 +171,7 @@ def main(argv, prog, description):
 
                 # Print task info
                 logger.richprint(f"Task '{task_full_name}':", "green")
-                logger.pprint_simple_dict(
+                logger.pprint_dict(
                     task_info, color="yellow", capitalize=True, indent=2
                 )
                 logger.newline()
@@ -183,9 +182,7 @@ def main(argv, prog, description):
             combined_registry = get_combined_plugin_registry()
             for plugin_name, plugin_info in combined_registry.items():
                 logger.richprint(f"{plugin_name}:", "green")
-                logger.pprint_simple_dict(
-                    plugin_info, color="yellow", indent=2
-                )
+                logger.pprint_dict(plugin_info, color="yellow", indent=2)
                 logger.newline()
 
         # Show available tasks
@@ -225,6 +222,4 @@ def main(argv, prog, description):
 
             # Print system info
             logger.padded_print("System information", "cyan")
-            logger.pprint_simple_dict(
-                system_info, color="yellow", capitalize=True
-            )
+            logger.pprint_dict(system_info, color="yellow", capitalize=True)

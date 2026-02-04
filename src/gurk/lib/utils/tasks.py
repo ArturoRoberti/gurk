@@ -38,8 +38,8 @@ class DefaultTaskDict(TypedDict):
     # fmt: off
     description:    str
     script:         str
-    function:       str | None
-    config_file:    NotRequired[str | None]
+    function:       None | str
+    config_file:    NotRequired[None | str]
     depends_on:     NotRequired[list[str]]
     privileged:     NotRequired[bool]
     supercedes:     NotRequired[list[str]]
@@ -94,8 +94,8 @@ class ResolvedDefaultTaskDict(TypedDict):
     # fmt: off
     description:    str
     script:         Path
-    function:       str | None
-    config_file:    Path | None
+    function:       None | str
+    config_file:    None | Path
     depends_on:     list[str]
     privileged:     bool
     supercedes:     list[str]
@@ -108,7 +108,7 @@ class ResolvedCustomTaskDict(TypedDict):
 
     # fmt: off
     enabled:     bool
-    config_file: Path | None
+    config_file: None | Path
     args:        list[str]
     # fmt: on
 
@@ -138,7 +138,7 @@ class ResolvedTask:
     # fmt: off
     name:        str             = field()
     command:     Command         = field()
-    config_file: str | None      = field(default=None)
+    config_file: None | str      = field(default=None)
     depends_on:  tuple[str, ...] = field(default_factory=tuple)
     privileged:  bool            = field(default=False)
     args:        tuple[str, ...] = field(default_factory=tuple)

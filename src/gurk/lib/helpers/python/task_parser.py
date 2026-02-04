@@ -8,7 +8,7 @@ from gurk.lib.utils.system_info import SystemInfo
 
 class TaskNamespace(Namespace):
     system_info: SystemInfo
-    config_file: Path | None
+    config_file: None | Path
     force: bool
 
 

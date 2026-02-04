@@ -50,7 +50,5 @@ options:
   default:
     nvidia/install-cuda:
       enabled: true
-    nvidia/install-nvidia-driver:
-      enabled: false
     nvidia/install-isaaclab:
       enabled: true

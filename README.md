@@ -32,19 +32,18 @@ Not supported yet.
 ## Main Installation
 Then, install `gurk` via `pipx`:
 ```bash
-pipx install gurk
-gurk init
+pipx install gurk && gurk init
 ```
 
 # Usage
 Using gurk you can run various plugins via
 ```bash
-gurk run <plugin> [args...]
+gurk run --plugin <plugin> [args...]
 ```
 
 where `<plugin>` is a plugin's git URL or the name of a locally installed plugin to run. For example:
 ```bash
-gurk run 'git@github.com:ArturoRoberti/example_gurk_plugin.git'
+gurk run --plugin 'git@github.com:ArturoRoberti/example_gurk_plugin.git'
 ```
 > [!WARNING]
 > Make sure to wrap git URLs in quotes to avoid shell interpretation issues with special characters (e.g. `&`)

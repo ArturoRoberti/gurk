@@ -57,10 +57,10 @@ class GitRefInfo(TypedDict):
 
     # fmt: off
     url:     str
-    branch:  str | None
-    commit:  str | None
-    path:    str | None
-    version: str | None
+    branch:  None | str
+    commit:  None | str
+    path:    None | str
+    version: None | str
     # fmt: on
 
 

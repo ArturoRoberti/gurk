@@ -202,7 +202,7 @@ class Command:
 
     # fmt: off
     script:     PathLike      = field()
-    function:   str | None    = field(default=None)
+    function:   None | str    = field(default=None)
     check_func: bool          = field(default=True)
     # fmt: on
 

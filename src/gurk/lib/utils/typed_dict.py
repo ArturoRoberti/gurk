@@ -168,11 +168,7 @@ def _build_default(tp: Any) -> Any:
 
     # Union / Optional
     if origin is Union or origin is types.UnionType:
-        if type(None) in args:
-            return None
-        else:
-            non_none_args = [a for a in args if a is not type(None)]
-            return _build_default(non_none_args[0])
+        return _build_default(args[0])
 
     # list[T] | set[T] | tuple[T, ...] | dict[K, V]
     if origin in {list, set, tuple, dict}:

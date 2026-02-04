@@ -14,6 +14,7 @@ from argparse import (
     _ArgumentGroup,
 )
 from collections import defaultdict
+from copy import deepcopy
 from pathlib import Path
 from typing import Iterator, NotRequired, Sequence, TypeAlias, TypedDict
 
@@ -152,8 +153,8 @@ class ResolvedPluginManifest(TypedDict):
 
 class PluginRegistryEntry(TypedDict):
     # fmt: off
-    local:   str | None
-    remote:  GitRef | None
+    local:   None | str
+    remote:  None | GitRef
     # fmt: on
 
 
@@ -466,8 +467,8 @@ def _load_resolved_plugin_manifest(
         return None
 
     # Fill missing properties
-    plugin_manifest: PluginManifest = fill_typed_dict(
-        plugin_manifest, PluginManifest
+    plugin_manifest: ResolvedPluginManifest = fill_typed_dict(
+        plugin_manifest, ResolvedPluginManifest
     )
 
     # Expand task paths
@@ -1454,7 +1455,8 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                 for dep in task.get(field, []):
                     if dep not in available_tasks:
                         error(
-                            f"Task '{task_name}' uses unknown task '{dep}' in '{field}' field."
+                            f"Task '{task_name}' uses unknown "
+                            f"task '{dep}' in '{field}' field."
                         )
                         return False
                     graph.add_edge(task_name, dep)
@@ -1530,17 +1532,26 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                     error(e)
                     return False
 
-            # Check that at least one task is being run.
-            # If any tasks are defined in the plugin, that at least one of them must be enabled
-            enabled_tasks = {k: v for k, v in option.items() if v["enabled"]}
+            # Determine enabled tasks (including dependencies)
+            directly_enabled_tasks = {
+                k for k, v in option.items() if v["enabled"]
+            }
+            enabled_tasks = deepcopy(directly_enabled_tasks)
+            for task_name in directly_enabled_tasks:
+                enabled_tasks.update(
+                    nx.descendants(task_dependency_graph, task_name)
+                )
+
+            # Check that at least one task is being run
             if not enabled_tasks:
                 error(f"Option '{option_name}' has no enabled tasks.")
                 return False
-            if plugin_tasks and not set(plugin_tasks.keys()) & set(
-                enabled_tasks.keys()
-            ):
+
+            # If any tasks are defined in the plugin, that at least one of them must be enabled
+            if plugin_tasks and not set(plugin_tasks.keys()) & enabled_tasks:
                 error(
-                    f"Option '{option_name}' does not enable any tasks defined in this plugin."
+                    f"Option '{option_name}' does not enable "
+                    "any tasks defined in this plugin."
                 )
                 return False
 
@@ -1548,8 +1559,8 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             for u, v in task_supercedes_graph.edges():
                 if u in enabled_tasks and v in enabled_tasks:
                     error(
-                        f"Tasks '{u}' and '{v}' that supercede each other are "
-                        f"both enabled in the same option '{option_name}'."
+                        f"Tasks '{u}' and '{v}' that supercede each other "
+                        f"would both be enabled in the '{option_name}' option"
                     )
                     return False
 

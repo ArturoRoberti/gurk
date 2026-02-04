@@ -408,28 +408,65 @@ class Logger:
             Logger.richprint("=" * total_length, color=color, file=file)
 
     @staticmethod
-    def pprint_simple_dict(
+    def pprint_dict(
         dct: dict[str, Any],
+        *,
         color: str = "white",
         capitalize: bool = False,
         indent: int = 0,
+        indent_step: int = 2,
     ) -> None:
         """
-        Pretty-print a simple dictionary with aligned keys and colored output.
+        Pretty-print a dictionary of arbitrary depth with aligned keys and colored output.
 
         :param dct: Dictionary to pretty-print
-        :type dct: dict
         :param color: Color name for the keys
-        :type color: str
-        :param capitalize: Whether to capitalize the keys
-        :type capitalize: bool
-        :param indent: Number of spaces to indent the output
-        :type indent: int
+        :param capitalize: Whether to capitalize string keys
+        :param indent: Base indentation (spaces)
+        :param indent_step: Spaces added per nesting level
         """
+
+        if not isinstance(dct, dict):
+            richprint(f"{' ' * indent}{dct}")
+            return
+
         maxlen = max((len(str(k)) for k in dct), default=0)
+
         for k, v in dct.items():
-            k = k.capitalize() if capitalize and isinstance(k, str) else k
-            richprint(f"{' ' * indent}[{color}]{k:<{maxlen}} :[/{color}] {v}")
+            key = k.capitalize() if capitalize and isinstance(k, str) else k
+            pad = " " * indent
+            msg = f"{pad}[{color}]{key:<{maxlen}}:[/{color}]"
+            if not v:
+                msg += f" {repr(v)}"
+                richprint(msg)
+                continue
+
+            if isinstance(v, dict):
+                richprint(msg)
+                Logger.pprint_dict(
+                    v,
+                    color=color,
+                    capitalize=capitalize,
+                    indent=indent + indent_step,
+                    indent_step=indent_step,
+                )
+
+            elif isinstance(v, (list, tuple, set)):
+                richprint(msg)
+                for item in v:
+                    if isinstance(item, dict):
+                        Logger.pprint_dict(
+                            item,
+                            color=color,
+                            capitalize=capitalize,
+                            indent=indent + indent_step,
+                            indent_step=indent_step,
+                        )
+                    else:
+                        richprint(f"{' ' * (indent + indent_step)}- {item}")
+
+            else:
+                richprint(f"{msg} {v}")
 
     @staticmethod
     def newline() -> None:

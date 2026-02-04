@@ -74,7 +74,6 @@ def main(argv, prog, description):
             for task_name in list(task_map.keys()):
                 task = task_map.pop(task_name)
                 new_name = task_name.replace("template", args.name)
-                print(f"Renaming task '{task_name}' to '{new_name}'")
                 task_map[new_name] = task
 
         tasks = data.get("tasks")

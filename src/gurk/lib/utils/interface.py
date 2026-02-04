@@ -37,7 +37,7 @@ def run_script_function(
 
 def run_script_function(
     script: PathLike,
-    function: str | None = None,
+    function: None | str = None,
     args: list[str] | None = None,
     *,
     run: bool = True,
@@ -52,7 +52,7 @@ def run_script_function(
     :param script: The path to the script to source or execute.
     :type script: PathLike
     :param function: The function within the script to call. If None, the script is executed directly.
-    :type function: str | None
+    :type function: None | str
     :param args: Arguments to pass to the function or script
     :type args: list[str] | None
     :param run: If True, executes the script. Otherwise, returns the string.
@@ -93,7 +93,7 @@ def run_script_function(
 
 def _run_bash_script_function(
     script: PathLike,
-    function: str | None,
+    function: None | str,
     args: list[str],
     run: bool,
     capture_output: bool,
@@ -105,7 +105,7 @@ def _run_bash_script_function(
     :param script: The path to the script to source or execute.
     :type script: PathLike
     :param function: The function within the script to call. If None, the script is executed directly.
-    :type function: str | None
+    :type function: None | str
     :param args: Arguments to pass to the function or script
     :type args: list[str]
     :param run: If True, executes the script. Otherwise, returns the string.
@@ -174,7 +174,7 @@ def _run_bash_script_function(
 
 def _run_python_script_function(
     script: PathLike,
-    function: str | None,
+    function: None | str,
     args: list[str],
     run: bool,
     capture_output: bool,
@@ -187,7 +187,7 @@ def _run_python_script_function(
     :param script: The path to the script to source or execute.
     :type script: PathLike
     :param function: The function within the script to call. If None, the script is executed directly.
-    :type function: str | None
+    :type function: None | str
     :param args: Arguments to pass to the function or script
     :type args: list[str]
     :param run: If True, executes the script. Otherwise, returns the string.
