@@ -29,5 +29,4 @@ tasks:
 
 options:
   default:
-    ros/install-ros:
-      enabled: true
+    ros/install-ros: {}

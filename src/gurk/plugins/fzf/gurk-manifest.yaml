@@ -23,9 +23,7 @@ tasks:
 
 options:
   install: &install_option
-    fzf/install-loki-shell:
-      enabled: true
+    fzf/install-loki-shell: {}
   uninstall:
-    fzf/uninstall-fzf:
-      enabled: true
+    fzf/uninstall-fzf: {}
   default: *install_option

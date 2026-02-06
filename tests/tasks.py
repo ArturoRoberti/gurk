@@ -90,7 +90,7 @@ def test_task(task: str) -> None:
         with ActiveLogger(logger):
             with pytest.raises(SystemExit) as e:
                 core.main(
-                    option={task: {"enabled": True}},
+                    option={task: {}},
                     cli_args=["--force"],
                     parser_base=GurkArgumentParser(
                         add_verbose_arg=False,

@@ -51,7 +51,6 @@ class CustomTaskDict(TypedDict):
     """Dictionary representing a custom task configuration."""
 
     # fmt: off
-    enabled:     bool
     config_file: NotRequired[str]
     args:        NotRequired[list[str]]
     # fmt: on
@@ -107,7 +106,6 @@ class ResolvedCustomTaskDict(TypedDict):
     """Dictionary representing a resolved custom task configuration."""
 
     # fmt: off
-    enabled:     bool
     config_file: None | Path
     args:        list[str]
     # fmt: on

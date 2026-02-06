@@ -59,10 +59,10 @@ class Processor:
             plugin = task_name.split("/")[0]
             if (
                 plugin != "gurk"
-                and task["enabled"]
+                and task_name in self.option
                 and not (PACKAGE_VENVS_PATH / plugin).exists()
             ):
-                task["enabled"] = False
+                del self.option[task_name]
                 logger.warning(
                     f"Disabling task '{task_name}' as its plugin venv "
                     "does not exist. Did you forget to run 'gurk init'?"
@@ -72,7 +72,7 @@ class Processor:
         tasks = {
             task_name: task
             for task_name, task in tasks.items()
-            if task["enabled"]
+            if task_name in self.option
         }
         task_args = {
             task_name: task_args[task_name] for task_name in tasks.keys()
@@ -148,7 +148,7 @@ class Processor:
 
         # Convert to ResolvedTask list
         for task_name, task in tasks.items():
-            if not task["enabled"]:
+            if task_name not in self.option:
                 continue
 
             resolved_task = ResolvedTask(
@@ -163,8 +163,9 @@ class Processor:
             )
             self.tasks.append(resolved_task)
 
-    @staticmethod
-    def enable_dependencies(tasks: TaskDictCollection) -> TaskDictCollection:
+    def enable_dependencies(
+        self, tasks: TaskDictCollection
+    ) -> TaskDictCollection:
         """
         Enable dependencies of enabled tasks.
 
@@ -185,16 +186,16 @@ class Processor:
 
         # Enable dependencies of enabled tasks
         for node in nx.topological_sort(dependency_graph):
-            if tasks[node]["enabled"]:
+            if node in self.option:
                 for dep in nx.ancestors(dependency_graph, node):
-                    if not tasks[dep]["enabled"]:
-                        tasks[dep]["enabled"] = True
+                    if dep not in self.option:
+                        self.option[dep] = {}
                         logger.debug(f"Enabling dependency '{dep}'")
 
         return tasks
 
-    @staticmethod
     def add_preparation_task(
+        self,
         tasks: ResolvedTaskDictCollection,
     ) -> ResolvedTaskDictCollection:
         """
@@ -217,9 +218,6 @@ class Processor:
                 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
                     # (STEP) Updating apt packages...
                     sudo apt-get update -y
-
-                    # (STEP) Upgrading apt packages...
-                    sudo apt-get upgrade -y
                 fi
                 """
                 )
@@ -235,8 +233,10 @@ class Processor:
             privileged=False,
             supercedes=[],
             args=[],
-            enabled=True,
         )
+
+        # Enable prep task
+        self.option[prepare_task_name] = {}
 
         # Prepend preparation task to all tasks' dependencies
         for _, task in tasks.items():

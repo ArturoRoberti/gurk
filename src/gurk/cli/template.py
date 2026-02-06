@@ -4,11 +4,22 @@ from pathlib import Path
 from gurk.lib.logger import ActiveLogger, Logger
 from gurk.lib.utils.common import PACKAGE_SRC_PATH
 from gurk.lib.utils.configs import dump_toml, dump_yaml, load_toml, load_yaml
-from gurk.lib.utils.plugins import GURK_MANIFEST_FILENAME, GurkArgumentParser
+from gurk.lib.utils.plugins import (
+    GURK_MANIFEST_FILENAME,
+    DefaultNamespace,
+    GurkArgumentParser,
+)
+
+
+class TemplateNamespace(DefaultNamespace):
+    # fmt: off
+    name:  str
+    force: bool
+    # fmt: on
 
 
 def main(argv, prog, description):
-    parser = GurkArgumentParser(
+    parser = GurkArgumentParser[TemplateNamespace](
         prog=prog,
         description=description,
     )
@@ -23,7 +34,7 @@ def main(argv, prog, description):
         "-f",
         "--force",
         action="store_true",
-        help="Allow overwriting an existing (plugin) folder in the current working directory.",
+        help="Allow overwriting an existing (plugin) folder in the current working directory",
     )
     args = parser.parse_args(argv)
 

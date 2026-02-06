@@ -11,9 +11,9 @@ On every PR, the [CI](../../.github/workflows/ci.yml) performs:
 	- If any fixable checks fail, the workflow auto-pushes fixes
 	- If checks are unfixable, the workflow fails
 - Unit tests using `pytest` (see [documentation](commands.md)):
-	- Tests validity of package configuration files (`default.yaml`, `enabled.yaml`)
-	- Tests validity of package scripts
-	- Determines the tasks affected by a given PR and tests those
+	- Tests validity of affected task configuration files
+	- Tests validity of affected task scripts
+	- Tests affected tasks themselves
 
 # CI (Workflow)
 On every issue and PR, the [Workflow CI](../../.github/workflows/workflow_ci.yml):

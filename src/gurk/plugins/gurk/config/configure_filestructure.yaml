@@ -4,7 +4,7 @@
 # - null (indicating an empty directory/file to create)
 #     (type (folder/file) is inferred from if a suffix is present (e.g. '.txt'))
 # - (str) a github repository reference (indicating a repo to clone from)
-#           (see see 'parse_git_ref' function in this repo for expected format)
+#           (see see '_parse_git_query' function in this repo for expected format)
 # - (str) a URL (indicating a file to download from), starting with "http(s)://"
 # - (str) a local path (indicating a file/directory to copy from)
 #         - You may add the "symlink://" prefix to create a symlink instead of copying.

@@ -48,7 +48,5 @@ tasks:
 
 options:
   default:
-    nvidia/install-cuda:
-      enabled: true
-    nvidia/install-isaaclab:
-      enabled: true
+    nvidia/install-cuda: {}
+    nvidia/install-isaaclab: {}

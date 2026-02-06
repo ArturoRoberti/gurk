@@ -15,8 +15,17 @@ from argparse import (
 )
 from collections import defaultdict
 from copy import deepcopy
+from enum import Enum, auto
 from pathlib import Path
-from typing import Iterator, NotRequired, Sequence, TypeAlias, TypedDict
+from typing import (
+    Generic,
+    Iterator,
+    NotRequired,
+    Sequence,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+)
 
 import networkx as nx
 
@@ -32,11 +41,15 @@ from gurk.lib.utils.common import (
 )
 from gurk.lib.utils.configs import dump_yaml, load_toml, load_yaml
 from gurk.lib.utils.remotes import (
-    GitRef,
+    GIT_QUERY_VERSIONING_FIELDS,
+    GitQuery,
+    determine_ref,
     edit_url,
     extract_url,
+    get_commit,
     git_clone,
     is_git_repo,
+    parse_git_query,
 )
 from gurk.lib.utils.scripts import (
     ScriptBlockTypes,
@@ -137,7 +150,7 @@ ResolvedPluginOptions: TypeAlias = dict[str, ResolvedCustomTaskDictCollection]
 
 class PluginManifest(TypedDict):
     # fmt: off
-    imports: NotRequired[list[GitRef | str]]
+    imports: NotRequired[list[GitQuery | str]]
     tasks:   NotRequired[DefaultTaskDictCollection]
     options: PluginOptions
     # fmt: on
@@ -145,7 +158,7 @@ class PluginManifest(TypedDict):
 
 class ResolvedPluginManifest(TypedDict):
     # fmt: off
-    imports: list[GitRef | str]
+    imports: list[GitQuery | str]
     tasks:   ResolvedDefaultTaskDictCollection
     options: ResolvedPluginOptions
     # fmt: on
@@ -154,8 +167,11 @@ class ResolvedPluginManifest(TypedDict):
 class PluginRegistryEntry(TypedDict):
     # fmt: off
     local:   None | str
-    remote:  None | GitRef
+    remote:  None | GitQuery
     # fmt: on
+
+
+PluginRegistry: TypeAlias = dict[str, PluginRegistryEntry]
 
 
 class PluginData(TypedDict):
@@ -166,12 +182,22 @@ class PluginData(TypedDict):
     # fmt: on
 
 
-PluginSpec: TypeAlias = str | PathLike | GitRef
+PluginSource: TypeAlias = PathLike | GitQuery
+PluginSpecification: TypeAlias = str | PluginSource
+
+
+class PluginSpecificationEnum(Enum):
+    # fmt: off
+    LOCAL_PATH  = auto()
+    GIT_REMOTE  = auto()
+    PLUGIN_NAME = auto()
+    # fmt: on
+
 
 GURK_MANIFEST_FILENAME = "gurk-manifest.yaml"
 
 
-def _get_plugin_dirs(
+def get_plugin_directories(
     home_registry: bool = True, package_registry: bool = True
 ) -> tuple[Path, ...]:
     """
@@ -183,6 +209,7 @@ def _get_plugin_dirs(
     :type package_registry: bool
     :return: Tuple of plugin directories (home, package), depending on the input
     :rtype: tuple[Path, ...]
+    :raises TypeError: If an expected plugin directory path exists but is not a directory
     """
     parent_paths: list[Path] = []
     if home_registry:
@@ -192,12 +219,17 @@ def _get_plugin_dirs(
 
     possible_plugin_paths = [p / "plugins" for p in parent_paths]
     for p in possible_plugin_paths:
+        if p.is_file():
+            raise TypeError(
+                f"Expected plugin directory at '{p.as_posix()}', but "
+                "found a file. Please remove or rename this file."
+            )
         p.mkdir(parents=True, exist_ok=True)
 
     return tuple(possible_plugin_paths)
 
 
-def _get_plugin_registries(
+def _get_plugin_registry_files(
     home_registry: bool = True, package_registry: bool = True
 ) -> tuple[Path, ...]:
     """
@@ -212,7 +244,7 @@ def _get_plugin_registries(
     """
     possible_plugin_registries = [
         p / "registry.yaml"
-        for p in _get_plugin_dirs(home_registry, package_registry)
+        for p in get_plugin_directories(home_registry, package_registry)
     ]
     for p in possible_plugin_registries:
         p.touch(exist_ok=True)
@@ -220,45 +252,69 @@ def _get_plugin_registries(
     return tuple(possible_plugin_registries)
 
 
-def get_combined_plugin_registry() -> dict[str, PluginRegistryEntry]:
+def get_plugin_registries(
+    home_registry: bool = True, package_registry: bool = True
+) -> tuple[PluginRegistry, ...]:
+    """
+    Get a tuple of plugin registries as dictionaries, with the home one first.
+
+    :param home_registry: Whether to include the home plugin registry
+    :type home_registry: bool
+    :param package_registry: Whether to include the package plugin registry
+    :type package_registry: bool
+    :return: Tuple of plugin registries as dictionaries (home, package), depending on the input
+    :rtype: tuple[PluginRegistry, ...]
+    """
+    # Get logger
+    logger = get_logger()
+
+    def _get_plugin_registry(registry_file: Path) -> PluginRegistry:
+        """
+        Load a plugin registry from a given file, validating its structure and prepending the path to local entries.
+
+        :param registry_file: Path to the plugin registry file
+        :type registry_file: Path
+        :return: Plugin registry as a dictionary
+        :rtype: PluginRegistry
+        """
+        registry = load_yaml(registry_file) or {}
+        for name, entry in registry.items():
+            if not (
+                isinstance(name, str)
+                and validate_typed_dict(entry, PluginRegistryEntry)
+            ):
+                logger.debug(
+                    f"Invalid plugin registry entry '{name}' - Not returning it. Please "
+                    f"manually fix or remove this entry from {registry_file.as_posix()}."
+                )
+                del registry[name]
+                continue
+
+            # Prepend path to 'local' entries
+            if entry["local"]:
+                entry["local"] = str(registry_file.parent / entry["local"])
+
+        return registry
+
+    return tuple(
+        _get_plugin_registry(p)
+        for p in _get_plugin_registry_files(home_registry, package_registry)
+    )
+
+
+def get_combined_plugin_registry() -> PluginRegistry:
     """
     Get the combined plugin registry from home and package registries.
 
     :return: Combined plugin registry
-    :rtype: dict[str, PluginRegistryEntry]
+    :rtype: PluginRegistry
     """
-    home_registry_file, package_registry_file = _get_plugin_registries()
-
-    # Get home registry and prepend path to 'local' entries
-    home_registry = load_yaml(home_registry_file) or {}
-    for entry in home_registry.values():
-        entry["local"] = (
-            str(Path(home_registry_file).parent / entry["local"])
-            if entry["local"]
-            else entry["local"]
-        )
-
-    # Get package registry and prepend path to 'local' entries
-    package_registry = load_yaml(package_registry_file) or {}
-    for entry in package_registry.values():
-        entry["local"] = (
-            str(Path(package_registry_file).parent / entry["local"])
-            if entry["local"]
-            else entry["local"]
-        )
-
-    # Combine registries, prioritizing home registry
-    combined_registry = package_registry.copy()
-    combined_registry.update(home_registry)
-
-    # Remove the template plugin
-    del combined_registry["template"]
-
-    return combined_registry
+    home_registry, package_registry = get_plugin_registries()
+    return {**package_registry, **home_registry}  # Home registry prioritized
 
 
 def _get_possible_plugin_entries(
-    plugin: PluginSpec,
+    plugin: PluginSpecification,
     home_registry: bool = True,
     package_registry: bool = True,
     require_local: bool = True,
@@ -267,8 +323,8 @@ def _get_possible_plugin_entries(
     Get possible plugin registry entries for a given plugin name.
         NOTE: This does not check the validity of the plugin yaml file.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :param home_registry: Whether to check the home plugin registry
     :type home_registry: bool
     :param package_registry: Whether to check the package plugin registry
@@ -283,9 +339,7 @@ def _get_possible_plugin_entries(
     def _load_plugin(
         registry_file: Path,
     ) -> tuple[str | None, PluginRegistryEntry | None]:
-        registry: dict[str, PluginRegistryEntry] = (
-            load_yaml(registry_file) or {}
-        )
+        registry: PluginRegistry = load_yaml(registry_file) or {}
 
         # Get plugin entry
         name_via_remote = next(
@@ -341,7 +395,9 @@ def _get_possible_plugin_entries(
 
         return name, entry
 
-    plugin_registries = _get_plugin_registries(home_registry, package_registry)
+    plugin_registries = _get_plugin_registry_files(
+        home_registry, package_registry
+    )
     plugin_entries = []
     for registry_file in plugin_registries:
         name, entry = _load_plugin(registry_file)
@@ -351,8 +407,8 @@ def _get_possible_plugin_entries(
     return tuple(plugin_entries)
 
 
-def _get_plugin_registration(
-    plugin: PluginSpec,
+def get_plugin_registration(
+    plugin: PluginSpecification,
     home_registry: bool = True,
     package_registry: bool = True,
     require_local: bool = True,
@@ -360,8 +416,8 @@ def _get_plugin_registration(
     """
     Get the registry entry of a plugin (path, remote) if it exists locally.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :param home_registry: Whether to check the home plugin registry
     :type home_registry: bool
     :param package_registry: Whether to check the package plugin registry
@@ -388,52 +444,18 @@ def _get_plugin_registration(
     return plugin_entries[0]
 
 
-def plugin_exists_locally(plugin: PluginSpec) -> bool:
-    """
-    Check if a plugin exists in the possible local plugin paths.
-
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
-    :return: True if the plugin exists locally, False otherwise
-    :rtype: bool
-    """
-    return all(_get_plugin_registration(plugin, require_local=True))
-
-
-def plugin_exists_remotely(plugin: GitRef) -> bool:
-    """
-    Check if a plugin exists in the possible remote plugin paths.
-
-    :param plugin: GitRef of the plugin
-    :type plugin: GitRef
-    :return: True if the plugin exists remotely, False otherwise
-    :rtype: bool
-    """
-    return is_git_repo(str(plugin))
-
-
-def plugin_exists(plugin: PluginSpec) -> bool:
-    """
-    Check if a plugin exists either locally or remotely.
-
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
-    :return: True if the plugin exists, False otherwise
-    :rtype: bool
-    """
-    return plugin_exists_locally(plugin) or plugin_exists_remotely(plugin)
-
-
-def load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
+def load_raw_plugin_manifest(
+    plugin: PluginSpecification,
+) -> PluginManifest | None:
     """
     Get the raw manifest of a plugin if it exists locally.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :return: Plugin manifest if the plugin exists locally, None otherwise
     :rtype: PluginManifest | None
     """
-    plugin_name, plugin_registration = _get_plugin_registration(plugin)
+    plugin_name, plugin_registration = get_plugin_registration(plugin)
     if not (plugin_name and plugin_registration):
         return None
 
@@ -450,15 +472,15 @@ def load_raw_plugin_manifest(plugin: PluginSpec) -> PluginManifest | None:
 
 
 def _load_resolved_plugin_manifest(
-    plugin: PluginSpec,
+    plugin: PluginSpecification,
 ) -> ResolvedPluginManifest | None:
     """
     Get the manifest of a local plugin with
     - all paths resolved and converted to "Path" objects
     - missing properties filled with default values
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
     :rtype: ResolvedPluginManifest | None
     """
@@ -472,7 +494,7 @@ def _load_resolved_plugin_manifest(
     )
 
     # Expand task paths
-    _, plugin_registration = _get_plugin_registration(plugin)
+    _, plugin_registration = get_plugin_registration(plugin)
     plugin_path = Path(plugin_registration["local"])
     for _, task in plugin_manifest["tasks"].items():
         # Expand script path
@@ -492,16 +514,18 @@ def _load_resolved_plugin_manifest(
     return plugin_manifest
 
 
-def _load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
+def _load_plugin_metadata(
+    plugin: PluginSpecification,
+) -> FilteredPluginMetadata | None:
     """
     Get the pyproject.toml metadata of a local plugin.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :return: Plugin metadata if the plugin exists locally, None otherwise
     :rtype: FilteredPluginMetadata | None
     """
-    plugin_name, plugin_registration = _get_plugin_registration(plugin)
+    plugin_name, plugin_registration = get_plugin_registration(plugin)
     if not (plugin_name and plugin_registration):
         return None
 
@@ -517,12 +541,12 @@ def _load_plugin_metadata(plugin: PluginSpec) -> FilteredPluginMetadata | None:
     return PluginMetadata.filtered(toml_data)
 
 
-def get_plugin_data(plugin: PluginSpec) -> PluginData:
+def get_plugin_data(plugin: PluginSpecification) -> PluginData:
     """
     Get the registry entry, manifest and pyproject.toml metadata of a local plugin.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :return: Plugin data containing registry entry, manifest and metadata
     :rtype: PluginData
     :raises ModuleNotFoundError: If no valid plugin was found
@@ -531,7 +555,7 @@ def get_plugin_data(plugin: PluginSpec) -> PluginData:
     def error_msg(message: str) -> str:
         return f"ERROR loading plugin data for {plugin}: {message}"
 
-    plugin_name, plugin_registration = _get_plugin_registration(plugin)
+    plugin_name, plugin_registration = get_plugin_registration(plugin)
     if not (plugin_name and plugin_registration):
         raise ModuleNotFoundError(
             error_msg("Could not load a (valid) plugin entry")
@@ -560,19 +584,45 @@ def get_plugin_data(plugin: PluginSpec) -> PluginData:
     )
 
 
-def installed_plugin_path(plugin: PluginSpec) -> Path | None:
+def is_plugin_installed(
+    plugin: PluginSpecification, *, require_venv: bool = True
+) -> bool:
     """
-    Get the local path of a plugin if it is installed.
+    Check if a plugin is validly installed, optionally requiring that its venv exists.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
-    :return: Local path of the plugin if it exists locally, None otherwise
-    :rtype: Path | None
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
+    :param require_venv: Whether to check if the plugin's virtual environment exists
+    :type require_venv: bool
+    :return: True if the plugin is installed (and its venv exists if require_venv is True), False otherwise
+    :rtype: bool
     """
-    plugin_registration = _get_plugin_registration(plugin)
-    return (
-        plugin_registration[1]["local"] if all(plugin_registration) else None
-    )
+    # Get logger
+    logger = get_logger()
+
+    # Check that the plugin is validly installed
+    try:
+        plugin_data = get_plugin_data(plugin)
+    except ModuleNotFoundError as e:
+        plugin_registration = get_plugin_registration(plugin)
+        if plugin_registration:
+            logger.debug(
+                f"Plugin '{plugin}' is installed but invalid - please fix or remove it. Error: {e}"
+            )
+        else:
+            logger.debug(f"Plugin '{plugin}' is not installed.")
+        return False
+
+    # Check that the plugin venv exists
+    if require_venv and not plugin_venv_exists(
+        plugin_data["metadata"]["name"]
+    ):
+        logger.debug(
+            f"Plugin '{plugin}' is installed but its venv is missing."
+        )
+        return False
+
+    return True
 
 
 def get_available_plugin_names() -> list[str]:
@@ -648,6 +698,43 @@ def get_local_plugin_version(plugin_path: PathLike) -> str | None:
         return None
 
 
+def get_plugin_version(plugin: PluginSpecification) -> str | None:
+    """
+    Return the version string of a local plugin, or None if not found.
+
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
+    :return: Version string, or None if not found
+    :rtype: str | None
+    """
+    plugin_registration = get_plugin_registration(plugin)
+    if not all(plugin_registration):
+        return None
+
+    local_path = plugin_registration[1]["local"]
+    return get_local_plugin_version(local_path) if local_path else None
+
+
+def get_plugin_commit(plugin_spec: PluginSpecification) -> str | None:
+    """
+    Return the current git commit hash of a local plugin.
+
+    :param plugin_spec: Plugin specification
+    :type plugin_spec: PluginSpecification
+    :return: Commit hash string, or None if not found
+    :rtype: str | None
+    """
+    # Get plugin registration
+    plugin_registration = get_plugin_registration(
+        plugin_spec, require_local=False
+    )
+    if not all(plugin_registration):
+        return None
+
+    parsed = parse_git_query(plugin_registration[1]["remote"])
+    return get_commit(parsed["url"], parsed["commit"])
+
+
 def add_plugin_entry(
     plugin_name: str, plugins_entry: PluginRegistryEntry
 ) -> bool:
@@ -665,7 +752,7 @@ def add_plugin_entry(
     logger = get_logger()
 
     # Check if the plugin already exists
-    _, plugin_registration = _get_plugin_registration(plugin_name)
+    _, plugin_registration = get_plugin_registration(plugin_name)
     if plugin_registration:
         logger.error(
             f"Plugin '{plugin_name}' already exists in some registry."
@@ -673,8 +760,8 @@ def add_plugin_entry(
         return False
 
     # Load home plugin registry
-    registry_file = _get_plugin_registries(package_registry=False)[0]
-    registry: dict[str, PluginRegistryEntry] = load_yaml(registry_file) or {}
+    registry = get_plugin_registries(package_registry=False)[0]
+    registry_file = _get_plugin_registry_files(package_registry=False)[0]
 
     # Add plugin entry
     registry[plugin_name] = {
@@ -687,7 +774,7 @@ def add_plugin_entry(
 
 
 def update_plugin_entry(
-    plugin_name: str, local: str | None = None, remote: GitRef | None = None
+    plugin_name: str, local: str | None = None, remote: GitQuery | None = None
 ) -> bool:
     """
     Update a plugin entry in any of the plugin registries.
@@ -696,8 +783,8 @@ def update_plugin_entry(
     :type plugin_name: str
     :param local: New local path of the plugin
     :type local: str | None
-    :param remote: New remote GitRef of the plugin
-    :type remote: GitRef | None
+    :param remote: New remote GitQuery of the plugin
+    :type remote: GitQuery | None
     :return: True if the plugin was updated successfully, False otherwise
     :rtype: bool
     :raises ValueError: If neither local nor remote is provided
@@ -709,12 +796,9 @@ def update_plugin_entry(
         )
 
     # Load registry files and update entry
-    registry_files = _get_plugin_registries()
-    for registry_file in registry_files:
-        registry: dict[str, PluginRegistryEntry] = (
-            load_yaml(registry_file) or {}
-        )
-
+    registries = get_plugin_registries()
+    registry_files = _get_plugin_registry_files()
+    for registry, registry_file in zip(registries, registry_files):
         # Check if plugin exists
         if plugin_name not in registry:
             continue
@@ -733,20 +817,18 @@ def update_plugin_entry(
     return False
 
 
-def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> bool:
+def _remove_plugin_entry(plugin: PluginSpecification) -> bool:
     """
     Remove a plugin from the home plugin registry.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin
-    :type plugin: PluginSpec
-    :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
-    :type purge: bool
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
     :return: True if the plugin was removed successfully, False otherwise
     :rtype: bool
     :raises ModuleNotFoundError: If no such local plugin is found
     """
     # Check if the plugin exists
-    plugin_name, plugin_registration = _get_plugin_registration(
+    plugin_name, plugin_registration = get_plugin_registration(
         plugin, require_local=False
     )
     if not (plugin_name and plugin_registration):
@@ -756,11 +838,15 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> bool:
 
     # Remove plugin entries
     def _remove_single_plugin_entry(
-        registry_file: Path, allow_purge: bool = False
+        registry: PluginRegistry,
+        registry_file: Path,
+        allow_purge: bool = False,
     ) -> bool:
         """
         Remove a plugin entry from a specific registry file.
 
+        :param registry: Plugin registry as a dictionary
+        :type registry: PluginRegistry
         :param registry_file: Path to the registry file
         :type registry_file: Path
         :param allow_purge: Whether purging is allowed for this registry
@@ -768,13 +854,8 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> bool:
         :return: True if the plugin entry was removed, False otherwise
         :rtype: bool
         """
-        # Get registry
-        registry: dict[str, PluginRegistryEntry] = (
-            load_yaml(registry_file) or {}
-        )
-
         # Edit entry
-        if purge and allow_purge:
+        if allow_purge:
             # Remove whole entry
             if plugin_name in registry:
                 del registry[plugin_name]
@@ -796,11 +877,14 @@ def _remove_plugin_entry(plugin: PluginSpec, purge: bool = False) -> bool:
         return True
 
     was_removed = False
-    for registry_file, allow_purge in zip(
-        _get_plugin_registries(),
+    for registry, registry_file, allow_purge in zip(
+        get_plugin_registries(),
+        _get_plugin_registry_files(),
         [True, False],
     ):
-        was_removed |= _remove_single_plugin_entry(registry_file, allow_purge)
+        was_removed |= _remove_single_plugin_entry(
+            registry, registry_file, allow_purge
+        )
 
     return was_removed
 
@@ -951,7 +1035,31 @@ class CleanHelpFormatter(RawTextHelpFormatter, ArgumentDefaultsHelpFormatter):
             return action.help or ""
 
 
-class GurkArgumentParser(ArgumentParser):
+class VerboseNamespace(Namespace):
+    verbose: bool
+
+
+class NonInteractiveNamespace(Namespace):
+    non_interactive: bool
+
+
+class ForceNamespace(Namespace):
+    force: bool
+
+
+class TaskNamespace(Namespace):
+    system_info: SystemInfo
+    config_file: PathLike | None
+
+
+class DefaultNamespace(VerboseNamespace, NonInteractiveNamespace):
+    pass
+
+
+T = TypeVar("T", bound=Namespace)
+
+
+class GurkArgumentParser(Generic[T], ArgumentParser):
     """
     Custom ArgumentParser that uses CleanHelpFormatter and adds common gurk CLI options.
     """
@@ -1183,7 +1291,7 @@ class GurkArgumentParser(ArgumentParser):
 
     def parse_args(
         self, args: Sequence[str] | None = None, namespace: None = None
-    ) -> Namespace:
+    ) -> T:
         # Reorder action groups to have 'required arguments' first
         self._reorder_actions()
 
@@ -1257,9 +1365,20 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                 print_typed_dict_types(PluginMetadata)
             return False
 
-        ## Unique plugin name
+        ## Valid and unique plugin name
         plugin_name = project_metadata["name"]
-        _, existing_plugin = _get_plugin_registration(plugin_name)
+        if not plugin_name:
+            error(
+                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file: 'project.name' is missing or empty."
+            )
+            return False
+        elif "/" in plugin_name or ":" in plugin_name:
+            error(
+                f"Plugin name '{plugin_name}' is invalid. '/' and ':' are not allowed in plugin names to avoid confusion with task and option task names."
+            )
+            return False
+
+        _, existing_plugin = get_plugin_registration(plugin_name)
         if (
             existing_plugin
             and Path(existing_plugin["local"]) != _plugin_path.resolve()
@@ -1298,9 +1417,20 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         for task_name, task in plugin_tasks.items():
             # Check task name
             plugin_prefix, remaining = (task_name.split("/", 1) + [None])[:2]
-            if plugin_prefix != plugin_name or not remaining:
+            if (
+                plugin_prefix != plugin_name
+                or not remaining
+                or "/" in remaining
+            ):
                 error(
-                    f"Task '{task_name}' has an invalid name. Its name should be '{plugin_name}/<task_name>'"
+                    f"Task '{task_name}' has an invalid name. Its "
+                    f"name should be '{plugin_name}/<task_name>'"
+                )
+                return False
+            elif ":" in task_name:
+                error(
+                    f"Task '{task_name}' has an invalid name. ':' is not "
+                    "allowed in task names to avoid confusion with option tasks."
                 )
                 return False
 
@@ -1415,9 +1545,9 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         imports_graph.add_node(plugin_name)
         for imp in imports:
             # Check that imported plugins exist in the desired location
-            if not plugin_exists_locally(imp):
+            if not is_plugin_installed(imp, require_venv=False):
                 msg = f"Imported plugin '{imp}' does not exist locally."
-                if plugin_exists_remotely(imp):
+                if is_git_repo(imp):
                     msg += f" You can pull it via 'gurk pull {imp}'."
                 error(msg)
                 return False
@@ -1429,7 +1559,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
             # Check imported plugin
             if not _check_local_plugin(
-                Path(_get_plugin_registration(imp)[1]["local"])
+                Path(get_plugin_registration(imp)[1]["local"])
             ):
                 error(f"Imported plugin '{imp}' is invalid.")
                 return False
@@ -1487,6 +1617,13 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
         ## Validate each option
         for option_name, option in options.items():
+            # Check option name
+            if "/" in option_name or ":" in option_name:
+                error(
+                    f"Option name '{option_name}' is invalid. Option names cannot contain '/' or ':'."
+                )
+                return False
+
             # Check that all tasks in the option are defined
             for task_name in option.keys():
                 if task_name not in available_tasks:
@@ -1509,7 +1646,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                         return False
 
             # Check that all args in the option are defined
-            for task_name, option_spec in option.items():
+            for task_name, task_spec in option.items():
                 # Create a temporary parser to validate args
                 parser = GurkArgumentParser(
                     add_verbose_arg=False,
@@ -1527,15 +1664,13 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
                 # Validate args
                 try:
-                    parser.parse_args(option_spec.get("args", []))
+                    parser.parse_args(task_spec.get("args", []))
                 except ValueError as e:
                     error(e)
                     return False
 
             # Determine enabled tasks (including dependencies)
-            directly_enabled_tasks = {
-                k for k, v in option.items() if v["enabled"]
-            }
+            directly_enabled_tasks = set(option.keys())
             enabled_tasks = deepcopy(directly_enabled_tasks)
             for task_name in directly_enabled_tasks:
                 enabled_tasks.update(
@@ -1571,7 +1706,31 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
     return _check_local_plugin(Path(plugin_path))
 
 
-def create_plugin_venv(plugin_name: str, dependencies: list[str]) -> bool:
+def get_venv_dir(plugin_name: str) -> Path:
+    """
+    Get the path to the virtual environment directory for a plugin.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :return: Path to the virtual environment directory
+    :rtype: Path
+    """
+    return PACKAGE_VENVS_PATH / plugin_name
+
+
+def plugin_venv_exists(plugin_name: str) -> bool:
+    """
+    Check if a virtual environment exists for a plugin.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :return: True if the virtual environment exists, False otherwise
+    :rtype: bool
+    """
+    return get_venv_dir(plugin_name).is_dir()
+
+
+def _create_plugin_venv(plugin_name: str, dependencies: list[str]) -> bool:
     """
     Create a virtual environment for a plugin and install its dependencies.
 
@@ -1586,8 +1745,8 @@ def create_plugin_venv(plugin_name: str, dependencies: list[str]) -> bool:
     logger = get_logger()
 
     # Check if venv already exists
-    venv_dir = PACKAGE_VENVS_PATH / plugin_name
-    if venv_dir.is_dir():
+    venv_dir = get_venv_dir(plugin_name)
+    if plugin_venv_exists(plugin_name):
         logger.error(
             f"Virtual environment for plugin '{plugin_name}' already exists at {venv_dir}"
         )
@@ -1618,16 +1777,38 @@ def create_plugin_venv(plugin_name: str, dependencies: list[str]) -> bool:
     return True
 
 
-def pull_local_plugin(
-    plugin_path: PathLike, pull_imports: bool = True
-) -> bool:
+def create_plugin_venv(plugin_name: str) -> bool:
+    """
+    Create a virtual environment for a plugin based on its dependencies in pyproject.toml.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :return: True if the virtual environment was created successfully, False otherwise
+    :rtype: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    # Check if plugin exists locally
+    if not is_plugin_installed(plugin_name, require_venv=False):
+        logger.error(
+            f"Plugin '{plugin_name}' is not installed - Cannot create virtual environment."
+        )
+        return False
+
+    # Get plugin dependencies
+    dependencies = get_plugin_data(plugin_name)["metadata"]["dependencies"]
+
+    # Create plugin venv
+    return _create_plugin_venv(plugin_name, dependencies)
+
+
+def _install_local_plugin(plugin_path: PathLike) -> bool:
     """
     Import a plugin from a local directory.
 
     :param plugin_path: Path to the local plugin directory
     :type plugin_path: PathLike
-    :param pull_imports: Whether to also pull imported plugins recursively
-    :type pull_imports: bool
     :return: True if the plugin was imported successfully, False otherwise
     :rtype: bool
     """
@@ -1653,7 +1834,7 @@ def pull_local_plugin(
         )
         return False
 
-    # Extract relevant metadata
+    # Extract plugin name from metadata
     try:
         plugin_name: str = metadata["project"]["name"]
     except KeyError as e:
@@ -1661,17 +1842,22 @@ def pull_local_plugin(
             f"Plugin at '{plugin_path}' has an invalid 'pyproject.toml' file: missing key {e}",
         )
         return False
-    dependencies: list[str] = (
-        metadata["project"].get("optional-dependencies", {}).get("gurk", [])
-    )
 
     # Check if plugin with same name already exists
-    if all(_get_plugin_registration(plugin_name)):
+    if all(get_plugin_registration(plugin_name)):
         logger.error(
             f"Plugin with name '{plugin_name}' already exists. Please "
             f"remove it via 'gurk remove {plugin_name}' first."
         )
         return False
+
+    # Pull imported plugins recursively
+    for imp in manifest_data.get("imports", []):
+        if not install_plugin(imp):
+            logger.error(
+                f"Failed to pull imported plugin '{imp}' for plugin '{plugin_path}'",
+            )
+            return False
 
     # Check validity of local plugin
     if not check_local_plugin(plugin_path, verbose=True):
@@ -1682,7 +1868,7 @@ def pull_local_plugin(
 
     # Add plugin registry entry
     if all(
-        _get_plugin_registration(
+        get_plugin_registration(
             plugin_name, home_registry=False, require_local=False
         )
     ):
@@ -1711,44 +1897,29 @@ def pull_local_plugin(
     shutil.copytree(plugin_path, dest_path)
 
     # Install plugin dependencies in the plugin venv
-    if not create_plugin_venv(plugin_name, dependencies):
+    if not create_plugin_venv(plugin_name):
         logger.error(
             f"Failed to create virtual environment for plugin '{plugin_name}'",
         )
         return False
 
-    # Pull imported plugins recursively
-    if pull_imports:
-        for imp in manifest_data.get("imports", []):
-            if not is_git_repo(imp):
-                # Ignore local imports
-                continue
-
-            logger.info(f"Pulling imported plugin '{imp}'...")
-            if not pull_plugin(imp, pull_imports):
-                logger.error(
-                    f"Failed to pull imported plugin '{imp}' for plugin '{plugin_path}'",
-                )
-                return False
-
-    # Verify by getting plugin data
-    try:
-        get_plugin_data(plugin_name)
-    except ModuleNotFoundError as e:
-        logger.error(str(e))
+    # Verify installation
+    if not is_plugin_installed(plugin_name, require_venv=True):
+        logger.error(
+            f"Plugin '{plugin_name}' installation verification "
+            f"failed after pulling local plugin from '{plugin_path}'",
+        )
         return False
 
     return True
 
 
-def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
+def _install_remote_plugin(plugin: GitQuery) -> bool:
     """
     Import a plugin from a remote Git repository.
 
-    :param plugin: GitRef of the plugin to import
-    :type plugin: GitRef
-    :param pull_imports: Whether to also pull imported plugins recursively
-    :type pull_imports: bool
+    :param plugin: GitQuery of the plugin to import
+    :type plugin: GitQuery
     :return: True if the plugin was imported successfully, False otherwise
     :rtype: bool
     """
@@ -1801,15 +1972,16 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
         return False
 
     # Check if plugin already exists
-    if installed_plugin_path(plugin_name):
+    if is_plugin_installed(plugin_name):
         error(
-            f"Plugin with remote '{plugin}' already exists locally. Please remove it "
-            f"via 'gurk remove {plugin_name}' first or update it via 'gurk update {plugin_name}'"
+            f"Plugin with remote '{plugin}' is already installed. "
+            f"Please remove it via 'gurk remove {plugin_name}' "
+            f"first or update it via 'gurk update {plugin_name}'"
         )
         return False
 
     # See if plugin source is valid
-    if not plugin_exists_remotely(plugin):
+    if not is_git_repo(plugin):
         error(
             f"Remote plugin source '{plugin}' does not exist or is not a valid git repository"
         )
@@ -1914,7 +2086,7 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
             return False
 
     # Pull local plugin from temporary directory
-    if not pull_local_plugin(temp_plugin_path, pull_imports):
+    if not _install_local_plugin(temp_plugin_path):
         error(
             f"Failed to import plugin from remote repository '{plugin}'",
             temp_plugin_path,
@@ -1924,7 +2096,9 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
     # Upate plugin registry entry to include remote
     update_plugin_entry(
         plugin_name,
-        remote=edit_url(extract_url(plugin), version=plugin_version),
+        remote=edit_url(
+            extract_url(plugin), commit=determine_ref(plugin, to_commit=True)
+        ),
     )
 
     # Clean up temporary plugin path
@@ -1934,16 +2108,32 @@ def pull_plugin(plugin: GitRef, pull_imports: bool = True) -> bool:
     return True
 
 
-def remove_plugin(
-    plugin: PluginSpec, purge: bool = False, verbose: bool = False
-) -> None:
+def remove_plugin_venv(plugin_name: str) -> bool:
+    """
+    Remove the virtual environment for a plugin, if it exists.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :return: True if the virtual environment was removed successfully, False otherwise
+    :rtype: bool
+    """
+    venv_path = get_venv_dir(plugin_name)
+    if venv_path.is_dir():
+        try:
+            shutil.rmtree(venv_path)
+        except Exception:
+            return False
+        else:
+            return True
+    return False
+
+
+def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
     """
     Remove a locally installed plugin.
 
-    :param plugin: Name, PathLike, or GitRef of the plugin to remove
-    :type plugin: PluginSpec
-    :param purge: Whether to also remove the plugin registry entry fully. Does not affect package registry entries.
-    :type purge: bool
+    :param plugin: Name, PathLike, or GitQuery of the plugin to remove
+    :type plugin: PluginSpecification
     :param verbose: Whether to print info messages
     :type verbose: bool
     :raises ModuleNotFoundError: If no such local plugin is found
@@ -1953,7 +2143,7 @@ def remove_plugin(
     remove_msg = []
 
     # Get plugin data
-    plugin_name, plugin_entry = _get_plugin_registration(
+    plugin_name, plugin_entry = get_plugin_registration(
         plugin, require_local=False
     )
     if not (plugin_name and plugin_entry):
@@ -1963,7 +2153,7 @@ def remove_plugin(
     local = plugin_entry["local"]
 
     # Remove plugin registry entry
-    if _remove_plugin_entry(plugin, purge):
+    if _remove_plugin_entry(plugin):
         remove_msg.append("registry entry")
 
     # Remove plugin folder
@@ -1974,9 +2164,7 @@ def remove_plugin(
         remove_msg.append("plugin files")
 
     # Remove plugin venv
-    venv_path = PACKAGE_VENVS_PATH / plugin_name
-    if venv_path.is_dir():
-        shutil.rmtree(venv_path)
+    if remove_plugin_venv(plugin_name):
         remove_msg.append("virtual environment")
 
     if verbose:
@@ -1988,3 +2176,208 @@ def remove_plugin(
             logger.info(
                 f"Nothing to remove for (package) plugin '{plugin_name}'"
             )
+
+
+def install_plugin(
+    plugin_source: PluginSource, reinstall: bool = False
+) -> bool:
+    """
+    Install a plugin from a specified source, which can be either a local path or a Git URL.
+
+    :param plugin_source: Path or Git URL specifying the plugin source
+    :type plugin_source: PluginSource
+    :param reinstall: Whether to reinstall the plugin if it is already installed (but does not match the specified source or version).
+    :type reinstall: bool
+    :return: True if the plugin was (re)installed successfully, False otherwise
+    :rtype: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    def unexpected_source_type_error():
+        logger.error(
+            f"Unexpected: Unknown source type '{source_type}' for source '{plugin_source}'."
+        )
+
+    # Check source type
+    if Path(plugin_source).is_dir():
+        source_type = PluginSpecificationEnum.LOCAL_PATH
+    elif is_git_repo(plugin_source):
+        source_type = PluginSpecificationEnum.GIT_REMOTE
+    else:
+        logger.error(
+            f"Invalid plugin source '{plugin_source}': Must be either a "
+            "local path or a Git URL pointing to an existing repository."
+        )
+        return False
+
+    # Check source and get plugin spec
+    if source_type == PluginSpecificationEnum.LOCAL_PATH:
+        plugin_path = Path(plugin_source)
+        # Check that the local path is not under either plugin directory
+        if any(
+            plugin_path.is_relative_to(d) for d in get_plugin_directories()
+        ):
+            logger.error(
+                f"Specified local path '{plugin_path}' is invalid: "
+                "Local paths cannot be under plugin directories."
+            )
+            return False
+
+        # Get the plugin name
+        try:
+            plugin_spec = load_toml(plugin_path / "pyproject.toml")["project"][
+                "name"
+            ]
+        except Exception as e:
+            logger.error(
+                f"Failed to load plugin name from '{plugin_path}': {str(e)}"
+            )
+            return False
+    elif source_type == PluginSpecificationEnum.GIT_REMOTE:
+        # Check that max one of version/commit is specified in the remote URL (if any)
+        parsed = parse_git_query(plugin_source)
+        if (
+            len(
+                [
+                    f
+                    for f in GIT_QUERY_VERSIONING_FIELDS
+                    if parsed[f] is not None
+                ]
+            )
+            > 1
+        ):
+            logger.error(
+                f"Invalid Git remote source '{plugin_source}':"
+                " Cannot specify more than one of "
+                f"{', '.join(GIT_QUERY_VERSIONING_FIELDS)} in the Git remote URL."
+            )
+            return False
+        plugin_spec = plugin_source
+    else:
+        unexpected_source_type_error()
+        return False
+
+    # Utility function to install plugin based on source type
+    def _install_plugin() -> bool:
+        """
+        Install the plugin based on its source type.
+
+        :return: True if the plugin was installed successfully, False otherwise
+        :rtype: bool
+        """
+        if source_type == PluginSpecificationEnum.LOCAL_PATH:
+            return _install_local_plugin(plugin_source)
+        elif source_type == PluginSpecificationEnum.GIT_REMOTE:
+            return _install_remote_plugin(plugin_source)
+        else:
+            unexpected_source_type_error()
+            return False
+
+    # Act depending on whether the plugin is already installed
+    if not is_plugin_installed(plugin_spec, require_venv=False):
+        # Handle existing venv
+        if plugin_venv_exists(plugin_spec):
+            if not reinstall:
+                logger.error(
+                    f"Plugin '{plugin_spec}' is not currently installed but "
+                    "has an existing virtual environment. Pass 'reinstall=True' "
+                    "to remove the existing venv and proceed with installation."
+                )
+                return False
+            else:
+                logger.debug(
+                    f"Removing existing virtual environment for plugin '{plugin_spec}' to proceed with installation..."
+                )
+                if not remove_plugin_venv(plugin_spec):
+                    logger.error(
+                        f"Failed to remove existing virtual environment for plugin '{plugin_spec}'."
+                    )
+                    return False
+
+        # Install plugin
+        logger.info(
+            f"Plugin '{plugin_spec}' is not currently installed - proceeding to install it."
+        )
+        if not _install_plugin():
+            logger.error(f"Failed to install plugin from '{plugin_source}'.")
+            return False
+    else:
+        # Get plugin data
+        plugin_data = get_plugin_data(plugin_spec)
+
+        # Determine if the plugin needs to be reinstalled
+        reinstall_required = False
+        if source_type == PluginSpecificationEnum.LOCAL_PATH:
+            if reinstall:
+                reinstall_required = True
+            else:
+                logger.debug(
+                    f"ERROR: Plugin '{plugin_spec}' is already installed. Pass 'reinstall=True' to reinstall it."
+                )
+                return False
+        elif source_type == PluginSpecificationEnum.GIT_REMOTE:
+            # Check version/commit against existing one if specified
+            if not plugin_data["registration"]["remote"]:
+                logger.error(
+                    f"Plugin '{plugin_spec}' is installed but does not have a "
+                    "remote URL registered, so the two plugins are considered "
+                    "different. Please change the specification or remove the "
+                    f"existing plugin first using 'gurk remove {plugin_spec}'."
+                )
+                return False
+            installed_commit = get_plugin_commit(plugin_spec)
+            specified_commit = determine_ref(plugin_spec, to_commit=True)
+            if installed_commit != specified_commit:
+                if reinstall:
+                    reinstall_required = True
+                else:
+                    msg = (
+                        f"Plugin '{plugin_spec}' is installed at a "
+                        "different version than specified:\n- specified: "
+                    )
+                    possibly_specified_commit = determine_ref(
+                        plugin_spec, to_commit=False
+                    )
+                    if specified_commit == possibly_specified_commit:
+                        msg += possibly_specified_commit
+                    else:
+                        specified_ref = determine_ref(
+                            plugin_spec, to_commit=False
+                        )
+                        msg += f"{specified_ref} -> {specified_commit}"
+                    logger.error(
+                        f"{msg}\n- installed: {installed_commit}\nUse "
+                        "'--replace' to reinstall and use the specified version."
+                    )
+                    return False
+        else:
+            unexpected_source_type_error()
+            return False
+
+        # Reinstall plugin if needed
+        if reinstall_required:
+            logger.info(
+                f"Reinstalling plugin '{plugin_spec}' to match specified commit."
+            )
+            if not remove_plugin(plugin_spec, verbose=True):
+                logger.error(
+                    f"Failed to remove existing plugin '{plugin_spec}' for reinstallation."
+                )
+                return False
+            if not _install_plugin():
+                logger.error(f"Failed to reinstall plugin '{plugin_spec}'.")
+                return False
+        else:
+            # Install the plugin venv if it doesn't exist
+            if not plugin_venv_exists(plugin_spec):
+                logger.info(
+                    f"Plugin '{plugin_spec}' is already installed but has no virtual environment. Creating venv..."
+                )
+                if not create_plugin_venv(plugin_data["metadata"]["name"]):
+                    logger.error(
+                        f"Failed to create virtual environment for plugin '{plugin_spec}'."
+                    )
+                    return False
+
+    return True

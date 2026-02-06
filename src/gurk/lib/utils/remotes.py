@@ -5,7 +5,7 @@ import subprocess
 from contextlib import contextmanager
 from functools import cache, wraps
 from pathlib import Path
-from typing import Any, TypeAlias, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict, overload
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
@@ -28,8 +28,8 @@ PACKAGE_GIT_CACHE_METADATA_PATH.touch(exist_ok=True)
 
 
 @contextmanager
-def _repo_lock(repo: Path):
-    with FileLock(repo / ".repo_lock"):
+def _repo_lock(repo: PathLike):
+    with FileLock(Path(repo) / ".repo_lock"):
         yield
 
 
@@ -52,24 +52,27 @@ def _git_run(
     return subprocess.run(*args, **kwargs)
 
 
-class GitRefInfo(TypedDict):
-    """TypedDict representing parsed Git reference information."""
+class GitQueryDict(TypedDict):
+    """TypedDict representing the parsed components of a GitQuery string"""
 
     # fmt: off
     url:     str
     branch:  None | str
     commit:  None | str
-    path:    None | str
     version: None | str
+    path:    None | str
     # fmt: on
 
 
-GitRef: TypeAlias = str  # See 'parse_git_ref' function for expected format
+GIT_QUERY_VERSIONING_FIELDS = {"branch", "commit", "version"}
+
+# See '_parse_git_query' function for expected format
+GitQuery: TypeAlias = str
 
 
-def parse_git_ref(repo: GitRef) -> GitRefInfo:
+def _parse_git_query(repo: GitQuery) -> GitQueryDict:
     """
-    Parse a Git repo reference string of the form `<repo_url>[?<param>=<value>&...]`
+    Parse a GitQuery string of the form `<repo_url>[?<param>=<value>&...]` into its components
 
     Examples:
     ```
@@ -81,13 +84,13 @@ def parse_git_ref(repo: GitRef) -> GitRefInfo:
     Supported query parameters:
         - branch: branch name
         - commit: commit hash (overrides branch if both provided)
+        - version: version string to find the corresponding commit for (overrides branch if both provided)
         - path: subdirectory path within the repo
 
-    :param repo: GitRef string of the above format
-    :type repo: GitRef
-    :return: Parsed GitRefInfo dictionary with keys: 'url', 'branch', 'commit', 'path'.
-             Missing fields are set to None.
-    :rtype: GitRefInfo
+    :param repo: GitQuery string of the above format
+    :type repo: GitQuery
+    :return: Parsed GitQueryDict
+    :rtype: GitQueryDict
     """
     parts = urlparse(repo)
     query = parse_qs(parts.query)
@@ -95,21 +98,66 @@ def parse_git_ref(repo: GitRef) -> GitRefInfo:
         "url": repo.split("?", 1)[0],
         "branch": query.get("branch", [None])[0],
         "commit": query.get("commit", [None])[0],
-        "path": query.get("path", [None])[0],
         "version": query.get("version", [None])[0],
+        "path": query.get("path", [None])[0],
     }
 
 
-def extract_url(repo: str | GitRef) -> str:
+def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
     """
-    Extract the URL from a string. If any string other than a GitRef is given, it is returned as-is.
+    Parse a Git repository input which can be either a URL or a GitQuery.
 
-    :param repo: str string
-    :type repo: str | GitRef
+    :param repo: Git repository URL, GitQuery string, or GitQueryDict dictionary
+    :type repo: str | GitQuery | GitQueryDict
+    :return: Parsed GitQueryDict dictionary
+    :rtype: GitQueryDict
+    :raises ValueError: For invalid input types
+    """
+    if isinstance(repo, str):
+        parsed = _parse_git_query(repo)
+    elif isinstance(repo, dict):
+        parsed = fill_typed_dict(repo, GitQueryDict)
+        if not validate_typed_dict(parsed, GitQueryDict):
+            # There are extra fields
+            extra_fields = set(repo.keys()) - set(
+                GitQueryDict.__annotations__.keys()
+            )
+            if extra_fields:
+                raise ValueError(
+                    f"Invalid fields in GitQueryDict dictionary: {extra_fields}"
+                )
+
+            # There are wrong types
+            wrong_types = {
+                k
+                for k, v in repo.items()
+                if not isinstance(v, GitQueryDict.__annotations__[k])
+            }
+            if wrong_types:
+                raise ValueError(
+                    f"Wrong types for fields in GitQueryDict dictionary: {wrong_types}"
+                )
+
+            # Other validation errors
+            raise ValueError("Invalid GitQueryDict dictionary provided.")
+    else:
+        raise ValueError(
+            "Invalid repo input. Must be GitQuery string or GitQueryDict dict."
+        )
+
+    return parsed
+
+
+def extract_url(repo: str | GitQuery | GitQueryDict) -> str:
+    """
+    Extract the URL from a string. If any string other than a GitQuery is given, it is returned as-is.
+
+    :param repo: Git repository URL, GitQuery string, or GitQueryDict dictionary
+    :type repo: str | GitQuery | GitQueryDict
     :return: URL without query parameters
     :rtype: str
     """
-    return parse_git_ref(repo)["url"]
+    return parse_git_query(repo)["url"]
 
 
 def edit_url(url: str, **kwargs: dict[str, str | None]) -> str:
@@ -164,12 +212,12 @@ def _is_git_repo(url: str) -> bool:
     return result.returncode == 0
 
 
-def is_git_repo(repo: str | GitRef) -> bool:
+def is_git_repo(repo: str | GitQuery) -> bool:
     """
     Check if a string is a valid Git repository URL. Also checks existence of the repo.
 
-    :param repo: Git repository URL or GitRef (in which case only the URL is used)
-    :type repo: str | GitRef
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
     :return: True if the string is a valid Git repository, False otherwise
     :rtype: bool
     """
@@ -218,8 +266,7 @@ def _register_mirror(url: str) -> Path:
         )
 
     # Update metadata
-    metadata_lock = GIT_MIRRORS_DIR / ".metadata_lock"
-    with FileLock(metadata_lock):
+    with FileLock(GIT_MIRRORS_DIR / ".metadata_lock"):
         meta = load_yaml(PACKAGE_GIT_CACHE_METADATA_PATH) or {}
         meta[url] = str(mirror)
         dump_yaml(meta, PACKAGE_GIT_CACHE_METADATA_PATH)
@@ -243,8 +290,9 @@ def _get_mirror(url: str) -> Path:
         return Path(meta[url])
 
 
-def version2commit(
-    repo: str | GitRef,
+@cache
+def _version2commit(
+    url: str,
     version: str,
 ) -> str | None:
     """
@@ -253,26 +301,30 @@ def version2commit(
 
         NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
 
-    :param repo: Git repository URL or GitRef (in which case only the URL is used)
-    :type repo: str | GitRef
+    :param url: Git repository URL
+    :type url: str
     :param version: Version string to search for
     :type version: str
     :return: Commit hash where the version was added, or None if not found
     :rtype: str | None
-    :raises ValueError: If the repository does not exist
+    :raises ValueError: If the repository does not exist or if the version string is invalid
     :raises CalledProcessError: If git commands fail for various reasons
     """
+    # Check that version is valid
+    if not check_version(version):
+        raise ValueError(f"Invalid version string: '{version}'")
+
     # Check that the repo exists
-    if not is_git_repo(repo):
+    if not is_git_repo(url):
         raise ValueError(
-            f"Repository {repo} does not exist or is not accessible."
+            f"Repository {url} does not exist or is not accessible."
         )
 
-    mirror = _get_mirror(extract_url(repo))
-    with _repo_lock(mirror):
-        # Fetch updates
-        _git_fetch(mirror)
+    # Fetch updates
+    mirror = _get_mirror(url)
+    _git_fetch(mirror)
 
+    with _repo_lock(mirror):
         # Get commits that touched the versioning file, newest first
         version_file = "pyproject.toml"
         result = _git_run(
@@ -306,6 +358,28 @@ def version2commit(
     return None
 
 
+def version2commit(
+    repo: str | GitQuery,
+    version: str,
+) -> str | None:
+    """
+    Return the commit hash where a specified version change was made
+    in the pyproject.toml file of a git repo, or None if not found.
+
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param version: Version string to search for
+    :type version: str
+    :return: Commit hash where the version was added, or None if not found
+    :rtype: str | None
+    :raises ValueError: If the repository does not exist or if the version string is invalid
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    return _version2commit(extract_url(repo), version)
+
+
 @cache
 def get_default_branch(
     url: str,
@@ -321,14 +395,21 @@ def get_default_branch(
     :raises CalledProcessError: If git commands fail for various reasons
     :raises RuntimeError: If the default branch cannot be determined
     """
-    # Get remote info
-    result = _git_run(
-        ["git", "remote", "show", "origin"],
-        cwd=_get_mirror(url),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    # Fetch updates
+    mirror = _get_mirror(url)
+    _git_fetch(mirror)
+
+    # Get default branch from remote info
+    with _repo_lock(mirror):
+        result = _git_run(
+            ["git", "remote", "show", "origin"],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    # Parse default branch
     origin = result.stdout.splitlines()
     head_line = next(
         (line for line in origin if line.strip().startswith("HEAD branch:")),
@@ -349,24 +430,122 @@ def _git_fetch(repo_path: PathLike) -> None:
     :param repo_path: Path to the Git repository
     :type repo_path: PathLike
     """
-    _git_run(
-        ["git", "fetch", "--prune", "--all"],
-        cwd=str(repo_path),
-        check=True,
-        capture_output=True,
-    )
+    with _repo_lock(repo_path):
+        _git_run(
+            ["git", "fetch", "--prune", "--all"],
+            cwd=str(repo_path),
+            check=True,
+            capture_output=True,
+        )
+
+
+@cache
+def _get_commit(url: str | GitQuery, commit: str | None) -> str:
+    """
+    Get the current commit hash of a local Git repository. If a specific commit is provided, checks if it exists and returns its full hash if so.
+
+    :param url: Git repository URL
+    :type url: str | GitQuery
+    :param commit: Optional commit hash to check and expand. If None, returns the current HEAD commit.
+    :type commit: str | None
+    :return: Current commit hash
+    :rtype: str
+    :raises ValueError: If the path is not a valid Git repository
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that the repo exists
+    if not is_git_repo(url):
+        raise ValueError(
+            f"Repository {url} does not exist or is not accessible."
+        )
+
+    if commit is None:
+        commit = "HEAD"
+
+    # Fetch updates
+    mirror = _get_mirror(url)
+    _git_fetch(mirror)
+
+    # Get commit hash
+    with _repo_lock(mirror):
+        result = _git_run(
+            ["git", "rev-parse", commit],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+
+def get_commit(repo: str | GitQuery, commit: str | None = None) -> str | None:
+    """
+    Get the current commit hash of a local Git repository. If a specific commit is provided, checks if it exists and returns its full hash if so.
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param commit: Optional commit hash to check and expand. If None, returns the current HEAD commit.
+    :type commit: str | None
+    :return: Current commit hash or None if the commit does not exist
+    :rtype: str | None
+    :raises ValueError: If the path is not a valid Git repository
+    """
+    try:
+        return _get_commit(extract_url(repo), commit)
+    except subprocess.CalledProcessError:
+        return None
+
+
+def determine_ref(
+    repo: str | GitQuery | GitQueryDict, *, to_commit: bool = False
+) -> str:
+    """
+    Determine the appropriate git ref (branch, version, or commit) to use for the given repository.
+
+    :param repo: Git repository URL, GitQuery string, or GitQueryDict dictionary
+    :type repo: str | GitQuery | GitQueryDict
+    :param to_commit: Whether to resolve to a commit hash. If False, returns branch or version if available.
+    :type to_commit: bool
+    :return: Git ref to use (branch name, version string, or commit hash)
+    :rtype: str
+    :raises ValueError: If the repository does not exist or if version cannot be resolved to a commit
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    parsed = parse_git_query(repo)
+
+    if parsed["commit"]:
+        ref = parsed["commit"]
+    elif parsed["version"]:
+        # Find commit for version
+        commit = version2commit(parsed["url"], parsed["version"])
+        if not commit:
+            raise ValueError(
+                f"Version '{parsed['version']}' not found in repository '{parsed['url']}'"
+            )
+        ref = commit
+    elif parsed["branch"]:
+        ref = parsed["branch"]
+    else:
+        # Get default branch
+        ref = get_default_branch(parsed["url"])
+
+    if to_commit:
+        # Resolve to commit hash
+        ref = get_commit(parsed["url"], ref)
+
+    return ref
 
 
 def git_clone(
-    repo: GitRef | GitRefInfo,
+    repo: str | GitQuery | GitQueryDict,
     dest: Path | None = None,
     overwrite: bool = False,
 ) -> Path:
     """
     Clone a Git repository or specific files/directories from it to the specified destination path.
 
-    :param repo: GitRef string or GitRefInfo dictionary representing the repository to clone
-    :type repo: GitRef | GitRefInfo
+    :param repo: Git repository URL, GitQuery string, or GitQueryDict dictionary representing the repository to clone
+    :type repo: str | GitQuery | GitQueryDict
     :param dest: Destination path to clone the files as. Required if cloning specific files/directories.
     :type dest: Path | None
     :param overwrite: Whether to overwrite existing path
@@ -378,34 +557,7 @@ def git_clone(
     """
     # Handle inputs
     ## repo
-    if isinstance(repo, GitRef):
-        parsed = parse_git_ref(repo)
-    elif isinstance(repo, dict):
-        parsed = fill_typed_dict(repo, GitRefInfo)
-        if not validate_typed_dict(parsed, GitRefInfo):
-            extra_fields = set(repo.keys()) - set(
-                GitRefInfo.__annotations__.keys()
-            )
-            if extra_fields:
-                raise ValueError(
-                    f"Invalid fields in GitRefInfo dictionary: {extra_fields}"
-                )
-
-            wrong_types = {
-                k
-                for k, v in repo.items()
-                if not isinstance(v, GitRefInfo.__annotations__[k])
-            }
-            if wrong_types:
-                raise ValueError(
-                    f"Wrong types for fields in GitRefInfo dictionary: {wrong_types}"
-                )
-
-            raise ValueError("Invalid GitRefInfo dictionary provided.")
-    else:
-        raise ValueError(
-            "Invalid repo input. Must be GitRef string or GitRefInfo dict."
-        )
+    parsed = parse_git_query(repo)
     ## dest
     if not isinstance(dest, Path) and dest is not None:
         raise ValueError("Destination 'dest' must be a Path or None.")
@@ -441,27 +593,13 @@ def git_clone(
         )
 
     # Determine ref to clone (commit > version > branch or default branch)
-    if parsed["commit"]:
-        ref = parsed["commit"]
-    elif parsed["version"]:
-        # Find commit for version
-        ref = version2commit(parsed["url"], parsed["version"])
-        if not ref:
-            raise ValueError(
-                f"Version '{parsed['version']}' not found in repository '{parsed['url']}'"
-            )
-    elif parsed["branch"]:
-        ref = parsed["branch"]
-    else:
-        # Get default branch
-        ref = get_default_branch(parsed["url"])
+    ref = determine_ref(repo)
 
-    # Update mirror with requested ref
+    # Fetch updates
     mirror = _get_mirror(parsed["url"])
-    with _repo_lock(mirror):
-        # Fetch updates
-        _git_fetch(mirror)
+    _git_fetch(mirror)
 
+    with _repo_lock(mirror):
         # Pull file(s)
         _git_run(
             ["git", "archive", ref, parsed["path"] or "."],
@@ -523,24 +661,151 @@ def git_clone(
     return dest
 
 
-def get_latest_version(
-    repo: str | GitRef,
+@cache
+def _get_commit_timestamp(
+    url: str,
+    commit: str,
+    human_readable: bool,
+) -> str | int:
+    """
+    Get the timestamp of a specific commit in the given Git repository.
+
+    :param url: Git repository URL
+    :type url: str
+    :param commit: Commit hash to get the timestamp for
+    :type commit: str
+    :param human_readable: Whether to return the timestamp in human-readable ISO 8601 format
+    :type human_readable: bool
+    :return: Commit timestamp in ISO 8601 format
+    :rtype: str if 'human_readable' else int
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that the repo exists
+    if not is_git_repo(url):
+        raise ValueError(
+            f"Repository {url} does not exist or is not accessible."
+        )
+
+    # Fetch updates
+    mirror = _get_mirror(url)
+    _git_fetch(mirror)
+
+    # Get commit timestamp
+    with _repo_lock(mirror):
+        format_str = "%cI" if human_readable else "%ct"
+        result = _git_run(
+            ["git", "show", "--no-patch", f"--format={format_str}", commit],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        stdout = result.stdout.strip()
+        return stdout if human_readable else int(stdout)
+
+
+@overload
+def get_commit_timestamp(
+    repo: str | GitQuery,
+    commit: str,
+    *,
+    human_readable: Literal[False] = ...,
+) -> int:
+    ...
+
+
+@overload
+def get_commit_timestamp(
+    repo: str | GitQuery,
+    commit: str,
+    *,
+    human_readable: Literal[True] = ...,
+) -> str:
+    ...
+
+
+def get_commit_timestamp(
+    repo: str | GitQuery,
+    commit: str,
+    *,
+    human_readable: bool = False,
+) -> str | int:
+    """
+    Get the timestamp of a specific commit in the given Git repository.
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param commit: Commit hash to get the timestamp for
+    :type commit: str
+    :param human_readable: Whether to return the timestamp in human-readable ISO 8601 format
+    :type human_readable: bool
+    :return: Commit timestamp in ISO 8601 format
+    :rtype: str if 'human_readable' else int
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    return _get_commit_timestamp(
+        extract_url(repo),
+        commit,
+        human_readable,
+    )
+
+
+def commit_exists(
+    repo: str | GitQuery,
+    commit: str,
+) -> bool:
+    """
+    Check if a specific commit exists in the given Git repository.
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param commit: Commit hash to check
+    :type commit: str
+    :return: True if the commit exists, False otherwise
+    :rtype: bool
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    try:
+        get_commit_timestamp(repo, commit)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+@cache
+def _commit2version(
+    url: str,
+    commit: str | None,
 ) -> str | None:
     """
-    Return the latest version string from the pyproject.toml file of a git repo, or None if not found.
+    Return the version string associated with a specific commit in the given Git repository, or None if not found.
         NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
 
-    :param repo: Git repository URL or GitRef (in which case only the URL is used)
-    :type repo: str | GitRef
-    :return: Latest version string, or None if not found
+    :param url: Git repository URL
+    :type url: str
+    :param commit: Commit hash to find the version for. If None, uses the latest commit on the default branch.
+    :type commit: str | None
+    :return: Version string associated with the commit, or None if not found
     :rtype: str | None
+    :raises ValueError: If the repository does not exist
+    :raises CalledProcessError: If git commands fail for various reasons
     """
+    # Check that the repo exists
+    if not is_git_repo(url):
+        raise ValueError(
+            f"Repository {url} does not exist or is not accessible."
+        )
+
     # Save the versioning file to a temporary location
     tmp_file = generate_random_path(suffix=".toml")
 
     try:
         # Clone the versioning file
-        git_clone(extract_url(repo) + "?path=pyproject.toml", dest=tmp_file)
+        git_query = edit_url(url, commit=commit, path="pyproject.toml")
+        git_clone(git_query, dest=tmp_file)
 
         # Load the versioning file
         version = load_toml(tmp_file)["project"]["version"]
@@ -555,38 +820,34 @@ def get_latest_version(
         return version
 
 
-def commit_exists(
-    repo: str | GitRef,
-    commit: str,
-) -> bool:
+def commit2version(
+    repo: str | GitQuery,
+    commit: str | None = None,
+) -> str | None:
     """
-    Check if a specific commit exists in the given Git repository.
+    Return the version string associated with a specific commit in the given Git repository, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
 
-    :param repo: Git repository URL or GitRef (in which case only the URL is used)
-    :type repo: str | GitRef
-    :param commit: Commit hash to check
-    :type commit: str
-    :return: True if the commit exists, False otherwise
-    :rtype: bool
-    :raises ValueError: If the repository does not exist
-    :raises CalledProcessError: If git commands fail for various reasons
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param commit: Commit hash to find the version for. If None, uses the latest commit on the default branch.
+    :type commit: str | None
+    :return: Version string associated with the commit, or None if not found
+    :rtype: str | None
     """
-    # Check that the repo exists
-    if not is_git_repo(repo):
-        raise ValueError(
-            f"Repository {repo} does not exist or is not accessible."
-        )
+    return _commit2version(extract_url(repo), commit)
 
-    mirror = _get_mirror(extract_url(repo))
-    with _repo_lock(mirror):
-        # Fetch updates
-        _git_fetch(mirror)
 
-        # Check for commit existence
-        result = _git_run(
-            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
-            cwd=mirror,
-            capture_output=True,
-            text=True,
-        )
-        return result.returncode == 0
+def get_latest_version(
+    repo: str | GitQuery,
+) -> str | None:
+    """
+    Return the latest version string from the pyproject.toml file of a git repo, or None if not found.
+        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :return: Latest version string, or None if not found
+    :rtype: str | None
+    """
+    return commit2version(repo)

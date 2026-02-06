@@ -10,9 +10,10 @@ def get_git_diff(
     path: str | Path | None = None,
     name_only: bool = False,
     staged: bool = True,
+    ref: str = DEFAULT_BRANCH,
 ) -> str:
     """
-    Get the git diff between the default branch and the current HEAD.
+    Get the git diff between the specified reference and the current HEAD.
 
     :param path: Optional path to get the diff for/under.
     :type path: str | Path | None
@@ -20,6 +21,8 @@ def get_git_diff(
     :type name_only: bool
     :param staged: Whether to include staged changes
     :type staged: bool
+    :param ref: The git reference to compare against
+    :type ref: str
     :return: The git diff as a string
     :rtype: str
     """
@@ -28,7 +31,7 @@ def get_git_diff(
         "diff",
         "--unified=0",
         "--ignore-space-change",
-        DEFAULT_BRANCH,
+        ref,
     ]
     if path:
         diff_cmd.extend(["--", str(path)])

@@ -33,13 +33,9 @@ tasks:
 
 options:
   conda:
-    conda/install-conda:
-      enabled: true
-    conda/install-conda-environments:
-      enabled: true
+    conda/install-conda: {}
+    conda/install-conda-environments: {}
   mamba: &mamba_option
-    conda/install-mamba:
-      enabled: true
-    conda/install-conda-environments:
-      enabled: true
+    conda/install-mamba: {}
+    conda/install-conda-environments: {}
   default: *mamba_option

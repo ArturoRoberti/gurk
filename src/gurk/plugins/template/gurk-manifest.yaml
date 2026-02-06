@@ -33,9 +33,7 @@ tasks:
 #     Multiple commands can be indirectly run by enabling dependencies, but in no other way (by design).
 options:
   some-option: &some_option
-    template/install-some-task:
-      enabled: true
+    template/install-some-task: {}
   another-option:
-    template/configure-another-task:
-      enabled: true
+    template/configure-another-task: {}
   default: *some_option

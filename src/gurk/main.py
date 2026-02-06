@@ -35,52 +35,8 @@ def main():
 @main.command(name="run", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def run_cmd(ctx: click.Context):
-    """Run a gurk plugin or task"""
+    """Run a gurk plugin task or option"""
     run.main(
-        argv=ctx.args,
-        prog=get_prog(ctx.info_name),
-        description=ctx.command.help,
-    )
-
-
-@main.command(name="pull", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
-@click.pass_context
-def pull_cmd(ctx: click.Context):
-    """Pull gurk plugins from git repositories"""
-    pull.main(
-        argv=ctx.args,
-        prog=get_prog(ctx.info_name),
-        description=ctx.command.help,
-    )
-
-
-@main.command(name="init", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
-@click.pass_context
-def init_cmd(ctx: click.Context):
-    """Initialize gurk"""
-    init.main(
-        argv=ctx.args,
-        prog=get_prog(ctx.info_name),
-        description=ctx.command.help,
-    )
-
-
-@main.command(name="upgrade", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
-@click.pass_context
-def upgrade_cmd(ctx: click.Context):
-    """Upgrade one or all gurk plugins to their newest state"""
-    upgrade.main(
-        argv=ctx.args,
-        prog=get_prog(ctx.info_name),
-        description=ctx.command.help,
-    )
-
-
-@main.command(name="remove", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
-@click.pass_context
-def remove_cmd(ctx: click.Context):
-    """Remove one or more local gurk plugins"""
-    remove.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
         description=ctx.command.help,
@@ -102,6 +58,50 @@ def setup_cmd(ctx: click.Context):
     )
 
 
+@main.command(name="upgrade", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def upgrade_cmd(ctx: click.Context):
+    """Upgrade one or all installed gurk plugins to their newest version"""
+    upgrade.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="init", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def init_cmd(ctx: click.Context):
+    """Initialize gurk"""
+    init.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="pull", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def pull_cmd(ctx: click.Context):
+    """Install gurk plugins from git repositories or local paths"""
+    pull.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="remove", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def remove_cmd(ctx: click.Context):
+    """Uninstall one or more gurk plugins (that are not officially supported)"""
+    remove.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
 @main.command(name="help", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def help_cmd(ctx: click.Context):
@@ -113,7 +113,7 @@ def help_cmd(ctx: click.Context):
     )
 
 
-for cmd in ["run", "upgrade", "pull", "setup", "remove", "help"]:
+for cmd in ["run", "setup", "upgrade", "init", "pull", "remove", "help"]:
     main.commands[cmd].category = "Core Commands"
 
 
@@ -136,7 +136,7 @@ def check_cmd(ctx: click.Context):
 @main.command(name="template", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def template_cmd(ctx: click.Context):
-    """Copy the gurk plugin template to the current directory"""
+    """Create a gurk plugin template in the current directory"""
     template.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),

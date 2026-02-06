@@ -27,5 +27,4 @@ tasks:
 
 options:
   default:
-    docker/install-docker-images:
-      enabled: true
+    docker/install-docker-images: {}

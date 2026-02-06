@@ -8,7 +8,7 @@ version = "1.1.1"
 description = "Contains anything related to setting up a new computer (desktop) system"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [ "click", "distro", "filelock", "networkx", "packaging", "requests", "rich", "ruamel.yaml", "termcolor", "tomli_w",]
+dependencies = [ "click", "distro", "filelock", "networkx", "packaging", "requests", "rich", "ruamel.yaml", "tomli_w",]
 classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: POSIX :: Linux", "Environment :: Console", "Topic :: System :: Installation/Setup", "Intended Audience :: End Users/Desktop",]
 [[project.authors]]
 name = "Arturo J. Roberti"

@@ -66,7 +66,7 @@ def run_script_function(
     :param check: If True, checks if the script and function exist before running. Usually set to False if e.g. the function is sourced from another script (e.g. with a bash helper).
     :type check: bool
     :return: The generated script string (if run=False)
-    :rtype: str | CompletedProcess
+    :rtype: str if 'run' else subprocess.CompletedProcess[str]
     :raises FileNotFoundError: If the script or function do not exist and check=True, or if the specified venv does not exist.
     :raises ValueError: If the script extension is not supported.
     """

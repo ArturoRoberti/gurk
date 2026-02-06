@@ -6,7 +6,7 @@ from textwrap import dedent
 
 from gurk.lib.logger import ActiveLogger, Logger, get_logger
 from gurk.lib.utils.cli import SETUP_DONE_FILE
-from gurk.lib.utils.plugins import GurkArgumentParser
+from gurk.lib.utils.plugins import DefaultNamespace, GurkArgumentParser
 from gurk.lib.utils.system_info import get_manufacturer
 
 
@@ -267,8 +267,16 @@ def print_secure_boot_steps() -> None:
     )
 
 
+class SetupNamespace(DefaultNamespace):
+    # fmt: off
+    ssh_keys:            bool
+    git_credentials:     bool
+    disable_secure_boot: bool
+    # fmt: on
+
+
 def main(argv, prog, description):
-    parser = GurkArgumentParser(
+    parser = GurkArgumentParser[SetupNamespace](
         prog=prog,
         description=description,
         add_verbose_arg=False,

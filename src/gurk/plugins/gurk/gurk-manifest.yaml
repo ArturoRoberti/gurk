@@ -63,21 +63,13 @@ tasks:
 
 options:
   install: &install_option
-    gurk/install-apt-packages:
-      enabled: true
-    gurk/install-flatpak-packages:
-      enabled: true
-    gurk/install-js-repositories:
-      enabled: true
-    gurk/install-npm-packages:
-      enabled: true
-    gurk/install-snap-packages:
-      enabled: true
+    gurk/install-apt-packages: {}
+    gurk/install-flatpak-packages: {}
+    gurk/install-js-repositories: {}
+    gurk/install-npm-packages: {}
+    gurk/install-snap-packages: {}
   configure:
-    gurk/configure-bashrc:
-      enabled: true
-    gurk/configure-filestructure:
-      enabled: true
-    gurk/configure-pinned-apps:
-      enabled: true
+    gurk/configure-bashrc: {}
+    gurk/configure-filestructure: {}
+    gurk/configure-pinned-apps: {}
   default: *install_option

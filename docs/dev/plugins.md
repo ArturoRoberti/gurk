@@ -37,10 +37,9 @@ The required `options` section defines the options in which the plugin can be ru
 
 Each option should only reference tasks defined in the `tasks` section of the manifest or tasks imported from other plugins. The `default` option is special/required and is used when no specific option is provided when running the plugin.
 
-The structure of an `OptionDict` is as follows (only `enabled` is required):
+The structure of an `OptionDict` is as follows (all fields optional):
 ```yaml
 <task-name>:
-  enabled: <true|false>
   config_file: <config_file>
   args: [<arg1>, <arg2>, ...]
   ...

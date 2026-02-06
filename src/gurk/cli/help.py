@@ -1,3 +1,4 @@
+from argparse import Namespace
 from collections import defaultdict
 from copy import deepcopy
 
@@ -12,13 +13,25 @@ from gurk.lib.utils.plugins import (
     get_combined_plugin_registry,
     get_combined_plugin_tasks,
     get_plugin_data,
+    is_plugin_installed,
 )
 from gurk.lib.utils.system_info import get_system_info
 from gurk.lib.utils.typed_dict import print_typed_dict_types
 
 
+class HelpNamespace(Namespace):
+    # fmt: off
+    plugins:           list[str] | None
+    tasks:             list[str] | None
+    available_plugins: bool
+    available_tasks:   bool
+    structure:         bool
+    system_info:       bool
+    # fmt: on
+
+
 def main(argv, prog, description):
-    parser = GurkArgumentParser(
+    parser = GurkArgumentParser[HelpNamespace](
         prog=prog,
         description=description,
         add_verbose_arg=False,
@@ -87,14 +100,13 @@ def main(argv, prog, description):
         # Show help for specific plugins
         elif args.plugins:
             for plugin_name in args.plugins:
-                # Get plugin data (if installed)
-                try:
-                    plugin_data = get_plugin_data(plugin_name)
-                except ModuleNotFoundError as e:
-                    logger.error(str(e))
+                # Check that the plugin is installed
+                if not is_plugin_installed(plugin_name):
+                    logger.error(f"Plugin '{plugin_name}' is not installed.")
                     continue
 
-                # Re-get plugin name from metadata if available, in case another PluginSpec was used
+                # Re-get plugin name from metadata if available, in case another PluginSpecification was used
+                plugin_data = get_plugin_data(plugin_name)
                 plugin_name = plugin_data["metadata"]["name"]
 
                 # Print general info
@@ -127,18 +139,17 @@ def main(argv, prog, description):
                 if plugin_manifest.get("imports"):
                     imports = {}
                     for imported_plugin in plugin_manifest["imports"]:
-                        # Plugin is not installed
                         try:
                             plugin_data = get_plugin_data(imported_plugin)
                         except ModuleNotFoundError:
+                            # Plugin is not installed
                             imports[imported_plugin] = "Not installed"
-                            continue
-
-                        # Plugin is installed - print source
-                        imports[imported_plugin] = (
-                            plugin_data["registration"]["remote"]
-                            or plugin_data["registration"]["local"]
-                        )
+                        else:
+                            # Plugin is installed - print source
+                            imports[imported_plugin] = (
+                                plugin_data["registration"]["remote"]
+                                or plugin_data["registration"]["local"]
+                            )
 
                     logger.padded_print("Imported Plugins", "cyan")
                     logger.pprint_dict(imports, color="yellow")

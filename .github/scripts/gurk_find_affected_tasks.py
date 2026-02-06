@@ -3,10 +3,11 @@ try:
     from gurk.lib.utils.configs import load_yaml
     from gurk.lib.utils.plugins import (
         get_combined_plugin_tasks,
+        install_plugin,
         iter_configs,
         iter_scripts,
-        pull_plugin,
     )
+    from gurk.lib.utils.remotes import get_commit_timestamp
     from gurk.lib.utils.scripts import ScriptBlockTypes, get_block_spans
     from gurk.lib.utils.tasks import RUNNER_SPECIFIC_TASKS
 except ImportError:
@@ -32,8 +33,6 @@ def _get_changed_remote_plugin_sources() -> set[str]:
     :return: Set of changed or new remote plugin sources
     :rtype: set[str]
     """
-    from packaging.version import Version
-
     RegistryData: TypeAlias = dict[str, dict[str, str]]
 
     def filter_remote_plugins(registry_data: RegistryData) -> RegistryData:
@@ -72,22 +71,24 @@ def _get_changed_remote_plugin_sources() -> set[str]:
         if k not in default_registry_data:
             continue  # New plugin, already handled
 
-        # Get current version
+        # Get current commit
         parts = urlparse(v["remote"])
         query = parse_qs(parts.query)
-        version = Version(query["version"])
+        t_commit = get_commit_timestamp(query["url"], query["commit"])
 
-        # Get default branch version
+        # Get default branch commit
         parts_def = urlparse(default_registry_data[k]["remote"])
         query_def = parse_qs(parts_def.query)
-        version_def = Version(query_def["version"])
+        t_commit_def = get_commit_timestamp(
+            query_def["url"], query_def["commit"]
+        )
 
-        # Compare versions
-        if version > version_def:
+        # Compare commit timestamps
+        if t_commit > t_commit_def:
             changed_plugins.add(v["remote"])
-        elif version < version_def:
+        elif t_commit < t_commit_def:
             raise RuntimeError(
-                f"Plugin '{k}' has a lower version ({version}) than in the default branch ({version_def})."
+                f"Plugin '{k}' has an older commit timestamp ({t_commit}) than in the default branch ({t_commit_def})."
             )
 
     return new_plugins.union(changed_plugins)
@@ -223,7 +224,7 @@ if __name__ == "__main__":
     # Pull changed remote plugins and stage for diff analysis
     changed_remote_plugins = _get_changed_remote_plugin_sources()
     for plugin_source in changed_remote_plugins:
-        if not pull_plugin(plugin_source):
+        if not install_plugin(plugin_source):
             raise RuntimeError(
                 f"Failed to pull changed/new remote plugin from source '{plugin_source}'."
             )

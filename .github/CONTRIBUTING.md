@@ -15,7 +15,7 @@ Furthermore, feel free to fork this repository or its example config repository 
 ## Developer instructions
 Please install the package via
 ```bash
-pipx install -e .[dev]
+pipx install -e .[dev] && gurk init
 ```
 
 You can find further developer instructions in the corresponding [documentation](https://github.com/ArturoRoberti/gurk/blob/main/docs/dev/).

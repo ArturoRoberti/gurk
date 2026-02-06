@@ -22,7 +22,5 @@ tasks:
 
 options:
   default:
-    vscode/install-vscode-extensions:
-      enabled: true
-    vscode/configure-vscode-keybindings:
-      enabled: true
+    vscode/install-vscode-extensions: {}
+    vscode/configure-vscode-keybindings: {}

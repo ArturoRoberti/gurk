@@ -1,9 +1,19 @@
 from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.plugins import GurkArgumentParser, check_local_plugin
+from gurk.lib.utils.plugins import (
+    DefaultNamespace,
+    GurkArgumentParser,
+    check_local_plugin,
+)
+
+
+class CheckNamespace(DefaultNamespace):
+    paths: list[str]
 
 
 def main(argv, prog, description):
-    parser = GurkArgumentParser(prog=prog, description=description)
+    parser = GurkArgumentParser[CheckNamespace](
+        prog=prog, description=description
+    )
     parser.add_argument(
         "paths",
         type=str,
