@@ -224,6 +224,21 @@ def is_git_repo(repo: str | GitQuery) -> bool:
     return _is_git_repo(extract_url(repo))
 
 
+def is_git_installed() -> bool:
+    """
+    Check if Git is installed on the system.
+
+    :return: True if Git is installed, False otherwise
+    :rtype: bool
+    """
+    try:
+        _git_run(["git", "--version"], capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        return False
+    else:
+        return True
+
+
 @cache
 def is_url(url: str) -> bool:
     """

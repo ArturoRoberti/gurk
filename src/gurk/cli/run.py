@@ -15,7 +15,7 @@ from gurk.lib.utils.plugins import (
     is_plugin_installed,
     load_raw_plugin_manifest,
 )
-from gurk.lib.utils.remotes import is_git_repo
+from gurk.lib.utils.remotes import is_git_installed, is_git_repo
 from gurk.lib.utils.tasks import COMMON_RESOLVED_TASK_DICT_FIELDS
 
 
@@ -103,11 +103,16 @@ def parse_specification(specification: str) -> ParsedSpecification:
         return local_path_specification
 
     # Git remote
-    git_remote_specification = check_specification_type(
-        PluginSpecificationEnum.GIT_REMOTE, is_git_repo
-    )
-    if git_remote_specification:
-        return git_remote_specification
+    git_installed = is_git_installed()
+    if git_installed:
+        git_remote_specification = check_specification_type(
+            PluginSpecificationEnum.GIT_REMOTE, is_git_repo
+        )
+        if git_remote_specification:
+            return git_remote_specification
+        git_msg = ""
+    else:
+        git_msg = "(NOTE: Git is not installed, so it cannot be used for plugin specifications) "
 
     # Installed plugin name
     def check_installed_plugin_name(plugin_name: str) -> bool:
@@ -122,9 +127,10 @@ def parse_specification(specification: str) -> ParsedSpecification:
 
     # If none of the above checks succeeded, raise an error
     raise ArgumentTypeError(
-        f"Invalid PluginSpecification '{specification}': Could not parse plugin specification. "
-        "Please specify a valid plugin name, remote Git repository, or local directory, "
-        "optionally followed by a task (using '/') or run option (using ':')."
+        f"Invalid PluginSpecification '{specification}': Could not parse "
+        f"plugin specification {git_msg}. Please specify a valid plugin "
+        "name, remote Git repository, or local directory, optionally "
+        "followed by a task (using '/') or run option (using ':')."
     )
 
 
@@ -153,7 +159,7 @@ def main(argv, prog, description):
     group.add_argument(
         "specification",
         type=parse_specification,
-        metavar="plugin[:<option> | /<task_name>]",
+        metavar="plugin[:<option> | /<task-subname>]",
         help="plugin specification (local path, remote (optionally including version/commit/branch) or name) of the plugin to run, with optional run option or task name appended",
     )
     parser.add_argument(

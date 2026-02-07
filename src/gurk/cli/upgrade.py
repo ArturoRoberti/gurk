@@ -10,7 +10,12 @@ from gurk.lib.utils.plugins import (
     install_plugin,
     is_plugin_installed,
 )
-from gurk.lib.utils.remotes import edit_url, extract_url, get_latest_version
+from gurk.lib.utils.remotes import (
+    edit_url,
+    extract_url,
+    get_latest_version,
+    is_git_installed,
+)
 
 
 class UpgradeNamespace(DefaultNamespace):
@@ -41,9 +46,16 @@ def main(argv, prog, description):
     # Execute with active logger
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
+        # Check that git is installed
+        if not is_git_installed():
+            logger.fatal(
+                "Git is not installed or not available in PATH."
+                "Please install it via 'sudo apt install git'"
+            )
+
+        # Parse plugin specifications to upgrade
         if args.plugins:
             plugins = args.plugins
-
             # Don't allow local paths
             for plugin in plugins:
                 if Path(plugin).exists():

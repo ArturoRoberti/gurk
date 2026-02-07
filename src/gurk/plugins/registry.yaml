@@ -13,7 +13,7 @@ docker:
   remote: null
 example:gurk-plugin:
   local: null
-  remote: git@github.com:ArturoRoberti/example_gurk_plugin.git?commit=2d18a56
+  remote: git@github.com:ArturoRoberti/example_gurk_plugin.git?commit=b71fc86
 fzf:
   local: fzf
   remote: null

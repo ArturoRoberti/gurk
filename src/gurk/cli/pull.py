@@ -4,6 +4,7 @@ from gurk.lib.utils.plugins import (
     GurkArgumentParser,
     install_plugin,
 )
+from gurk.lib.utils.remotes import is_git_installed
 
 
 class PullNamespace(DefaultNamespace):
@@ -32,8 +33,15 @@ def main(argv, prog, description):
     # Execute with active logger
     logger = Logger(args.verbose, args.non_interactive)
     with ActiveLogger(logger):
+        # Check that git is installed
+        if not is_git_installed():
+            logger.fatal(
+                "Git is not installed or not available in PATH."
+                "Please install it via 'sudo apt install git'"
+            )
+
+        # (Re)install specified plugins
         for source in args.sources:
-            # (Re)install specified plugin
             if not install_plugin(source, reinstall=args.replace):
                 logger.error(f"Failed to pull plugin from source '{source}'.")
                 continue
