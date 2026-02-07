@@ -91,16 +91,14 @@ def main(argv, prog, description):
 
         for plugin in plugins:
             # Logging helper
-            if args.plugins and plugin in args.plugins:
-                wlogfunc = logger.warning
-                ilogfunc = logger.info
+            if args.plugins:
+                logfunc = logger.info
             else:
-                wlogfunc = logger.debug
-                ilogfunc = logger.debug
+                logfunc = logger.debug
 
             # Check if plugin is installed
             if not is_plugin_installed(plugin, require_venv=False):
-                wlogfunc(
+                logfunc(
                     f"Plugin '{plugin}' is not validly installed. Skipping upgrade..."
                 )
                 continue
@@ -113,7 +111,7 @@ def main(argv, prog, description):
 
             # Skip local-only plugins
             if not plugin_remote:
-                ilogfunc(
+                logfunc(
                     f"Plugin '{plugin}' is local-only and has no remote. Skipping upgrade..."
                 )
                 continue
@@ -124,13 +122,13 @@ def main(argv, prog, description):
                 plugin_local,
                 extract_url(plugin_remote),
             }:
-                ilogfunc(f"Excluding plugin '{plugin}' from upgrade.")
+                logfunc(f"Excluding plugin '{plugin}' from upgrade.")
                 continue
 
             # See if the current version is already the latest
             latest_version = get_latest_version(plugin_remote)
             if latest_version == get_plugin_version(plugin):
-                ilogfunc(
+                logfunc(
                     f"Plugin '{plugin}' is already at the latest version. Skipping upgrade..."
                 )
                 continue

@@ -34,4 +34,5 @@ jobs:
           fi
 
           echo "Running pytest for affected tasks: ${AFFECTED_TASKS}"
+          gurk init
           gurk pytest -v tests/tasks.py --tasks="${AFFECTED_TASKS}"
