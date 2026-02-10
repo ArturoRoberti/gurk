@@ -2,12 +2,12 @@ import os
 import shutil
 from pathlib import Path
 
+from gurk.lib.core.context import get_logger
+from gurk.lib.core.plugins import GurkArgumentParser
 from gurk.lib.core.processor import Processor
 from gurk.lib.core.scheduler import Scheduler
-from gurk.lib.logger import get_logger
 from gurk.lib.utils.cli import get_sudo_askpass, prompt_setup
 from gurk.lib.utils.common import IS_GITHUB_RUNNER, generate_random_path
-from gurk.lib.utils.plugins import GurkArgumentParser
 from gurk.lib.utils.system_info import get_system_info
 from gurk.lib.utils.tasks import CustomTaskDictCollection
 

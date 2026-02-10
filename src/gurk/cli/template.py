@@ -1,14 +1,14 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.common import PACKAGE_SRC_PATH
-from gurk.lib.utils.configs import dump_toml, dump_yaml, load_toml, load_yaml
-from gurk.lib.utils.plugins import (
+from gurk.lib.core.context import GurkContext, Logger
+from gurk.lib.core.plugins import (
     GURK_MANIFEST_FILENAME,
     DefaultNamespace,
     GurkArgumentParser,
 )
+from gurk.lib.utils.common import PACKAGE_SRC_PATH
+from gurk.lib.utils.configs import dump_toml, dump_yaml, load_toml, load_yaml
 
 
 class TemplateNamespace(DefaultNamespace):
@@ -39,16 +39,19 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
-    with ActiveLogger(logger):
+    with GurkContext(
+        logger=Logger(args.verbose, args.non_interactive), writable=False
+    ) as ctx:
         # Determine destination path
         dest: Path = Path.cwd() / args.name
         if dest.exists():
             if args.force:
                 shutil.rmtree(dest)
-                logger.debug(f"Removed existing folder '{dest.as_posix()}'.")
+                ctx.logger.debug(
+                    f"Removed existing folder '{dest.as_posix()}'."
+                )
             else:
-                logger.fatal(
+                ctx.logger.fatal(
                     f"Cannot create plugin folder '{args.name}' in '{dest.parent.as_posix()}': "
                     f"Destination path '{dest.as_posix()}' already exists."
                 )
@@ -59,7 +62,7 @@ def main(argv, prog, description):
             PACKAGE_SRC_PATH / "plugins" / "template",
             dest,
         )
-        logger.debug(f"Copied template plugin to '{dest.as_posix()}'")
+        ctx.logger.debug(f"Copied template plugin to '{dest.as_posix()}'")
 
         # Replace plugin name
         versioning_file = dest / "pyproject.toml"

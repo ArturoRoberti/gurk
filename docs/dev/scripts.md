@@ -9,7 +9,7 @@ The progress bar is updated via `STEP` statements in both Bash and Python script
 
 **Example (Python):**
 ```python
-from gurk.core.logger import Logger
+from gurk import Logger
 # (STEP) Some step with progress
 Logger.step("Some step without progress")
 Logger.step("Some step with warning", warning=True)

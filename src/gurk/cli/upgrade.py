@@ -1,10 +1,9 @@
 from pathlib import Path
 
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.plugins import (
+from gurk.lib.core.context import GurkContext, Logger, get_registries
+from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
-    get_combined_plugin_registry,
     get_plugin_data,
     get_plugin_version,
     install_plugin,
@@ -17,6 +16,8 @@ from gurk.lib.utils.remotes import (
     is_git_installed,
 )
 
+# TODO: Only upgrade if relevant files have changed (except for pyproject.toml)
+
 
 class UpgradeNamespace(DefaultNamespace):
     plugins: list[str]
@@ -27,14 +28,14 @@ def main(argv, prog, description):
     parser = GurkArgumentParser[UpgradeNamespace](
         prog=prog, description=description
     )
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_required_group()
     group.add_argument(
         "plugins",
         type=str,
         nargs="*",
         help="PluginSpecifications (name or remote) of the installed plugins to upgrade. If empty, upgrade all local plugins",
     )
-    group.add_argument(
+    parser.add_argument(
         "-e",
         "--exclude",
         type=str,
@@ -44,11 +45,12 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
-    with ActiveLogger(logger):
+    with GurkContext(
+        logger=Logger(args.verbose, args.non_interactive), writable=True
+    ) as ctx:
         # Check that git is installed
         if not is_git_installed():
-            logger.fatal(
+            ctx.logger.fatal(
                 "Git is not installed or not available in PATH."
                 "Please install it via 'sudo apt install git'"
             )
@@ -59,14 +61,16 @@ def main(argv, prog, description):
             # Don't allow local paths
             for plugin in plugins:
                 if Path(plugin).exists():
-                    logger.error(
+                    ctx.logger.error(
                         f"Invalid plugin specification '{plugin}' given for upgrade. "
                         f"Only plugin names or remotes are allowed. Skipping..."
                     )
                     plugins.remove(plugin)
         else:
             # Get all local plugins to upgrade if none specified
-            combined_registry = get_combined_plugin_registry()
+            combined_registry = get_registries(
+                home_registry=True, package_registry=True, combine=True
+            )
             plugins = combined_registry.keys()  # All plugin names
 
         # Check 'exclude' plugins if specified
@@ -74,7 +78,7 @@ def main(argv, prog, description):
         for exclude in args.exclude or []:
             # Don't allow local paths
             if Path(exclude).exists():
-                logger.error(
+                ctx.logger.error(
                     f"Invalid plugin specification '{exclude}' given for exclusion. "
                     f"Only plugin names or remotes are allowed. Skipping..."
                 )
@@ -82,7 +86,7 @@ def main(argv, prog, description):
 
             # Check that the plugin to exclude exists
             if not is_plugin_installed(exclude, require_venv=False):
-                logger.warning(
+                ctx.logger.warning(
                     f"Excluded plugin '{exclude}' is not validly installed. Ignoring..."
                 )
                 continue
@@ -92,9 +96,9 @@ def main(argv, prog, description):
         for plugin in plugins:
             # Logging helper
             if args.plugins:
-                logfunc = logger.info
+                logfunc = ctx.logger.info
             else:
-                logfunc = logger.debug
+                logfunc = ctx.logger.debug
 
             # Check if plugin is installed
             if not is_plugin_installed(plugin, require_venv=False):
@@ -138,8 +142,8 @@ def main(argv, prog, description):
                 plugin_remote, version=latest_version, commit=None
             )
             if not install_plugin(new_remote, reinstall=True):
-                logger.error(
+                ctx.logger.error(
                     f"Failed to upgrade plugin from remote '{new_remote}'."
                 )
 
-    logger.done("Plugin upgrades complete.")
+        ctx.logger.done("Plugin upgrades complete.")

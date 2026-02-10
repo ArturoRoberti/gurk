@@ -1,5 +1,5 @@
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.plugins import (
+from gurk.lib.core.context import GurkContext, Logger
+from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
     install_plugin,
@@ -16,7 +16,8 @@ def main(argv, prog, description):
     parser = GurkArgumentParser[PullNamespace](
         prog=prog, description=description
     )
-    parser.add_argument(
+    group = parser.add_required_group()
+    group.add_argument(
         "sources",
         type=str,
         nargs="+",
@@ -31,19 +32,18 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
-    with ActiveLogger(logger):
+    with GurkContext(
+        logger=Logger(args.verbose, args.non_interactive), writable=True
+    ) as ctx:
         # Check that git is installed
         if not is_git_installed():
-            logger.fatal(
+            ctx.logger.fatal(
                 "Git is not installed or not available in PATH."
                 "Please install it via 'sudo apt install git'"
             )
 
         # (Re)install specified plugins
         for source in args.sources:
-            if not install_plugin(source, reinstall=args.replace):
-                logger.error(f"Failed to pull plugin from source '{source}'.")
-                continue
+            install_plugin(source, reinstall=args.replace)
 
-        logger.done("Plugin pulling complete.")
+        ctx.logger.done("Plugin pulling complete.")

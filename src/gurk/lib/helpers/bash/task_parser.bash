@@ -16,19 +16,13 @@ parse_task_args() {
 	Returns:
 	  0 if successfully parsed, 1 otherwise
 	"
-	local task_name="$1"
-	local args=("${@:2}")
-
+	local args="$(printf "'%s'," "$@" | sed 's/,$//')" # Python list syntax
 	local argparser=$(mktemp 2>/dev/null || mktemp -t argparser)
 	cat >>"$argparser" <<EOF
-from gurk.lib.logger import allow_missing_logger
-from gurk.lib.utils.plugins import GurkArgumentParser
+import sys
+from gurk import parse_task_args
 
-parser = GurkArgumentParser(add_verbose_arg=False, add_non_interactive_arg=False, add_force_arg=True, add_task_args=True)
-with allow_missing_logger():
-    parser.extend_task_arguments("${task_name}")
-args = parser.parse_args()
-
+args = parse_task_args(${args})
 for arg in [a for a in dir(args) if not a.startswith('_')]:
     key = arg.upper()
     value = getattr(args, arg, None)
@@ -50,12 +44,12 @@ EOF
 
 	# Define variables corresponding to the options if the args can be
 	# parsed without errors; otherwise, print the text of the error message.
-	if python3 "$argparser" "${args[@]}" &>/dev/null; then
-		eval $(python3 "$argparser" "${args[@]}")
+	if python3 "$argparser" &>/dev/null; then
+		eval $(python3 "$argparser")
 		retval=0
 	else
 		echo "Error parsing task arguments:" >&2
-		python3 "$argparser" "${args[@]}"
+		python3 "$argparser"
 		retval=1
 	fi
 

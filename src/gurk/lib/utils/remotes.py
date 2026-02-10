@@ -5,7 +5,7 @@ import subprocess
 from contextlib import contextmanager
 from functools import cache, wraps
 from pathlib import Path
-from typing import Any, Literal, TypeAlias, TypedDict, overload
+from typing import Any, Literal, TypeAlias, TypedDict, get_type_hints, overload
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
@@ -120,7 +120,7 @@ def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
         if not validate_typed_dict(parsed, GitQueryDict):
             # There are extra fields
             extra_fields = set(repo.keys()) - set(
-                GitQueryDict.__annotations__.keys()
+                get_type_hints(GitQueryDict).keys()
             )
             if extra_fields:
                 raise ValueError(
@@ -131,7 +131,7 @@ def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
             wrong_types = {
                 k
                 for k, v in repo.items()
-                if not isinstance(v, GitQueryDict.__annotations__[k])
+                if not isinstance(v, get_type_hints(GitQueryDict)[k])
             }
             if wrong_types:
                 raise ValueError(
@@ -142,7 +142,7 @@ def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
             raise ValueError("Invalid GitQueryDict dictionary provided.")
     else:
         raise ValueError(
-            "Invalid repo input. Must be GitQuery string or GitQueryDict dict."
+            f"Invalid repo input. Must be GitQuery string or GitQueryDict dict, but is: {repo} of type {type(repo)}"
         )
 
     return parsed

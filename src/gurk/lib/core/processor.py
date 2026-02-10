@@ -3,13 +3,13 @@ from textwrap import dedent
 
 import networkx as nx
 
-from gurk.lib.logger import get_logger
+from gurk.lib.core.context import get_logger
+from gurk.lib.core.plugins import (
+    GurkArgumentParser,
+    get_available_plugin_tasks,
+)
 from gurk.lib.utils.common import PACKAGE_VENVS_PATH, generate_random_path
 from gurk.lib.utils.configs import overlay_dicts
-from gurk.lib.utils.plugins import (
-    GurkArgumentParser,
-    get_combined_plugin_tasks,
-)
 from gurk.lib.utils.scripts import Command
 from gurk.lib.utils.tasks import (
     CustomTaskDictCollection,
@@ -38,7 +38,7 @@ class Processor:
         logger = get_logger()
 
         # Get all tasks
-        tasks = get_combined_plugin_tasks()
+        tasks = get_available_plugin_tasks()
 
         # Extract task args
         task_args: ResolvedArgsDefinitionCollection = dict()

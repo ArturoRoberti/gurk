@@ -12,8 +12,7 @@ from textwrap import dedent
 from threading import Event, Lock, Thread
 from typing import TextIO
 
-from gurk.lib.logger import Logger, get_logger
-from gurk.lib.logger.utils import TaskTerminationType
+from gurk.lib.core.context import Logger, TaskTerminationType, get_logger
 from gurk.lib.utils.common import (
     PACKAGE_VENVS_PATH,
     CommandKind,

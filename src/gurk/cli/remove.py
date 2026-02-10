@@ -1,13 +1,17 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.plugins import (
+from gurk.lib.core.context import (
+    GurkContext,
+    Logger,
+    get_plugin_directories,
+    get_registries,
+    get_registry_files,
+    is_plugin_registered,
+)
+from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
-    get_plugin_directories,
-    get_plugin_registration,
-    get_plugin_registries,
     remove_plugin,
 )
 from gurk.lib.utils.remotes import is_git_repo
@@ -21,7 +25,8 @@ def main(argv, prog, description):
     parser = GurkArgumentParser[RemoveNamespace](
         prog=prog, description=description
     )
-    parser.add_argument(
+    group = parser.add_required_group()
+    group.add_argument(
         "plugins",
         type=str,
         nargs="*",
@@ -30,22 +35,31 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
-    with ActiveLogger(logger):
+    with GurkContext(
+        logger=Logger(args.verbose, args.non_interactive), writable=True
+    ) as ctx:
         for plugin_name in args.plugins:
             # Only allow plugin names
             if Path(plugin_name).exists() or is_git_repo(plugin_name):
-                logger.fatal(
+                ctx.logger.fatal(
                     f"Invalid plugin specification '{plugin_name}' given "
                     f"for removal. Only plugin names are allowed."
                 )
                 continue
 
             # Exclude package plugins, as they should not be removed
-            package_registry = get_plugin_registries(home_registry=False)[0]
+            package_registry = get_registries(
+                home_registry=False, package_registry=True
+            )
             if plugin_name in package_registry:
-                logger.info(
-                    f"Skipping removal of package plugin '{plugin_name}', which cannot be removed."
+                registry_file = get_registry_files(
+                    home_registry=False, package_registry=True
+                )
+                ctx.logger.info(
+                    f"Skipping removal of package plugin '{plugin_name}', "
+                    "which cannot be removed, as it is a package plugin. If "
+                    "you really want to remove this plugin, you can manually set "
+                    f"its local path to 'null' in {registry_file.as_posix()}."
                 )
                 continue
 
@@ -53,7 +67,7 @@ def main(argv, prog, description):
             try:
                 remove_plugin(plugin_name, verbose=True)
             except ModuleNotFoundError as e:
-                logger.error(str(e))
+                ctx.logger.error(str(e))
 
         # Prompt to remove invalid plugins if any exist
         if not args.non_interactive:
@@ -61,12 +75,14 @@ def main(argv, prog, description):
             unregistered_paths: set[Path] = set()
             for dir, is_home in zip(get_plugin_directories(), [True, False]):
                 for item in dir.iterdir():
-                    if item.is_dir() and not all(
-                        get_plugin_registration(
-                            item,
-                            home_registry=is_home,
-                            package_registry=not is_home,
-                        )
+                    if item.name == "template":
+                        # Skip template directory, which is not registered
+                        continue
+
+                    if item.is_dir() and not is_plugin_registered(
+                        item,
+                        home_registry=is_home,
+                        package_registry=not is_home,
                     ):
                         unregistered_paths.add(item)
                     elif item.is_file() and not item.name == "registry.yaml":
@@ -78,14 +94,14 @@ def main(argv, prog, description):
                 for path in unregistered_paths:
                     msg += f"\n- {str(path)}"
 
-                logger.warning(msg)
-                if logger.prompt_bool("Remove these unregistered paths?"):
+                ctx.logger.warning(msg)
+                if ctx.logger.prompt_bool("Remove these unregistered paths?"):
                     for path in unregistered_paths:
                         if path.is_dir():
                             shutil.rmtree(path)
                         elif path.is_file():
                             path.unlink()
 
-                    logger.info("Unregistered paths removed successfully.")
+                    ctx.logger.info("Unregistered paths removed successfully.")
 
-        logger.done("Plugin removals completed.")
+        ctx.logger.done("Plugin removals completed.")

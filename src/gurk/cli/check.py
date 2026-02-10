@@ -1,5 +1,5 @@
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.plugins import (
+from gurk.lib.core.context import GurkContext, Logger
+from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
     check_local_plugin,
@@ -14,7 +14,8 @@ def main(argv, prog, description):
     parser = GurkArgumentParser[CheckNamespace](
         prog=prog, description=description
     )
-    parser.add_argument(
+    group = parser.add_required_group()
+    group.add_argument(
         "paths",
         type=str,
         nargs="+",
@@ -23,12 +24,13 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
-    with ActiveLogger(logger):
+    with GurkContext(
+        logger=Logger(args.verbose, args.non_interactive), writable=False
+    ) as ctx:
         for source in args.paths:
             if not check_local_plugin(source, True):
-                logger.fatal(f"Plugin source '{source}' is invalid.")
+                ctx.logger.fatal(f"Plugin source '{source}' is invalid.")
             else:
-                logger.info(f"Plugin source '{source}' is valid.")
+                ctx.logger.info(f"Plugin source '{source}' is valid.")
 
-        logger.done("Plugin checks complete.")
+        ctx.logger.done("Plugin checks complete.")

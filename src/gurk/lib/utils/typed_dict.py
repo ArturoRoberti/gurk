@@ -1,11 +1,13 @@
 import types
 from typing import (
     Any,
+    Literal,
     NotRequired,
     Union,
     get_args,
     get_origin,
     get_type_hints,
+    overload,
 )
 
 
@@ -97,7 +99,7 @@ def _validate_typed_dict_keys(data: dict[str, Any], td_cls: dict) -> bool:
         return False
 
     # Check required keys
-    annotations = td_cls.__annotations__
+    annotations = get_type_hints(td_cls, include_extras=True)
     required_keys = {
         k
         for k, t in annotations.items()
@@ -136,7 +138,9 @@ def validate_typed_dict(data: Any, td_cls: dict) -> bool:
         return False
 
     # Check value types
-    for key, expected_type in td_cls.__annotations__.items():
+    for key, expected_type in get_type_hints(
+        td_cls, include_extras=True
+    ).items():
         if key in data and not is_instance_of_type(data[key], expected_type):
             return False
 
@@ -240,7 +244,29 @@ def fill_typed_dict(data: dict, td_type: dict) -> dict:
 #################################################################################################################
 ##################################################### Print #####################################################
 #################################################################################################################
-def print_typed_dict_types(td: Any, indent: int = 0) -> None:
+
+
+@overload
+def print_typed_dict_types(
+    td: Any,
+    indent: int = ...,
+    as_str: Literal[False] = ...,
+) -> None:
+    ...
+
+
+@overload
+def print_typed_dict_types(
+    td: Any,
+    indent: int = ...,
+    as_str: Literal[True] = ...,
+) -> str:
+    ...
+
+
+def print_typed_dict_types(
+    td: Any, indent: int = 0, as_str: bool = False
+) -> str | None:
     """
     Print the types of a TypedDict's fields in a human-readable format.
 
@@ -248,14 +274,22 @@ def print_typed_dict_types(td: Any, indent: int = 0) -> None:
     :type td: Any
     :param indent: Indentation level (number of spaces).
     :type indent: int
+    :param as_str: Whether to return the formatted string instead of printing it
+    :type as_str: bool
+    :return: The formatted string if as_str is True, otherwise None
+    :rtype: str | None
     """
     if not _is_typed_dict(td):
-        print(" " * indent + _type_to_str(td))
-        return
+        rmsg = " " * indent + _type_to_str(td)
+        if as_str:
+            return f"{rmsg}\n"
+        else:
+            print(rmsg)
+            return
 
     hints = get_type_hints(td, include_extras=True)
     if not hints:
-        return
+        return "" if as_str else None
 
     # Prepare fields and compute padding only for inline fields
     fields = []
@@ -269,14 +303,21 @@ def print_typed_dict_types(td: Any, indent: int = 0) -> None:
         if inline:
             max_inline = max(max_inline, len(display))
 
+    rmsg = ""
     for display, tp, inline in fields:
         key = display.ljust(max_inline) if inline else display
-        _print_field(key, tp, indent)
+        rmsg += _print_field(key, tp, indent)
+
+    if as_str:
+        return rmsg
+    else:
+        print(rmsg)
+        return
 
 
-def _print_field(key: str, tp: Any, indent: int) -> None:
+def _print_field(key: str, tp: Any, indent: int) -> str:
     """
-    Print a single field of a TypedDict, handling nested TypedDicts and containers.
+    Return a single field of a TypedDict, handling nested TypedDicts and containers.
 
     :param key: Field name to print
     :type key: str
@@ -284,30 +325,30 @@ def _print_field(key: str, tp: Any, indent: int) -> None:
     :type tp: Any
     :param indent: Indentation level (number of spaces)
     :type indent: int
+    :return: A formatted string representing the field and its type
+    :rtype: str
     """
     origin = get_origin(tp)
 
     # TypedDict -> newline then recurse
     if _is_typed_dict(tp):
-        print(" " * indent + key + ":")
-        print_typed_dict_types(tp, indent + 2)
-        return
+        rmsg = " " * indent + key + ":\n"
+        return f"{rmsg}{print_typed_dict_types(tp, indent + 2, as_str=True)}"
 
     # dict[K, V] where V contains TypedDict -> print <K>: then recurse into V
     if origin is dict and (args := get_args(tp)):
         ktype, vtype = args
         if _container_has_typed_dict(vtype):
-            print(" " * indent + key + ":")
-            print(" " * (indent + 2) + f"<{_type_name(ktype)}>:")
-            _print_container_as_fields(vtype, indent + 4)
-            return
+            rmsg = " " * indent + key + ":\n"
+            rmsg += " " * (indent + 2) + f"<{_type_name(ktype)}>:\n"
+            return f"{rmsg}{_print_container_as_fields(vtype, indent + 4)}"
+
         # plain dict printed inline
-        print(
+        return (
             " " * indent
             + key
-            + f": dict[{_type_to_str(ktype)}, {_type_to_str(vtype)}]"
+            + f": dict[{_type_to_str(ktype)}, {_type_to_str(vtype)}]\n"
         )
-        return
 
     # list/set/tuple containing TypedDict -> print key then recurse into element
     if (
@@ -315,10 +356,9 @@ def _print_field(key: str, tp: Any, indent: int) -> None:
         and (args := get_args(tp))
         and _container_has_typed_dict(args[0])
     ):
-        print(" " * indent + key + ":")
-        print(" " * (indent + 2) + "-")
-        _print_container_as_fields(args[0], indent + 4)
-        return
+        rmsg = " " * indent + key + ":\n"
+        rmsg += " " * (indent + 2) + "-\n"
+        return f"{rmsg}{_print_container_as_fields(args[0], indent + 4)}"
 
     # Union (PEP 604 or typing.Union)
     if origin in (Union, types.UnionType):
@@ -329,14 +369,13 @@ def _print_field(key: str, tp: Any, indent: int) -> None:
                 if not _container_has_typed_dict(a)
                 else "<...>"
             )
-        print(" " * indent + key + ": " + " | ".join(parts))
-        return
+        return " " * indent + key + ": " + " | ".join(parts) + "\n"
 
     # fallback: simple inline type
-    print(" " * indent + key + ": " + _type_to_str(tp))
+    return " " * indent + key + ": " + _type_to_str(tp) + "\n"
 
 
-def _print_container_as_fields(tp: Any, indent: int) -> None:
+def _print_container_as_fields(tp: Any, indent: int) -> str:
     """
     Print the contents of a container type (dict, list, set, tuple) as fields.
 
@@ -344,19 +383,20 @@ def _print_container_as_fields(tp: Any, indent: int) -> None:
     :type tp: Any
     :param indent: Indentation level (number of spaces)
     :type indent: int
+    :return: A formatted string representing the container's fields
+    :rtype: str
     """
     if _is_typed_dict(tp):
-        print_typed_dict_types(tp, indent)
-        return
+        return f"{print_typed_dict_types(tp, indent, as_str=True)}"
     origin = get_origin(tp)
     args = get_args(tp)
     if origin is dict and args:
-        print(" " * indent + f"<{_type_name(args[0])}>:")
-        _print_container_as_fields(args[1], indent + 2)
+        rmsg = " " * indent + f"<{_type_name(args[0])}>:\n"
+        return f"{rmsg}{_print_container_as_fields(args[1], indent + 2)}"
     elif origin in (list, set, tuple) and args:
-        _print_container_as_fields(args[0], indent)
+        return f"{_print_container_as_fields(args[0], indent)}"
     else:
-        print(" " * indent + _type_to_str(tp))
+        return " " * indent + _type_to_str(tp) + "\n"
 
 
 def _container_has_typed_dict(tp: Any) -> bool:

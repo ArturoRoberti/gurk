@@ -139,6 +139,7 @@ class PatternCollection(Enum):
     }
     ANSI:           EnumValue[re.Pattern] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
     TRACEBACK_FILE: EnumValue[re.Pattern] = re.compile(r'^\s*File\s+"([^"]+)",\s+line\s+(\d+)')
+    NAMING:         EnumValue[re.Pattern] = re.compile(r"^[A-Za-z_-]+$")
     # fmt: on
 
     @property

@@ -8,18 +8,13 @@ import pytest
 import tomllib
 from ruamel.yaml import YAML
 
-from gurk.lib.core import core
-from gurk.lib.logger import (
-    ActiveLogger,
-    Logger,
-    LoggerSeverity,
-    allow_missing_logger,
+from gurk.lib.core import run
+from gurk.lib.core.context import GurkContext, Logger, LoggerSeverity
+from gurk.lib.core.plugins import (
+    GurkArgumentParser,
+    get_available_plugin_tasks,
 )
 from gurk.lib.utils.common import IS_GITHUB_RUNNER
-from gurk.lib.utils.plugins import (
-    GurkArgumentParser,
-    get_combined_plugin_tasks,
-)
 from gurk.lib.utils.scripts import check_script_blocks
 
 
@@ -27,8 +22,8 @@ def test_task(task: str) -> None:
     """Parametrized test for any task. Used mainly in github actions to test affected tasks only."""
 
     # Get task info
-    with allow_missing_logger():
-        task_info = get_combined_plugin_tasks()
+    with GurkContext(logger=None, writable=False):
+        task_info = get_available_plugin_tasks()
     if task not in task_info:
         pytest.fail(f"Task '{task}' not found in available tasks")
 
@@ -86,10 +81,9 @@ def test_task(task: str) -> None:
     if IS_GITHUB_RUNNER:
         # For now, only run in GitHub Actions runner to avoid askpass prompts
         captured = []
-        logger = Logger(True, True)
-        with ActiveLogger(logger):
+        with GurkContext(logger=Logger(True, True), writable=False) as ctx:
             with pytest.raises(SystemExit) as e:
-                core.main(
+                run.main(
                     option={task: {}},
                     cli_args=["--force"],
                     parser_base=GurkArgumentParser(
@@ -103,7 +97,7 @@ def test_task(task: str) -> None:
                 )
 
             if e.value.code != 0:
-                logger.fatal(
+                ctx.logger.fatal(
                     f"Core exited with non-zero code for task '{task}'"
                 )
 
@@ -123,32 +117,32 @@ def test_task(task: str) -> None:
                 """
                 for task in tasks:
                     # Print task name
-                    logger.richprint(f"\n{task[0]}:", file=file)
+                    ctx.logger.richprint(f"\n{task[0]}:", file=file)
                     # Print the logfile (if it exists - would not be the case in e.g. a skipped task)
                     if task[1] is not None and Path(task[1]).is_file():
                         with open(task[1], "r") as f:
-                            logger.richprint(f.read(), file=file)
+                            ctx.logger.richprint(f.read(), file=file)
 
             # Print successful task outputs
             if successful_tasks:
-                logger.padded_print(
+                ctx.logger.padded_print(
                     f"Successful tasks ({len(successful_tasks)})"
                 )
                 print_task_outputs(successful_tasks)
             else:
-                logger.error("No successful tasks")
+                ctx.logger.error("No successful tasks")
 
             # Print failed task outputs
             if failed_tasks:
-                logger.padded_print(
+                ctx.logger.padded_print(
                     f"Failed tasks ({len(failed_tasks)})", file=sys.stderr
                 )
                 print_task_outputs(failed_tasks, file=sys.stderr)
             else:
-                logger.info("No failed tasks")
+                ctx.logger.info("No failed tasks")
 
             if failed_tasks:
-                logger.fatal("Some tasks failed during testing.")
+                ctx.logger.fatal("Some tasks failed during testing.")
     else:
         Logger.logrichprint(
             LoggerSeverity.WARNING,

@@ -2,19 +2,18 @@ from argparse import Namespace
 from collections import defaultdict
 from copy import deepcopy
 
-from gurk.lib.logger import ActiveLogger, Logger
-from gurk.lib.utils.common import PACKAGE_SRC_PATH
-from gurk.lib.utils.configs import load_toml
-from gurk.lib.utils.plugins import (
+from gurk.lib.core.context import GurkContext, Logger, get_registries
+from gurk.lib.core.plugins import (
     GURK_MANIFEST_FILENAME,
     GurkArgumentParser,
     PluginManifest,
     PluginMetadata,
-    get_combined_plugin_registry,
-    get_combined_plugin_tasks,
+    get_available_plugin_tasks,
     get_plugin_data,
     is_plugin_installed,
 )
+from gurk.lib.utils.common import PACKAGE_SRC_PATH
+from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.system_info import get_system_info
 from gurk.lib.utils.typed_dict import print_typed_dict_types
 
@@ -76,8 +75,7 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with active logger
-    logger = Logger(False, False)
-    with ActiveLogger(logger):
+    with GurkContext(logger=Logger(False, False), writable=False) as ctx:
         # Print help about gurk itself
         if not any(vars(args).values()):
             # Load help from pyproject.toml
@@ -92,17 +90,19 @@ def main(argv, prog, description):
             }
 
             # Link to documentation
-            logger.richprint(
+            ctx.logger.richprint(
                 "For detailed help, visit the Gurk documentation:", "green"
             )
-            logger.pprint_dict(gurk_help, color="yellow", indent=2)
+            ctx.logger.pprint_dict(gurk_help, color="yellow", indent=2)
 
         # Show help for specific plugins
         elif args.plugins:
             for plugin_name in args.plugins:
                 # Check that the plugin is installed
                 if not is_plugin_installed(plugin_name):
-                    logger.error(f"Plugin '{plugin_name}' is not installed.")
+                    ctx.logger.error(
+                        f"Plugin '{plugin_name}' is not installed."
+                    )
                     continue
 
                 # Re-get plugin name from metadata if available, in case another PluginSpecification was used
@@ -110,7 +110,7 @@ def main(argv, prog, description):
                 plugin_name = plugin_data["metadata"]["name"]
 
                 # Print general info
-                logger.padded_print(
+                ctx.logger.padded_print(
                     f"Plugin '{plugin_name}' General Info", "green"
                 )
                 general_info = deepcopy(plugin_data["metadata"])
@@ -119,21 +119,21 @@ def main(argv, prog, description):
                     or plugin_data["registration"]["local"]
                 )
 
-                logger.pprint_dict(
+                ctx.logger.pprint_dict(
                     general_info, color="yellow", capitalize=True
                 )
-                logger.newline()
+                ctx.logger.newline()
 
                 # Print tasks defined by the plugin
                 plugin_manifest = plugin_data["manifest"]
                 if plugin_manifest.get("tasks"):
-                    logger.padded_print("Defined Tasks", "cyan")
+                    ctx.logger.padded_print("Defined Tasks", "cyan")
                     for task_name, task_info in plugin_manifest[
                         "tasks"
                     ].items():
-                        logger.richprint(f"- {task_name}:", "yellow")
-                        logger.pprint_dict(task_info, color="cyan")
-                        logger.newline()
+                        ctx.logger.richprint(f"- {task_name}:", "yellow")
+                        ctx.logger.pprint_dict(task_info, color="cyan")
+                        ctx.logger.newline()
 
                 # Print imported plugins
                 if plugin_manifest.get("imports"):
@@ -151,76 +151,80 @@ def main(argv, prog, description):
                                 or plugin_data["registration"]["local"]
                             )
 
-                    logger.padded_print("Imported Plugins", "cyan")
-                    logger.pprint_dict(imports, color="yellow")
-                    logger.newline()
+                    ctx.logger.padded_print("Imported Plugins", "cyan")
+                    ctx.logger.pprint_dict(imports, color="yellow")
+                    ctx.logger.newline()
 
                 # Print 'options' section
-                logger.padded_print("Run Options", "cyan")
+                ctx.logger.padded_print("Run Options", "cyan")
                 for option_name, option in plugin_manifest["options"].items():
                     key = plugin_name + (
                         " (default)"
                         if option_name == "default"
                         else f"={option_name}"
                     )
-                    logger.richprint(f"- {key}: ", "yellow")
-                    logger.pprint_dict(option, color="cyan")
-                    logger.newline()
+                    ctx.logger.richprint(f"- {key}: ", "yellow")
+                    ctx.logger.pprint_dict(option, color="cyan")
+                    ctx.logger.newline()
 
         # Show help for specific tasks
         elif args.tasks:
             # Get all available tasks
-            tasks = get_combined_plugin_tasks()
-            logger.padded_print("Task Information", "cyan")
+            tasks = get_available_plugin_tasks()
+            ctx.logger.padded_print("Task Information", "cyan")
 
             for task_full_name in args.tasks:
                 # Get task (if installed)
                 task_info = tasks.get(task_full_name)
                 if not task_info:
-                    logger.error(f"Task '{task_full_name}' is not installed.")
+                    ctx.logger.error(
+                        f"Task '{task_full_name}' is not installed."
+                    )
                     continue
 
                 # Print task info
-                logger.richprint(f"Task '{task_full_name}':", "green")
-                logger.pprint_dict(
+                ctx.logger.richprint(f"Task '{task_full_name}':", "green")
+                ctx.logger.pprint_dict(
                     task_info, color="yellow", capitalize=True, indent=2
                 )
-                logger.newline()
+                ctx.logger.newline()
 
         # Show available plugins
         elif args.available_plugins:
-            logger.padded_print("Available Plugins", "cyan")
-            combined_registry = get_combined_plugin_registry()
+            ctx.logger.padded_print("Available Plugins", "cyan")
+            combined_registry = get_registries(
+                home_registry=True, package_registry=True, combine=True
+            )
             for plugin_name, plugin_info in combined_registry.items():
-                logger.richprint(f"{plugin_name}:", "green")
-                logger.pprint_dict(plugin_info, color="yellow", indent=2)
-                logger.newline()
+                ctx.logger.richprint(f"{plugin_name}:", "green")
+                ctx.logger.pprint_dict(plugin_info, color="yellow", indent=2)
+                ctx.logger.newline()
 
         # Show available tasks
         elif args.available_tasks:
             # Get all available tasks and group them by plugin
-            tasks = get_combined_plugin_tasks()
+            tasks = get_available_plugin_tasks()
             grouped = defaultdict(list)
             for key in tasks.keys():
                 group = key.split("/", 1)[0]
                 grouped[group].append(key)
 
             # Print available tasks
-            logger.padded_print("Available Tasks", "cyan")
+            ctx.logger.padded_print("Available Tasks", "cyan")
             for plugin_name, task_list in grouped.items():
-                logger.richprint(f"- {plugin_name}:", "green")
+                ctx.logger.richprint(f"- {plugin_name}:", "green")
                 for task_name in task_list:
-                    logger.richprint(f"  - {task_name}", "yellow")
+                    ctx.logger.richprint(f"  - {task_name}", "yellow")
 
         # Show required plugin structure
         elif args.structure:
-            logger.padded_print(
+            ctx.logger.padded_print(
                 f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan"
             )
             print_typed_dict_types(PluginManifest)
-            logger.newline()
+            ctx.logger.newline()
 
-            logger.padded_print(
+            ctx.logger.padded_print(
                 "Structure of 'project' section in 'pyproject.toml'", "cyan"
             )
             print_typed_dict_types(PluginMetadata)
@@ -232,5 +236,7 @@ def main(argv, prog, description):
             del system_info["simulate_hardware"]
 
             # Print system info
-            logger.padded_print("System information", "cyan")
-            logger.pprint_dict(system_info, color="yellow", capitalize=True)
+            ctx.logger.padded_print("System information", "cyan")
+            ctx.logger.pprint_dict(
+                system_info, color="yellow", capitalize=True
+            )

@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
 
-from gurk.lib.logger import ActiveLogger, Logger, get_logger
+from gurk.lib.core.context import GurkContext, Logger, get_logger
+from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
 from gurk.lib.utils.cli import SETUP_DONE_FILE
-from gurk.lib.utils.plugins import DefaultNamespace, GurkArgumentParser
 from gurk.lib.utils.system_info import get_manufacturer
 
 
@@ -310,25 +310,24 @@ def main(argv, prog, description):
             flags[flag] = True
 
     # Execute with active logger
-    logger = Logger(False, False)
-    with ActiveLogger(logger):
+    with GurkContext(logger=Logger(False, False), writable=False) as ctx:
         # Set up SSH keys
         ssh_keys_manager = SSHKeysManager()
         ssh_keys_exist = ssh_keys_manager.keys_exist()
         if args.ssh_keys:
             if (
                 not ssh_keys_exist
-                and logger.prompt_bool(
+                and ctx.logger.prompt_bool(
                     "No SSH keys detected. Would you like to create SSH keys?"
                 )
             ) or (
                 ssh_keys_exist
-                and logger.prompt_bool(
+                and ctx.logger.prompt_bool(
                     "Existing SSH keys detected. Would you still like to create new ones?"
                 )
             ):
                 ssh_keys_manager.setup_keys()
-            logger.newline()
+            ctx.logger.newline()
 
         # Set up Git Credentials
         git_credentials_manager = GitCredentialsManager()
@@ -336,20 +335,20 @@ def main(argv, prog, description):
         if args.git_credentials:
             if (
                 not git_credentials_exist
-                and logger.prompt_bool(
+                and ctx.logger.prompt_bool(
                     "Git user name/email not set. Would you like to set them up?"
                 )
             ) or (
                 git_credentials_exist
-                and logger.prompt_bool(
+                and ctx.logger.prompt_bool(
                     f"Git user name/email already set (to '{git_credentials_manager.user_name}' resp. '{git_credentials_manager.user_email}'). Would you like to update them?"
                 )
             ):
                 git_credentials_manager.setup_credentials()
-            logger.newline()
+            ctx.logger.newline()
 
         # Print Secure Boot disabling steps
-        if args.disable_secure_boot and logger.prompt_bool(
+        if args.disable_secure_boot and ctx.logger.prompt_bool(
             "Would you like to see the steps to disable Secure Boot in UEFI/BIOS?"
         ):
             print_secure_boot_steps()

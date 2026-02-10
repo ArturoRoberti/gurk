@@ -1,12 +1,12 @@
 try:
-    from gurk.lib.logger import allow_missing_logger
-    from gurk.lib.utils.configs import load_yaml
-    from gurk.lib.utils.plugins import (
-        get_combined_plugin_tasks,
+    from gurk.lib.core.context import GurkContext
+    from gurk.lib.core.plugins import (
+        get_available_plugin_tasks,
         install_plugin,
         iter_configs,
         iter_scripts,
     )
+    from gurk.lib.utils.configs import load_yaml
     from gurk.lib.utils.remotes import get_commit_timestamp
     from gurk.lib.utils.scripts import ScriptBlockTypes, get_block_spans
     from gurk.lib.utils.tasks import RUNNER_SPECIFIC_TASKS
@@ -179,7 +179,7 @@ def compute_affected_tasks() -> list[str]:
             affected_config_files.add(file_path.name)
 
     # Determine affected tasks
-    tasks = get_combined_plugin_tasks()
+    tasks = get_available_plugin_tasks()
     affected_tasks: set[str] = set()
     for task_name, task in tasks.items():
         # Affected script block
@@ -237,7 +237,7 @@ if __name__ == "__main__":
         )
 
     # Compute affected tasks from git diff
-    with allow_missing_logger():
+    with GurkContext(logger=None, writable=False):
         affected_tasks = compute_affected_tasks()
 
     # Write to GitHub Actions env

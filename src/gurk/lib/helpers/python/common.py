@@ -3,7 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal
 
-from gurk.lib.logger import Logger
+from gurk.lib.core.context import Logger
 from gurk.lib.utils.interface import (
     PACKAGE_BASH_HELPERS_PATH,
     run_script_function,

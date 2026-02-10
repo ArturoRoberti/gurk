@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from gurk.lib.logger import get_logger
+from gurk.lib.core.context import get_logger
 from gurk.lib.utils.common import SETUP_DONE_FILE
 
 

@@ -1,10 +1,13 @@
 import shutil
+import traceback
 from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import IO, Any
+from typing import IO, Any, Literal, TypedDict, TypeVar, overload
 
 from rich import print as richprint
 from rich.console import Console
@@ -20,24 +23,145 @@ from rich.prompt import Confirm, Prompt
 
 from gurk.lib.utils.common import NO_ANSWERS, YES_ANSWERS
 
-from .utils import LoggerEnum, LoggerSeverity, TaskInfos, TaskTerminationType
+
+@dataclass(frozen=True)
+class LoggerTextSpec:
+    """
+    Text specification for logger enums.
+
+    NOTE: Not all colors support additional tweaks such as "bold" or "bright" (etc.). Look at all available colors
+          via the rich.color.ANSI_COLOR_NAMES list (from rich.color import ANSI_COLOR_NAMES; print(ANSI_COLOR_NAMES))
+    """
+
+    # fmt: off
+    label:  str
+    color:  str
+    bold:   bool
+    bright: bool
+    # fmt: on
 
 
+class LoggerEnumBase(Enum):
+    """
+    Base class for logger enums with text specifications.
+    """
+
+    value: LoggerTextSpec
+
+    @property
+    def label(self) -> str:
+        return self.value.label
+
+    @property
+    def color(self) -> str:
+        return self.value.color
+
+    @property
+    def bold(self) -> bool:
+        return self.value.bold
+
+    @property
+    def bright(self) -> bool:
+        return self.value.bright
+
+
+class TaskTerminationType(LoggerEnumBase):
+    """
+    Types of task termination statuses.
+    """
+
+    # fmt: off
+    SUCCESS = LoggerTextSpec("Success", "green"  , False, False)
+    FAILURE = LoggerTextSpec("Failure", "red"    , False, False)
+    SKIPPED = LoggerTextSpec("Skipped", "yellow" , False, False)
+    PARTIAL = LoggerTextSpec("Partial", "orange1", False, False)
+    # fmt: on
+
+
+class LoggerSeverity(LoggerEnumBase):
+    """
+    Severity levels for logging messages.
+    """
+
+    # fmt: off
+    DEBUG   = LoggerTextSpec(" DEBUG ", "cyan",    False, False)
+    INFO    = LoggerTextSpec("  INFO ", "blue",    False, False)
+    WARNING = LoggerTextSpec("WARNING", "orange1", False, False)
+    ERROR   = LoggerTextSpec(" ERROR ", "red",     False, False)
+    FATAL   = LoggerTextSpec(" FATAL ", "red",     True , True )
+    DONE    = LoggerTextSpec("  DONE ", "purple",  True , False)
+    # fmt: on
+
+
+LoggerEnum = TypeVar("LoggerEnum", bound=LoggerEnumBase)
+
+
+_current_logger = ContextVar("current_logger", default=None)
+
+
+class DummyLogger:
+    """A dummy logger that replaces Logger functions when not initialized."""
+
+    def __init__(self):
+        self._token = None
+
+    def __enter__(self):
+        # make this globally visible
+        self._token = _current_logger.set(self)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # restore previous logger
+        _current_logger.reset(self._token)
+
+        # propagate exceptions
+        return False
+
+    def __getattr__(self, name):
+        # Do nothing for any logger calls
+        pass
+
+    def __repr__(self):
+        return "<Dummy Logger>"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+# TODO: Use as
+# ```
+# with GurkContext(logger=..., writable=...) as ctx:
+#     logger = ctx.logger  # Mimics/Calls get_logger() i.e. raises if not set
+# ```
 @dataclass
 class Logger:
     """Logger with progress tracking and rich-formatted output."""
 
+    class TaskInfo(TypedDict):
+        """
+        Information about a logged task.
+        """
+
+        # fmt: off
+        name:      str
+        total:     int
+        completed: int
+        logfile:   Path | None
+        # fmt: on
+
     # fmt: off
-    verbose:         bool      = field()
-    non_interactive: bool      = field()
+    verbose:         bool = field()
+    non_interactive: bool = field()
 
-    logdir:          Path      = field(init=False)
-    task_infos:      TaskInfos = field(init=False, repr=False, default_factory=dict)
+    _logdir:         Path = field(init=False)
+    _tasks_lock:     Lock = field(init=False, repr=False, default_factory=Lock)
+    _task_infos:     dict[TaskID, TaskInfo] = field(init=False, repr=False, default_factory=dict)
 
-    _tasks_lock:     Lock      = field(init=False, repr=False, default_factory=Lock)
-    _console_out:    Console   = field(init=False, repr=False)
-    _console_err:    Console   = field(init=False, repr=False)
-    _progress:       Progress  = field(init=False, repr=False)
+    _console_out:    Console  = field(init=False, repr=False)
+    _console_err:    Console  = field(init=False, repr=False)
+    _progress:       Progress = field(init=False, repr=False)
+
+    _token:          Token    = field(init=False, repr=False)
     # fmt: on
 
     def __post_init__(self):
@@ -51,7 +175,7 @@ class Logger:
             TextColumn("{task.description}"),
             console=self._console_out,
         )
-        self.logdir = (
+        self._logdir = (
             Path.home()
             / ".gurk"
             / "logs"
@@ -59,18 +183,41 @@ class Logger:
         )
 
     def __enter__(self):
-        self._progress.__enter__()  # start live-render
+        # start live-render
+        self._progress.__enter__()
+
+        # make this globally visible
+        self._token = _current_logger.set(self)
+
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        self._progress.__exit__(exc_type, exc, tb)  # stop live-render
-        return False  # propagate exceptions
+        # restore previous logger
+        _current_logger.reset(self._token)
+
+        # stop live-render
+        self._progress.__exit__(exc_type, exc, tb)
+
+        # no exception or SystemExit → just propagate
+        if exc_type in (None, SystemExit):
+            return False
+
+        # Handle other exceptions
+        if exc_type is KeyboardInterrupt:
+            msg = "Process interrupted by user"
+        else:
+            traceback_str = "".join(
+                traceback.format_exception(exc_type, exc, tb)
+            )
+            msg = f"An Exception occurred: {exc_type.__name__} - {exc}\n\n{traceback_str}"
+        Logger.logrichprint(LoggerSeverity.FATAL, msg)
+        raise SystemExit(1)
 
     def create_log_dir(self) -> None:
         """Create the log directory if it does not exist."""
-        self.logdir.mkdir(parents=True, exist_ok=True)
+        self._logdir.mkdir(parents=True, exist_ok=True)
         if self.verbose:
-            script_logdir = self.logdir / "modified_scripts"
+            script_logdir = self._logdir / "modified_scripts"
             script_logdir.mkdir(parents=True, exist_ok=True)
 
     def log_script(self, script: Path, task_name: str, ext: str) -> None:
@@ -89,7 +236,7 @@ class Logger:
             return
 
         safe_name = task_name.replace("/", "_")
-        dest = self.logdir / "modified_scripts" / f"{safe_name}.{ext}"
+        dest = self._logdir / "modified_scripts" / f"{safe_name}.{ext}"
         shutil.copy2(script, dest)
         self.debug(
             f"Logged modified script for task '{task_name}' to '{dest.as_posix()}'"
@@ -113,7 +260,7 @@ class Logger:
             task_id, description=f"[yellow]⚡Started: {task_name}"
         )
         with self._tasks_lock:
-            self.task_infos[task_id] = {
+            self._task_infos[task_id] = {
                 "name": task_name,
                 "total": total or 0,
                 "completed": 0,
@@ -131,12 +278,12 @@ class Logger:
         :rtype: Path | None
         """
         with self._tasks_lock:
-            if task_id not in self.task_infos:
+            if task_id not in self._task_infos:
                 return None
-            task_info = self.task_infos[task_id]
+            task_info = self._task_infos[task_id]
 
             safe_name = task_info["name"].replace("/", "_")
-            logfile = self.logdir / f"{safe_name}.log"
+            logfile = self._logdir / f"{safe_name}.log"
             task_info["logfile"] = logfile
 
         return logfile
@@ -151,8 +298,8 @@ class Logger:
         :type total: int
         """
         with self._tasks_lock:
-            if task_id in self.task_infos:
-                self.task_infos[task_id]["total"] = total
+            if task_id in self._task_infos:
+                self._task_infos[task_id]["total"] = total
         self._progress.update(task_id, total=total)
 
     def update_task(
@@ -169,9 +316,9 @@ class Logger:
         :type advance: bool
         """
         with self._tasks_lock:
-            if task_id not in self.task_infos:
+            if task_id not in self._task_infos:
                 return
-            task_info = self.task_infos[task_id]
+            task_info = self._task_infos[task_id]
 
             task_name = task_info["name"]
             if (
@@ -292,9 +439,9 @@ class Logger:
         :raises ValueError: If an unknown task termination type is provided
         """
         with self._tasks_lock:
-            if task_id not in self.task_infos:
+            if task_id not in self._task_infos:
                 return
-            task_info = self.task_infos[task_id]
+            task_info = self._task_infos[task_id]
 
             total = task_info["total"]
             if task_info.get("completed", 0) >= total:
@@ -407,6 +554,32 @@ class Logger:
         if bottom:
             Logger.richprint("=" * total_length, color=color, file=file)
 
+    @overload
+    @staticmethod
+    def pprint_dict(
+        dct: dict[str, Any],
+        *,
+        color: str = ...,
+        capitalize: bool = ...,
+        indent: int = ...,
+        indent_step: int = ...,
+        as_str: Literal[False] = ...,
+    ) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def pprint_dict(
+        dct: dict[str, Any],
+        *,
+        color: str = ...,
+        capitalize: bool = ...,
+        indent: int = ...,
+        indent_step: int = ...,
+        as_str: Literal[True] = ...,
+    ) -> str:
+        ...
+
     @staticmethod
     def pprint_dict(
         dct: dict[str, Any],
@@ -415,58 +588,80 @@ class Logger:
         capitalize: bool = False,
         indent: int = 0,
         indent_step: int = 2,
-    ) -> None:
+        as_str: bool = False,
+    ) -> str | None:
         """
         Pretty-print a dictionary of arbitrary depth with aligned keys and colored output.
 
         :param dct: Dictionary to pretty-print
+        :type dct: dict[str, Any]
         :param color: Color name for the keys
+        :type color: str
         :param capitalize: Whether to capitalize string keys
+        :type capitalize: bool
         :param indent: Base indentation (spaces)
+        :type indent: int
         :param indent_step: Spaces added per nesting level
+        :type indent_step: int
+        :param as_str: Whether to return the formatted string instead of printing it
+        :type as_str: bool
+        :return: The formatted string if as_str is True, otherwise None
+        :rtype: str | None
         """
 
         if not isinstance(dct, dict):
-            richprint(f"{' ' * indent}{dct}")
-            return
+            rmsg = f"{' ' * indent}{dct}"
+            if as_str:
+                return f"{rmsg}\n"
+            else:
+                richprint(rmsg)
+                return
 
         maxlen = max((len(str(k)) for k in dct), default=0)
 
+        rmsg = ""
         for k, v in dct.items():
             key = k.capitalize() if capitalize and isinstance(k, str) else k
             pad = " " * indent
             msg = f"{pad}[{color}]{key:<{maxlen}}:[/{color}]"
             if not v:
-                msg += f" {repr(v)}"
-                richprint(msg)
+                rmsg += f"{msg} {repr(v)}\n"
                 continue
 
             if isinstance(v, dict):
-                richprint(msg)
-                Logger.pprint_dict(
+                rmsg += f"{msg}\n"
+                rmsg += Logger.pprint_dict(
                     v,
                     color=color,
                     capitalize=capitalize,
                     indent=indent + indent_step,
                     indent_step=indent_step,
+                    as_str=True,
                 )
+                continue
 
             elif isinstance(v, (list, tuple, set)):
                 richprint(msg)
                 for item in v:
                     if isinstance(item, dict):
-                        Logger.pprint_dict(
+                        rmsg += Logger.pprint_dict(
                             item,
                             color=color,
                             capitalize=capitalize,
                             indent=indent + indent_step,
                             indent_step=indent_step,
+                            as_str=True,
                         )
                     else:
-                        richprint(f"{' ' * (indent + indent_step)}- {item}")
+                        rmsg += f"{' ' * (indent + indent_step)}- {item}\n"
 
             else:
-                richprint(f"{msg} {v}")
+                rmsg += f"{msg} {v}\n"
+
+        if as_str:
+            return rmsg
+        else:
+            richprint(rmsg)
 
     @staticmethod
     def newline() -> None:
@@ -581,3 +776,18 @@ class Logger:
             return Prompt.ask(
                 f"{message}", console=self._console_out, password=password
             )
+
+
+def get_logger() -> Logger | DummyLogger:
+    """
+    Get the currently active logger, if set.
+
+    :return: The currently active logger
+    :rtype: Logger
+    :raises RuntimeError: If no logger is initialized
+    """
+    logger = _current_logger.get()
+    if logger is None:
+        raise RuntimeError("Logger not initialized")
+
+    return logger

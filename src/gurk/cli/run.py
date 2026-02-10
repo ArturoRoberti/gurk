@@ -3,18 +3,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from gurk.lib.core import core
-from gurk.lib.logger import ActiveLogger, Logger, allow_missing_logger
-from gurk.lib.utils.configs import load_toml
-from gurk.lib.utils.plugins import (
+from gurk.lib.core import run
+from gurk.lib.core.context import GurkContext, Logger
+from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
     PluginSpecificationEnum,
     get_plugin_data,
+    get_raw_plugin_manifest,
     install_plugin,
     is_plugin_installed,
-    load_raw_plugin_manifest,
 )
+from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.remotes import is_git_installed, is_git_repo
 from gurk.lib.utils.tasks import COMMON_RESOLVED_TASK_DICT_FIELDS
 
@@ -116,7 +116,7 @@ def parse_specification(specification: str) -> ParsedSpecification:
 
     # Installed plugin name
     def check_installed_plugin_name(plugin_name: str) -> bool:
-        with allow_missing_logger():
+        with GurkContext(logger=None, writable=False):
             return is_plugin_installed(plugin_name, require_venv=True)
 
     installed_plugin_specification = check_specification_type(
@@ -171,8 +171,9 @@ def main(argv, prog, description):
     args = parser.parse_args(run_argv)
 
     # Execute with active logger
-    logger = Logger(args.verbose, args.non_interactive)
-    with ActiveLogger(logger):
+    with GurkContext(
+        logger=Logger(args.verbose, args.non_interactive), writable=True
+    ) as ctx:
         if args.specification.specification_type in (
             PluginSpecificationEnum.LOCAL_PATH,
             PluginSpecificationEnum.GIT_REMOTE,
@@ -181,7 +182,7 @@ def main(argv, prog, description):
             if not install_plugin(
                 args.specification.plugin, reinstall=args.replace
             ):
-                logger.fatal(
+                ctx.logger.fatal(
                     f"Failed to install plugin from '{args.specification.plugin}'."
                 )
 
@@ -195,7 +196,7 @@ def main(argv, prog, description):
                         Path(args.specification.plugin) / "pyproject.toml"
                     )["project"]["name"]
                 except Exception as e:
-                    logger.fatal(
+                    ctx.logger.fatal(
                         f"Unexpected: Failed to load plugin name from local path '{args.specification.plugin}': {str(e)}"
                     )
             else:
@@ -205,7 +206,7 @@ def main(argv, prog, description):
             if not is_plugin_installed(
                 args.specification.plugin, require_venv=True
             ):
-                logger.fatal(
+                ctx.logger.fatal(
                     f"Plugin '{args.specification.plugin}' is not installed. Please install it first or change its specification."
                 )
 
@@ -214,7 +215,7 @@ def main(argv, prog, description):
 
         # CHECK: Plugin should now be installed
         if not is_plugin_installed(plugin_spec, require_venv=False):
-            logger.fatal(
+            ctx.logger.fatal(
                 f"Unexpected: Plugin '{plugin_spec}' is still not installed."
             )
 
@@ -235,7 +236,7 @@ def main(argv, prog, description):
                     msg += (
                         f" Available tasks are: {list(plugin_tasks.keys())}."
                     )
-                logger.fatal(msg)
+                ctx.logger.fatal(msg)
             ## Define mock option with the specific task enabled
             option = {task_name: {}}
         else:
@@ -243,14 +244,14 @@ def main(argv, prog, description):
             manifest_options = plugin_data["manifest"]["options"]
             option = manifest_options.get(args.specification.option)
             if not option:
-                logger.fatal(
+                ctx.logger.fatal(
                     f"Plugin '{plugin_spec}' does not have a run option specified "
                     f"for '{args.specification.option}'. Available options "
                     f"are: {list(manifest_options.keys())}."
                 )
             ## For any common fields, if they are missing in the raw
             ##  option, remove them (to be filled later) to use defaults
-            raw_plugin_yaml = load_raw_plugin_manifest(plugin_spec)
+            raw_plugin_yaml = get_raw_plugin_manifest(plugin_spec)
             raw_option = raw_plugin_yaml["options"][args.specification.option]
             for (_, task), raw_task in zip(
                 option.items(), raw_option.values()
@@ -271,13 +272,13 @@ def main(argv, prog, description):
         )
 
         # Run task(s)
-        core.main(
+        run.main(
             option=option,
             cli_args=remaining,
             parser_base=task_parser_base,
         )
 
         # Final message
-        logger.done(
+        ctx.logger.done(
             "All tasks completed - You may need to reboot for some changes to take effect"
         )
