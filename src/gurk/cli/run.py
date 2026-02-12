@@ -1,9 +1,10 @@
+import os
 from argparse import ArgumentTypeError
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from gurk.lib.core import run
+from gurk.lib.core import runner
 from gurk.lib.core.context import GurkContext, Logger
 from gurk.lib.core.plugins import (
     DefaultNamespace,
@@ -138,6 +139,7 @@ class RunNamespace(DefaultNamespace):
     # fmt: off
     specification: ParsedSpecification
     replace:       bool
+    askpass:       str | None
     # fmt: on
 
 
@@ -167,6 +169,13 @@ def main(argv, prog, description):
         "--replace",
         action="store_true",
         help="Replace an existing plugin of a different version if it already exists",
+    )
+    parser.add_argument(
+        "-A",
+        "--askpass",
+        type=str,
+        default=os.getenv("SUDO_ASKPASS"),
+        help="Path to a script that echoes the sudo password, used for running tasks that require sudo. Can also be set with the 'SUDO_ASKPASS' environment variable.",
     )
     args = parser.parse_args(run_argv)
 
@@ -286,10 +295,11 @@ def main(argv, prog, description):
         )
 
         # Run task(s)
-        run.main(
+        runner.main(
             option=option,
             cli_args=remaining,
             parser_base=task_parser_base,
+            askpass=args.askpass,
         )
 
         # Final message

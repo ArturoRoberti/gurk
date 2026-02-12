@@ -1,13 +1,11 @@
 import os
-import shutil
 from pathlib import Path
 
 from gurk.lib.core.context import get_logger
 from gurk.lib.core.plugins import GurkArgumentParser
 from gurk.lib.core.processor import Processor
 from gurk.lib.core.scheduler import Scheduler
-from gurk.lib.utils.cli import get_sudo_askpass, prompt_setup
-from gurk.lib.utils.common import IS_GITHUB_RUNNER, generate_random_path
+from gurk.lib.utils.runner import check_askpass, get_sudo_askpass, prompt_setup
 from gurk.lib.utils.system_info import get_system_info
 from gurk.lib.utils.tasks import CustomTaskDictCollection
 
@@ -35,11 +33,11 @@ def main(
     logger = get_logger()
 
     # Set default values in case of early exception
-    cloned_config_dir, askpass_path = None, None
+    askpass_path = None
 
     try:
         # Prompt to run the 'setup' command upon first usage
-        if not logger.non_interactive or IS_GITHUB_RUNNER:
+        if not logger.non_interactive:
             prompt_setup()
 
         # Check system information
@@ -52,28 +50,18 @@ def main(
         # Load option and process tasks
         processor = Processor(option, cli_args, parser_base)
 
-        # Prompt for sudo password
-        if not IS_GITHUB_RUNNER:
-            non_interactive = logger.non_interactive
-
-            if non_interactive:
-                logger.warning(
-                    "sudo access is required to run tasks. "
-                    "Non-interactive mode is not supported for this yet."
+        # Get sudo password
+        if not check_askpass():
+            if logger.non_interactive:
+                logger.fatal(
+                    "sudo access is required to run tasks. Please set the "
+                    "'SUDO_ASKPASS' environment variable or run in interactive mode."
                 )
-
-                # TEMPORARY: enable logger interactive mode to get password
-                logger.non_interactive = False
-
+            # Prompt for sudo password
             askpass_path = get_sudo_askpass()
-
-            # TEMPORARY: restore non-interactive mode
-            if non_interactive:
-                logger.non_interactive = True
         else:
-            # In GitHub Actions, sudo is available without a
-            #   password, thus a mock askpass script suffices
-            askpass_path = generate_random_path(suffix=".sh")
+            # Get existing askpass path
+            askpass_path = os.getenv("SUDO_ASKPASS")
 
         # Schedule and run tasks (where possible, in parallel)
         scheduler = Scheduler(processor.tasks, askpass_path)
@@ -90,6 +78,3 @@ def main(
         # Remove temporary sudo askpass file
         if askpass_path is not None and Path(askpass_path).is_file():
             os.remove(askpass_path)
-        # Remove cloned config directory if applicable
-        if cloned_config_dir is not None and cloned_config_dir.is_dir():
-            shutil.rmtree(cloned_config_dir)

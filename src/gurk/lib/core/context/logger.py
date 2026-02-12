@@ -105,6 +105,8 @@ class DummyLogger:
 
     def __init__(self):
         self._token = None
+        self.verbose = False
+        self.non_interactive = True
 
     def __enter__(self):
         # make this globally visible
@@ -231,7 +233,7 @@ class Logger:
                 traceback.format_exception(exc_type, exc, tb)
             )
             msg = f"An Exception occurred: {exc_type.__name__} - {exc}\n\n{traceback_str}"
-        Logger.logrichprint(LoggerSeverity.FATAL, msg)
+        self.logrichprint(LoggerSeverity.FATAL, msg)
         raise SystemExit(1)
 
     def log_script(self, script: Path, task_name: str, ext: str) -> None:
@@ -444,11 +446,6 @@ class Logger:
             #   print a simple message to stderr and exit
             print(f"Logging failed: {e}", file=sys.stderr)
 
-        if severity == LoggerSeverity.DONE:
-            raise SystemExit(0)
-        elif severity == LoggerSeverity.FATAL:
-            raise SystemExit(1)
-
     def debug(self, message: str, syntax_highlight: bool = True) -> None:
         """Log a debug message. See Logger.log for details."""
         self.log(LoggerSeverity.DEBUG, message, syntax_highlight)
@@ -466,12 +463,14 @@ class Logger:
         self.log(LoggerSeverity.ERROR, message, syntax_highlight)
 
     def fatal(self, message: str, syntax_highlight: bool = True) -> None:
-        """Log a fatal message and exit. See Logger.log for details."""
+        """Log a fatal message and exit(1). See Logger.log for details."""
         self.log(LoggerSeverity.FATAL, message, syntax_highlight)
+        raise SystemExit(1)
 
     def done(self, message: str, syntax_highlight: bool = True) -> None:
-        """Log a done message. See Logger.log for details."""
+        """Log a done message and exit(0). See Logger.log for details."""
         self.log(LoggerSeverity.DONE, message, syntax_highlight)
+        raise SystemExit(0)
 
     def finish_task(
         self,

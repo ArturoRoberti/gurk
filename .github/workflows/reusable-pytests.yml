@@ -28,11 +28,21 @@ jobs:
 
       - name: Run pytest for affected tasks
         run: |
+          # Check affected tasks
           if [ -z "${AFFECTED_TASKS}" ]; then
             echo "No affected tasks. Skipping pytest."
             exit 0
+          else
+            echo "Running pytest for affected tasks: ${AFFECTED_TASKS}"
           fi
 
-          echo "Running pytest for affected tasks: ${AFFECTED_TASKS}"
+          # Create a mock askpass script (no password needed in GitHub Actions)
+          askpass_path=$(mktemp --suffix=".sh")
+          echo '#!/bin/sh' > "$askpass_path"
+          echo 'echo ""' >> "$askpass_path"
+          chmod +x "$askpass_path"
+          export SUDO_ASKPASS="$askpass_path"
+
+          # Run pytest for affected tasks
           gurk init
           gurk pytest -v tests/tasks.py --tasks="${AFFECTED_TASKS}"

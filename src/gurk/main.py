@@ -1,6 +1,7 @@
 import click
 
 from gurk.cli import (
+    _pytest,
     check,
     help,
     init,
@@ -156,16 +157,12 @@ for cmd in ["check", "template"]:
 @main.command(name="pytest", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def pytest_cmd(ctx: click.Context):
-    """Run pytest (able to import this package). Use as you would the normal 'pytest' command."""
-    try:
-        import pytest
-    except ImportError:
-        raise RuntimeError(
-            "'pytest' is not installed. Please install this package with the "
-            "'dev' extras to use this command via: 'pipx install -e .[dev]'"
-        )
-
-    raise SystemExit(pytest.main(ctx.args))
+    """
+    \b
+    Run pytest (able to import this package). Use as you would the normal 'pytest' command.
+      NOTE: Set the 'SUDO_ASKPASS' environment variable to include task-running tests
+    """
+    _pytest.main(argv=ctx.args)
 
 
 for cmd in ["pytest"]:

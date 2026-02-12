@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -8,13 +9,13 @@ import pytest
 import tomllib
 from ruamel.yaml import YAML
 
-from gurk.lib.core import run
-from gurk.lib.core.context import GurkContext, Logger, LoggerSeverity
+from gurk.cli._pytest import check_askpass
+from gurk.lib.core import runner
+from gurk.lib.core.context import GurkContext, Logger
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
 )
-from gurk.lib.utils.common import IS_GITHUB_RUNNER
 from gurk.lib.utils.scripts import check_script_blocks
 
 
@@ -78,12 +79,12 @@ def test_task(task: str) -> None:
                 )
 
     # Run task and capture task results
-    if IS_GITHUB_RUNNER:
+    if check_askpass():
         # For now, only run in GitHub Actions runner to avoid askpass prompts
         captured = []
-        with GurkContext(logger=Logger(True, True), writable=False) as ctx:
+        with GurkContext(logger=Logger(False, True), writable=False) as ctx:
             with pytest.raises(SystemExit) as e:
-                run.main(
+                runner.main(
                     option={task: {}},
                     cli_args=["--force"],
                     parser_base=GurkArgumentParser(
@@ -93,6 +94,7 @@ def test_task(task: str) -> None:
                         add_task_args=False,
                         allow_complex_types=False,
                     ),
+                    askpass=os.getenv("SUDO_ASKPASS"),
                     _captured=captured,
                 )
 
@@ -144,7 +146,7 @@ def test_task(task: str) -> None:
             if failed_tasks:
                 ctx.logger.fatal("Some tasks failed during testing.")
     else:
-        Logger.logrichprint(
-            LoggerSeverity.WARNING,
-            "Skipping task test (not in GitHub Actions runner).",
-        )
+        with GurkContext(logger=Logger(False, True), writable=False) as ctx:
+            ctx.logger.warning(
+                "'SUDO_ASKPASS' is not properly set. Skipping task-running tests."
+            )

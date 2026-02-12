@@ -8,6 +8,31 @@ from gurk.lib.core.context import get_logger
 from gurk.lib.utils.common import SETUP_DONE_FILE
 
 
+def check_askpass() -> bool:
+    """
+    Check that 'SUDO_ASKPASS' environment variable is set to a valid executable script.
+
+    :return: True if 'SUDO_ASKPASS' is properly set, False otherwise
+    :rtype: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    # Check 'SUDO_ASKPASS'
+    askpass = os.getenv("SUDO_ASKPASS")
+    if not askpass:
+        logger.warning("'SUDO_ASKPASS' environment variable is not set")
+        return False
+    elif not Path(askpass).is_file():
+        logger.warning(f"'SUDO_ASKPASS' script '{askpass}' not found")
+        return False
+    elif not os.access(askpass, os.X_OK):
+        logger.warning(f"'SUDO_ASKPASS' script '{askpass}' is not executable")
+        return False
+
+    return True
+
+
 def get_sudo_askpass() -> Path:
     """
     Create a temporary sudo askpass script that provides the user's sudo password.

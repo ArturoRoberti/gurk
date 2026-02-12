@@ -6,7 +6,7 @@ from textwrap import dedent
 
 from gurk.lib.core.context import GurkContext, Logger, get_logger
 from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
-from gurk.lib.utils.cli import SETUP_DONE_FILE
+from gurk.lib.utils.common import SETUP_DONE_FILE
 from gurk.lib.utils.system_info import get_manufacturer
 
 

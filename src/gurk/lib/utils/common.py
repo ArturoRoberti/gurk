@@ -19,7 +19,6 @@ PACKAGE_HOME_PATH = Path.home() / ".gurk"
 PACKAGE_VENVS_PATH = PACKAGE_HOME_PATH / "venvs"
 PACKAGE_CACHE_PATH = Path.home() / ".cache" / "gurk"
 SETUP_DONE_FILE = PACKAGE_HOME_PATH / "setup.done"
-IS_GITHUB_RUNNER = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 PACKAGE_VENVS_PATH.mkdir(parents=True, exist_ok=True)
