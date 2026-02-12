@@ -38,7 +38,7 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
-    # Execute with active logger
+    # Execute without writing to plugins
     with GurkContext(
         logger=Logger(args.verbose, args.non_interactive), writable=False
     ) as ctx:

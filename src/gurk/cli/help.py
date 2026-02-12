@@ -74,7 +74,7 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
-    # Execute with active logger
+    # Execute without writing to plugins
     with GurkContext(logger=Logger(False, False), writable=False) as ctx:
         # Print help about gurk itself
         if not any(vars(args).values()):

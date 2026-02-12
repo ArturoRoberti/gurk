@@ -16,7 +16,7 @@ parse_task_args() {
 	Returns:
 	  0 if successfully parsed, 1 otherwise
 	"
-	local args="$(printf "'%s'," "$@" | sed 's/,$//')" # Python list syntax
+	local args="[$(printf "'%s'," "$@" | sed 's/,$//')]" # Python list syntax
 	local argparser=$(mktemp 2>/dev/null || mktemp -t argparser)
 	cat >>"$argparser" <<EOF
 import sys

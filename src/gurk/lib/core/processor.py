@@ -142,10 +142,6 @@ class Processor:
         # Prepend system preparation task
         tasks = self.add_preparation_task(tasks)
 
-        # Create logging directory
-        logger.create_log_dir()
-        logger.debug(f"Created logging directory at '{logger.logdir}'")
-
         # Convert to ResolvedTask list
         for task_name, task in tasks.items():
             if task_name not in self.option:

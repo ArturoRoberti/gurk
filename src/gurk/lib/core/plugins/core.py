@@ -44,6 +44,7 @@ from .versioning import get_plugin_commit
 #########################################################################################
 
 
+# TODO: Version/commit check?
 def is_plugin_installed(
     plugin: PluginSpecification, *, require_venv: bool = True
 ) -> bool:
@@ -707,11 +708,12 @@ def install_plugin(
                 return False
         else:
             # Install the plugin venv if it doesn't exist
-            if not venv_exists(plugin_spec):
+            plugin_name = plugin_data["metadata"]["name"]
+            if not venv_exists(plugin_name):
                 logger.info(
                     f"Plugin '{plugin_spec}' is already installed but has no virtual environment. Creating venv..."
                 )
-                if not create_plugin_venv(plugin_data["metadata"]["name"]):
+                if not create_plugin_venv(plugin_name):
                     logger.error(
                         f"Failed to create virtual environment for plugin '{plugin_spec}'."
                     )

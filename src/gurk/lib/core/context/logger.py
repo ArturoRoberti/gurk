@@ -1,4 +1,5 @@
 import shutil
+import sys
 import traceback
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -119,7 +120,10 @@ class DummyLogger:
 
     def __getattr__(self, name):
         # Do nothing for any logger calls
-        pass
+        def noop(*args, **kwargs):
+            pass
+
+        return noop
 
     def __repr__(self):
         return "<Dummy Logger>"
@@ -128,11 +132,6 @@ class DummyLogger:
         return self.__repr__()
 
 
-# TODO: Use as
-# ```
-# with GurkContext(logger=..., writable=...) as ctx:
-#     logger = ctx.logger  # Mimics/Calls get_logger() i.e. raises if not set
-# ```
 @dataclass
 class Logger:
     """Logger with progress tracking and rich-formatted output."""
@@ -152,6 +151,7 @@ class Logger:
     # fmt: off
     verbose:         bool = field()
     non_interactive: bool = field()
+    log_to_msg:      str | None = field(default="")  # Optional logging purpose description. None to disable logging to disk.
 
     _logdir:         Path = field(init=False)
     _tasks_lock:     Lock = field(init=False, repr=False, default_factory=Lock)
@@ -165,22 +165,36 @@ class Logger:
     # fmt: on
 
     def __post_init__(self):
+        # Rich consoles for output and error
         self._console_out = Console(log_path=False, log_time=False)
         self._console_err = Console(
             log_path=False, log_time=False, stderr=True
         )
+
+        # Rich progress tracker
         self._progress = Progress(
             TimeElapsedColumn(),
             BarColumn(),
             TextColumn("{task.description}"),
             console=self._console_out,
         )
-        self._logdir = (
-            Path.home()
-            / ".gurk"
-            / "logs"
-            / datetime.now().strftime("%Y%m%d_%H%M%S")
-        )
+
+        if self.log_to_msg is not None:
+            # Logging directory
+            self._logdir = (
+                Path.home()
+                / ".gurk"
+                / "logs"
+                / datetime.now().strftime("%Y%m%d_%H%M%S")
+            )
+            self._logdir.mkdir(parents=True, exist_ok=True)
+            if self.verbose:
+                script_logdir = self._logdir / "modified_scripts"
+                script_logdir.mkdir(parents=True, exist_ok=True)
+
+            # Main logfile
+            self._logfile = self._logdir / "full.log"
+            self._logfile.touch(exist_ok=True)
 
     def __enter__(self):
         # start live-render
@@ -188,6 +202,13 @@ class Logger:
 
         # make this globally visible
         self._token = _current_logger.set(self)
+
+        # Print logfile
+        if self.log_to_msg is not None:
+            msg = f"Logging to: {self._logfile}"
+            if self.log_to_msg:
+                msg = f"{self.log_to_msg} - {msg}"
+            self.info(msg)
 
         return self
 
@@ -213,13 +234,6 @@ class Logger:
         Logger.logrichprint(LoggerSeverity.FATAL, msg)
         raise SystemExit(1)
 
-    def create_log_dir(self) -> None:
-        """Create the log directory if it does not exist."""
-        self._logdir.mkdir(parents=True, exist_ok=True)
-        if self.verbose:
-            script_logdir = self._logdir / "modified_scripts"
-            script_logdir.mkdir(parents=True, exist_ok=True)
-
     def log_script(self, script: Path, task_name: str, ext: str) -> None:
         """
         Save the given script to the log directory under 'modified_scripts'.
@@ -233,6 +247,12 @@ class Logger:
         """
         if not self.verbose:
             # Don't log scripts if not in verbose mode
+            return
+        if self.log_to_msg is None:
+            # Can't log scripts if not logging to disk
+            self.warning(
+                f"Cannot log modified script for task '{task_name}' because 'log_to_msg' is None."
+            )
             return
 
         safe_name = task_name.replace("/", "_")
@@ -277,6 +297,12 @@ class Logger:
         :return: The path to the logfile, or None if task not found
         :rtype: Path | None
         """
+        if self.log_to_msg is None:
+            self.warning(
+                f"Cannot generate logfile path for task ID {task_id} because 'log_to_msg' is None."
+            )
+            return None
+
         with self._tasks_lock:
             if task_id not in self._task_infos:
                 return None
@@ -374,26 +400,49 @@ class Logger:
         :param syntax_highlight: Whether to apply syntax highlighting
         :type syntax_highlight: bool
         """
-        if severity == LoggerSeverity.DEBUG and not self.verbose:
-            return
-        elif severity in (LoggerSeverity.ERROR, LoggerSeverity.FATAL):
+        if severity in (LoggerSeverity.ERROR, LoggerSeverity.FATAL):
             console = self._console_err
         else:
             console = self._console_out
 
-        lines = message.splitlines()
-        if lines:
+        def _log_first(line: str, enriched: bool = True) -> str:
             # First line: include the severity tag
-            console.log(
-                f"{self.logstart(severity)} {lines[0]}",
-                highlight=syntax_highlight,
+            return (
+                f"{self.logstart(severity)} {line}"
+                if enriched
+                else f"[{severity.label}] {line}"
             )
+
+        def _log_cont(line: str) -> str:
             # Remaining lines: indent under the tag
-            for line in lines[1:]:
-                console.log(
-                    f"{' ' * (len(severity.label) + 3)}{line}",
-                    highlight=syntax_highlight,
-                )  # +3 accounts for the brackets and space
+            #   NOTE: +3 accounts for the brackets and space
+            return f"{' ' * (len(severity.label) + 3)}{line}"
+
+        try:
+            lines = str(message).splitlines()
+            if lines:
+                if not (severity == LoggerSeverity.DEBUG and not self.verbose):
+                    # Console logging
+                    console.log(
+                        _log_first(lines[0]),
+                        highlight=syntax_highlight,
+                    )
+                    for line in lines[1:]:
+                        console.log(
+                            _log_cont(line),
+                            highlight=syntax_highlight,
+                        )
+
+                # Main logfile logging
+                if self.log_to_msg is not None:
+                    with self._logfile.open("a", encoding="utf-8") as f:
+                        f.write(f"{_log_first(lines[0], enriched=False)}\n")
+                        for line in lines[1:]:
+                            f.write(f"{_log_cont(line)}\n")
+        except Exception as e:
+            # Logging should never stop execution. In case,
+            #   print a simple message to stderr and exit
+            print(f"Logging failed: {e}", file=sys.stderr)
 
         if severity == LoggerSeverity.DONE:
             raise SystemExit(0)

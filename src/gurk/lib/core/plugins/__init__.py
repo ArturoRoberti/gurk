@@ -26,7 +26,7 @@ from .gurk_argparser import (
     TaskParserNamespace,
 )
 from .versioning import get_plugin_version
-from .virtual_environments import venv_exists
+from .virtual_environments import remove_venv, venv_exists
 
 __all__ = [
     "is_plugin_installed",
@@ -50,4 +50,5 @@ __all__ = [
     "TaskParserNamespace",
     "PluginMetadata",
     "venv_exists",
+    "remove_venv",
 ]

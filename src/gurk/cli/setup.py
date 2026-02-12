@@ -309,7 +309,7 @@ def main(argv, prog, description):
         for flag in flags:
             flags[flag] = True
 
-    # Execute with active logger
+    # Execute without writing to plugins
     with GurkContext(logger=Logger(False, False), writable=False) as ctx:
         # Set up SSH keys
         ssh_keys_manager = SSHKeysManager()

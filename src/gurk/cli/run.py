@@ -112,7 +112,7 @@ def parse_specification(specification: str) -> ParsedSpecification:
             return git_remote_specification
         git_msg = ""
     else:
-        git_msg = "(NOTE: Git is not installed, so it cannot be used for plugin specifications) "
+        git_msg = " (NOTE: Git is not installed, so it cannot be used for plugin specifications) "
 
     # Installed plugin name
     def check_installed_plugin_name(plugin_name: str) -> bool:
@@ -128,7 +128,7 @@ def parse_specification(specification: str) -> ParsedSpecification:
     # If none of the above checks succeeded, raise an error
     raise ArgumentTypeError(
         f"Invalid PluginSpecification '{specification}': Could not parse "
-        f"plugin specification {git_msg}. Please specify a valid plugin "
+        f"plugin specification{git_msg}. Please specify an installed plugin "
         "name, remote Git repository, or local directory, optionally "
         "followed by a task (using '/') or run option (using ':')."
     )
@@ -170,9 +170,14 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(run_argv)
 
-    # Execute with active logger
+    # Execute with writing to plugins
     with GurkContext(
-        logger=Logger(args.verbose, args.non_interactive), writable=True
+        logger=Logger(
+            args.verbose,
+            args.non_interactive,
+            log_to_msg="Processing plugin specification",
+        ),
+        writable=True,
     ) as ctx:
         if args.specification.specification_type in (
             PluginSpecificationEnum.LOCAL_PATH,
@@ -260,10 +265,19 @@ def main(argv, prog, description):
                     if field not in raw_task and field in task:
                         del task[field]
 
+    # Execute without writing to plugins and with writing to logs
+    with GurkContext(
+        logger=Logger(
+            args.verbose,
+            args.non_interactive,
+            log_to_msg="Running specification",
+        ),
+        writable=False,
+    ) as ctx:
         # Generate task argparser base
         task_parser_base = GurkArgumentParser(
-            prog=f"{prog} {args.specification.original}",
-            description=f"Options to run {args.specification.original}",
+            prog=f"{prog} {args.specification.specification}",
+            description=f"Options to run {args.specification.specification}",
             add_verbose_arg=False,
             add_non_interactive_arg=False,
             add_force_arg=True,

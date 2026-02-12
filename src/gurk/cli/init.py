@@ -5,6 +5,7 @@ from gurk.lib.core.plugins import (
     create_plugin_venv,
     install_plugin,
     is_plugin_installed,
+    remove_venv,
     venv_exists,
 )
 
@@ -15,22 +16,27 @@ def main(argv, prog, description):
     )
     args = parser.parse_args(argv)
 
-    # Execute with active logger
+    # Execute with writing to plugins
     with GurkContext(
         logger=Logger(args.verbose, args.non_interactive), writable=True
     ) as ctx:
-        # See if registries and logger are initialized correctly
         combined_registry = get_registries(
             home_registry=True, package_registry=True, combine=True
         )
         for plugin_name, plugin_entry in combined_registry.items():
-            # Check if plugin is already validly installed
-            if is_plugin_installed(plugin_name, require_venv=True):
+            # Remove plugin venv (if any) to ensure the current gurk version is installed
+            if venv_exists(plugin_name):
                 ctx.logger.debug(
-                    f"Plugin '{plugin_name}' is already installed. Skipping..."
+                    f"Removing existing virtual environment for plugin '{plugin_name}' to ensure it is re-created with the current gurk version."
                 )
-                continue
-            elif not is_plugin_installed(plugin_name, require_venv=False):
+                if not remove_venv(plugin_name):
+                    ctx.logger.error(
+                        f"Failed to remove existing virtual environment for plugin '{plugin_name}'."
+                    )
+                    return False
+
+            # Check if plugin is already validly installed
+            if not is_plugin_installed(plugin_name, require_venv=False):
                 if plugin_entry.get("remote"):
                     # Pull plugin (and remove any existing invalid plugin) if not installed
                     source = plugin_entry["remote"]
@@ -55,17 +61,12 @@ def main(argv, prog, description):
                 )
                 continue
 
-            # Create plugin venv if necessary
-            if not venv_exists(plugin_name) and plugin_name != "gurk":
-                # Create venv
+            # Create plugin venv
+            if plugin_name != "gurk":
                 if not create_plugin_venv(plugin_name):
                     ctx.logger.error(
                         f"Failed to create virtual environment for plugin '{plugin_name}'",
                     )
                     continue
-                else:
-                    ctx.logger.info(
-                        f"Successfully created venv for local plugin '{plugin_name}'."
-                    )
 
         ctx.logger.done("Initialization complete.")
