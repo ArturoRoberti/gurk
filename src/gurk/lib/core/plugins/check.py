@@ -6,7 +6,7 @@ from typing import get_type_hints
 import networkx as nx
 
 from gurk.lib.core.context import get_logger
-from gurk.lib.core.context.registry_manager import get_plugin_registration
+from gurk.lib.core.context.registry_queries import get_plugin_registration
 from gurk.lib.utils.common import PathLike, check_version
 from gurk.lib.utils.configs import load_toml, load_yaml
 from gurk.lib.utils.patterns import PatternCollection

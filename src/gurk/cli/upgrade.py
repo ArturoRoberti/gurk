@@ -16,9 +16,6 @@ from gurk.lib.utils.remotes import (
     is_git_installed,
 )
 
-# TODO: Only upgrade if relevant files have changed (except for pyproject.toml)
-
-
 class UpgradeNamespace(DefaultNamespace):
     plugins: list[str]
     exclude: list[str] | None

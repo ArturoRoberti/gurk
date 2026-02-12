@@ -1,9 +1,9 @@
 from enum import Enum, auto
 from typing import NotRequired, TypeAlias, TypedDict
 
-from gurk.lib.core.context.registry_manager import PluginRegistryEntry
+from gurk.lib.core.context.registry_types import PluginRegistryEntry
 from gurk.lib.utils.common import PathLike
-from gurk.lib.utils.remotes import GitQuery
+from gurk.lib.utils.git_query import GitQuery
 from gurk.lib.utils.tasks import (
     CustomTaskDictCollection,
     DefaultTaskDictCollection,

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from gurk.lib.core.context.registry_manager import get_plugin_registration
+from gurk.lib.core.context.registry_queries import get_plugin_registration
 from gurk.lib.utils.common import PathLike, check_version
 from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.remotes import get_commit, parse_git_query

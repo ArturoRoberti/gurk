@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterator
 
-from gurk.lib.core.context.registry_manager import (
+from gurk.lib.core.context.registry_queries import (
     get_available_plugin_names,
     get_plugin_registration,
 )

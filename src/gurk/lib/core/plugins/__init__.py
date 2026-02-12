@@ -6,12 +6,9 @@ from .common import (
     PluginSpecificationEnum,
     ResolvedPluginManifest,
 )
-from .core import (
-    create_plugin_venv,
-    install_plugin,
-    is_plugin_installed,
-    remove_plugin,
-)
+from .core import is_plugin_installed
+from .install import create_plugin_venv, install_plugin
+from .uninstall import remove_plugin
 from .getters import (
     get_available_plugin_tasks,
     get_plugin_data,

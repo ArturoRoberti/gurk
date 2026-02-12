@@ -4,10 +4,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import IO, Any, Literal, TypedDict, TypeVar, overload
+from typing import IO, Any, Literal, TypedDict, overload
 
 from rich import print as richprint
 from rich.console import Console
@@ -23,77 +22,11 @@ from rich.prompt import Confirm, Prompt
 
 from gurk.lib.utils.common import NO_ANSWERS, YES_ANSWERS
 
-
-@dataclass(frozen=True)
-class LoggerTextSpec:
-    """
-    Text specification for logger enums.
-
-    NOTE: Not all colors support additional tweaks such as "bold" or "bright" (etc.). Look at all available colors
-          via the rich.color.ANSI_COLOR_NAMES list (from rich.color import ANSI_COLOR_NAMES; print(ANSI_COLOR_NAMES))
-    """
-
-    # fmt: off
-    label:  str
-    color:  str
-    bold:   bool
-    bright: bool
-    # fmt: on
-
-
-class LoggerEnumBase(Enum):
-    """
-    Base class for logger enums with text specifications.
-    """
-
-    value: LoggerTextSpec
-
-    @property
-    def label(self) -> str:
-        return self.value.label
-
-    @property
-    def color(self) -> str:
-        return self.value.color
-
-    @property
-    def bold(self) -> bool:
-        return self.value.bold
-
-    @property
-    def bright(self) -> bool:
-        return self.value.bright
-
-
-class TaskTerminationType(LoggerEnumBase):
-    """
-    Types of task termination statuses.
-    """
-
-    # fmt: off
-    SUCCESS = LoggerTextSpec("Success", "green"  , False, False)
-    FAILURE = LoggerTextSpec("Failure", "red"    , False, False)
-    SKIPPED = LoggerTextSpec("Skipped", "yellow" , False, False)
-    PARTIAL = LoggerTextSpec("Partial", "orange1", False, False)
-    # fmt: on
-
-
-class LoggerSeverity(LoggerEnumBase):
-    """
-    Severity levels for logging messages.
-    """
-
-    # fmt: off
-    DEBUG   = LoggerTextSpec(" DEBUG ", "cyan",    False, False)
-    INFO    = LoggerTextSpec("  INFO ", "blue",    False, False)
-    WARNING = LoggerTextSpec("WARNING", "orange1", False, False)
-    ERROR   = LoggerTextSpec(" ERROR ", "red",     False, False)
-    FATAL   = LoggerTextSpec(" FATAL ", "red",     True , True )
-    DONE    = LoggerTextSpec("  DONE ", "purple",  True , False)
-    # fmt: on
-
-
-LoggerEnum = TypeVar("LoggerEnum", bound=LoggerEnumBase)
+from .logger_types import (
+    LoggerEnum,
+    LoggerSeverity,
+    TaskTerminationType,
+)
 
 
 _current_logger = ContextVar("current_logger", default=None)
@@ -128,11 +61,6 @@ class DummyLogger:
         return self.__repr__()
 
 
-# TODO: Use as
-# ```
-# with GurkContext(logger=..., writable=...) as ctx:
-#     logger = ctx.logger  # Mimics/Calls get_logger() i.e. raises if not set
-# ```
 @dataclass
 class Logger:
     """Logger with progress tracking and rich-formatted output."""
