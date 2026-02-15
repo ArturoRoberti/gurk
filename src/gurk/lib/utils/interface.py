@@ -9,6 +9,7 @@ from gurk.lib.utils.common import (
     PIPX_PYTHON_PATH,
     CommandKind,
     PathLike,
+    typecheck,
 )
 from gurk.lib.utils.scripts import Command
 
@@ -35,6 +36,7 @@ def run_script_function(
     ...
 
 
+@typecheck
 def run_script_function(
     script: PathLike,
     function: None | str = None,
@@ -91,6 +93,7 @@ def run_script_function(
         )
 
 
+@typecheck
 def _run_bash_script_function(
     script: PathLike,
     function: None | str,
@@ -172,6 +175,7 @@ def _run_bash_script_function(
     return wrapper_src
 
 
+@typecheck
 def _run_python_script_function(
     script: PathLike,
     function: None | str,
@@ -247,6 +251,7 @@ def _run_python_script_function(
     return wrapper_src
 
 
+@typecheck
 def revert_sudo_permissions(path: PathLike) -> None:
     """
     Revert sudo permissions on the specified path using bash helper.

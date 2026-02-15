@@ -4,9 +4,14 @@ from subprocess import DEVNULL, CalledProcessError, check_call
 from venv import EnvBuilder
 
 from gurk.lib.core.context import get_logger
-from gurk.lib.utils.common import PACKAGE_SRC_PATH, PACKAGE_VENVS_PATH
+from gurk.lib.utils.common import (
+    PACKAGE_SRC_PATH,
+    PACKAGE_VENVS_PATH,
+    typecheck,
+)
 
 
+@typecheck
 def _get_venv_dir(plugin_name: str) -> Path:
     """
     Get the path to the virtual environment directory for a plugin.
@@ -19,6 +24,7 @@ def _get_venv_dir(plugin_name: str) -> Path:
     return PACKAGE_VENVS_PATH / plugin_name
 
 
+@typecheck
 def venv_exists(venv_name: str) -> bool:
     """
     Check if a virtual environment exists for a plugin.
@@ -31,6 +37,7 @@ def venv_exists(venv_name: str) -> bool:
     return _get_venv_dir(venv_name).is_dir()
 
 
+@typecheck
 def create_venv(venv_name: str, dependencies: list[str]) -> bool:
     """
     Create a virtual environment for a plugin and install its dependencies.
@@ -69,18 +76,20 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
     try:
         check_call([pip_bin, "install", "--upgrade", "pip"], stdout=DEVNULL)
         check_call([pip_bin, "install", *all_dependencies], stdout=DEVNULL)
-    except CalledProcessError as e:
+    except (KeyboardInterrupt, CalledProcessError) as e:
         logger.error(
             f"Failed to install dependencies for virtual environment '{venv_name}': {e}"
         )
+        remove_venv(venv_name)
         return False
 
-    logger.info(
+    logger.success(
         f"Successfully created virtual environment for plugin '{venv_name}'"
     )
     return True
 
 
+@typecheck
 def remove_venv(venv_name: str) -> bool:
     """
     Remove the virtual environment for a plugin, if it exists.

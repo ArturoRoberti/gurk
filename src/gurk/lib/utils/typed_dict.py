@@ -3,240 +3,95 @@ from typing import (
     Any,
     Literal,
     NotRequired,
+    TypeGuard,
+    TypeVar,
     Union,
     get_args,
     get_origin,
     get_type_hints,
+    is_typeddict,
     overload,
 )
 
+from pydantic import TypeAdapter, ValidationError
+
+from gurk.lib.utils.common import typecheck
 
 #################################################################################################################
 ##################################################### Check #####################################################
 #################################################################################################################
-def _is_typed_dict(tp: Any) -> bool:
-    """
-    Check if a type is a TypedDict.
-
-    :param tp: The type to check.
-    :type tp: Any
-    :return: True if the type is a TypedDict, False otherwise.
-    :rtype: bool
-    """
-    return (
-        isinstance(tp, type)
-        and issubclass(tp, dict)
-        and hasattr(tp, "__annotations__")
-        and hasattr(tp, "__required_keys__")
-    )
+T = TypeVar("T")
 
 
-def is_instance_of_type(value: Any, expected_type: Any) -> bool:
+@typecheck
+def full_isinstance(value: Any, expected_type: type[T]) -> TypeGuard[T]:
     """
     Check if a value is an instance of the expected type.
 
     :param value: The value to check.
     :type value: Any
     :param expected_type: The expected type (can be a plain type, Union, TypedDict, etc.).
-    :type expected_type: Any
+    :type expected_type: type[T]
     :return: True if the value matches the expected type, False otherwise.
     :rtype: bool
     """
-    origin = get_origin(expected_type)
-    args = get_args(expected_type)
-
-    # Handle NotRequired
-    if origin is NotRequired:
-        # The field is optional; only validate type if value is present
-        return is_instance_of_type(value, args[0])
-
-    # TypedDict → recurse
-    if _is_typed_dict(expected_type):
-        return validate_typed_dict(value, expected_type)
-
-    # Plain types (int, str, bool, etc.)
-    if origin is None:
-        return isinstance(value, expected_type)
-
-    # Union / Optional
-    if origin is Union or origin is types.UnionType:
-        return any(is_instance_of_type(value, t) for t in args)
-
-    # List / tuple / set
-    if origin in (list, tuple, set):
-        if not isinstance(value, origin):
-            return False
-        if not args:
-            return True
-        return all(is_instance_of_type(v, args[0]) for v in value)
-
-    # Dict[K, V]
-    if origin is dict:
-        if not isinstance(value, dict):
-            return False
-        key_type, val_type = args
-        return all(
-            is_instance_of_type(k, key_type)
-            and is_instance_of_type(v, val_type)
-            for k, v in value.items()
-        )
-
-    return False
-
-
-def _validate_typed_dict_keys(data: dict[str, Any], td_cls: dict) -> bool:
-    """
-    Validate that data has the correct keys for a TypedDict definition.
-
-    :param data: The data dictionary to validate.
-    :type data: dict[str, Any]
-    :param td_cls: The TypedDict class defining the expected keys.
-    :type td_cls: dict
-    :return: True if the keys match the TypedDict definition, False otherwise.
-    :rtype: bool
-    """
-    if not _is_typed_dict(td_cls) or not isinstance(data, dict):
+    adapter = TypeAdapter(expected_type)
+    try:
+        adapter.validate_python(value, strict=True, extra="forbid")
+    except ValidationError:
         return False
-
-    # Check required keys
-    annotations = get_type_hints(td_cls, include_extras=True)
-    required_keys = {
-        k
-        for k, t in annotations.items()
-        if not (get_origin(t) is NotRequired)
-        and (
-            td_cls.__total__
-            or k in getattr(td_cls, "__required_keys__", annotations)
-        )
-    }
-    allowed_keys = annotations.keys()
-    if not (
-        required_keys.issubset(data.keys())
-        and set(data.keys()).issubset(allowed_keys)
-    ):
-        return False
-
-    return True
-
-
-def validate_typed_dict(data: Any, td_cls: dict) -> bool:
-    """
-    Validate that data matches a TypedDict definition.
-
-    :param data: The data to validate.
-    :type data: Any
-    :param td_cls: The TypedDict class defining the expected structure.
-    :type td_cls: dict
-    :return: True if the data matches the TypedDict definition, False otherwise.
-    :rtype: bool
-    """
-    if not _is_typed_dict(td_cls) or not isinstance(data, dict):
-        return False
-
-    # Check required keys
-    if not _validate_typed_dict_keys(data, td_cls):
-        return False
-
-    # Check value types
-    for key, expected_type in get_type_hints(
-        td_cls, include_extras=True
-    ).items():
-        if key in data and not is_instance_of_type(data[key], expected_type):
-            return False
-
-    return True
+    else:
+        return True
 
 
 #################################################################################################################
 ##################################################### Fill ######################################################
 #################################################################################################################
-def _build_default(tp: Any) -> Any:
-    """
-    Build a default value for the given type annotation.
 
-    :param tp: The type annotation.
-    :type tp: Any
-    :return: A default value for the type.
-    :rtype: Any
+
+def fill_typed_dict(data: Any, tp: type[T]) -> T:
+    """
+    Recursively fill a TypedDict (or nested structures containing TypedDicts) with default values.
+
+    :param data: The data to fill (can be a dict or None).
+    :type data: Any
+    :param tp: The TypedDict type to use for filling.
+    :type tp: type[T]
+    :return: The filled data.
+    :rtype: T
     """
     origin = get_origin(tp)
     args = get_args(tp)
 
-    # NotRequired[T]
+    # unwrap NotRequired / Union
     if origin is NotRequired:
-        return _build_default(args[0])
+        return fill_typed_dict(data, args[0])
+    if origin in (Union, types.UnionType):
+        return fill_typed_dict(data, args[0])
 
-    # TypedDict
-    if _is_typed_dict(tp):
-        return fill_typed_dict({}, tp)
-
-    # Union / Optional
-    if origin is Union or origin is types.UnionType:
-        return _build_default(args[0])
-
-    # list[T] | set[T] | tuple[T, ...] | dict[K, V]
-    if origin in {list, set, tuple, dict}:
-        return origin()
-
-    # Plain type
-    return tp() if callable(tp) else None
-
-
-def fill_value(value: Any, annotated_type: Any) -> None:
-    """
-    Fill a value according to its annotated type.
-
-    :param value: The value to fill.
-    :type value: Any
-    :param annotated_type: The annotated type to use for filling.
-    :type annotated_type: Any
-    """
-    origin = get_origin(annotated_type)
-
-    # unwrap NotRequired
-    if origin is NotRequired:
-        annotated_type = get_args(annotated_type)[0]
-        origin = get_origin(annotated_type)
-
-    # TypedDict
-    if _is_typed_dict(annotated_type) and isinstance(value, dict):
-        fill_typed_dict(value, annotated_type)
-        return
+    # TypedDict schema
+    if is_typeddict(tp) and isinstance(data, dict):
+        for key, sub_tp in get_type_hints(tp, include_extras=True).items():
+            if key not in data:
+                data[key] = fill_typed_dict(None, sub_tp)
+            else:
+                data[key] = fill_typed_dict(data[key], sub_tp)
+        return data
 
     # dict[K, V]
-    if origin is dict and isinstance(value, dict):
-        _, val_type = get_args(annotated_type)
-        for v in value.values():
-            fill_value(v, val_type)
-
-
-def fill_typed_dict(data: dict, td_type: dict) -> dict:
-    """
-    Treat TypedDict as a schema:
-    - All fields are created if missing
-    - Nested containers and TypedDicts are recursively materialized
-    - Existing values are preserved
-    """
-    origin = get_origin(td_type)
-    if origin is dict:
-        # If this is a dict[K, V] schema, recurse into values
-        _, val_type = get_args(td_type)
-        for k, v in data.items():
-            if v is None:
-                data[k] = _build_default(val_type)
-            fill_value(data[k], val_type)
-        return data
-    elif not _is_typed_dict(td_type):
-        # Not a TypedDict schema, return as is
+    if origin is dict and isinstance(data, dict):
+        val_tp = args[1]
+        for k in data:
+            data[k] = fill_typed_dict(data[k], val_tp)
         return data
 
-    hints = get_type_hints(td_type, include_extras=True)
-
-    for key, annotated_type in hints.items():
-        if key not in data:
-            data[key] = _build_default(annotated_type)
-        else:
-            fill_value(data[key], annotated_type)
+    # default construction
+    if data is None:
+        if origin in (list, set, tuple, dict):
+            return origin()
+        if is_typeddict(tp):
+            return fill_typed_dict({}, tp)
+        return tp() if callable(tp) else None
 
     return data
 
@@ -264,216 +119,165 @@ def print_typed_dict_types(
     ...
 
 
+@typecheck
 def print_typed_dict_types(
     td: Any, indent: int = 0, as_str: bool = False
 ) -> str | None:
     """
-    Print the types of a TypedDict's fields in a human-readable format.
+    Print the structure of a TypedDict type, including nested TypedDicts.
 
-    :param td: The TypedDict class to print.
+    :param td: The TypedDict type to print.
     :type td: Any
-    :param indent: Indentation level (number of spaces).
+    :param indent: Number of spaces to use for indentation (default: 0).
     :type indent: int
-    :param as_str: Whether to return the formatted string instead of printing it
+    :param as_str: If True, return the output as a string instead of printing it.
     :type as_str: bool
-    :return: The formatted string if as_str is True, otherwise None
+    :return: The formatted string if `as_str` is True, otherwise None.
     :rtype: str | None
     """
-    if not _is_typed_dict(td):
-        rmsg = " " * indent + _type_to_str(td)
-        if as_str:
-            return f"{rmsg}\n"
-        else:
-            print(rmsg)
-            return
 
-    hints = get_type_hints(td, include_extras=True)
-    if not hints:
-        return "" if as_str else None
+    def type_to_str(tp: Any) -> str:
+        """
+        Convert a type annotation to a human-readable string.
 
-    # Prepare fields and compute padding only for inline fields
-    fields = []
-    max_inline = 0
-    for k, ann in hints.items():
-        is_nr = get_origin(ann) is NotRequired
-        core = get_args(ann)[0] if is_nr else ann
-        display = k + (" (NotRequired)" if is_nr else "")
-        inline = _is_inline_type(core)
-        fields.append((display, core, inline))
-        if inline:
-            max_inline = max(max_inline, len(display))
+        :param tp: The type annotation to convert.
+        :type tp: Any
+        :return: The human-readable string representation of the type.
+        :rtype: str
+        """
+        if tp is None or tp is type(None):
+            return "None"
+        if isinstance(tp, type):
+            return tp.__name__
 
-    rmsg = ""
-    for display, tp, inline in fields:
-        key = display.ljust(max_inline) if inline else display
-        rmsg += _print_field(key, tp, indent)
+        origin = get_origin(tp)
+        args = get_args(tp)
+
+        if origin in (list, set, tuple):
+            return f"{origin.__name__}[{type_to_str(args[0])}]"
+        if origin is dict and args:
+            return f"dict[{type_to_str(args[0])}, {type_to_str(args[1])}]"
+        if origin in (Union, types.UnionType):
+            return " | ".join(type_to_str(a) for a in args)
+
+        return str(tp)
+
+    def contains_typeddict(tp: Any) -> bool:
+        """
+        Check if a type annotation contains a TypedDict (directly or nested).
+
+        :param tp: The type annotation to check.
+        :type tp: Any
+        :return: True if the type annotation contains a TypedDict, otherwise False.
+        :rtype: bool
+        """
+        if is_typeddict(tp):
+            return True
+
+        origin = get_origin(tp)
+        args = get_args(tp)
+
+        if origin is dict and args:
+            return contains_typeddict(args[1])
+        if origin in (list, set, tuple) and args:
+            return contains_typeddict(args[0])
+        if origin in (Union, types.UnionType):
+            return any(contains_typeddict(a) for a in args)
+
+        return False
+
+    def render(tp: Any, key: str | None, ind: int) -> str:
+        """
+        Recursively render the structure of a TypedDict type as a formatted string.
+
+        :param tp: The TypedDict type to render.
+        :type tp: Any
+        :param key: The key name for the current level (None for root).
+        :type key: str | None
+        :param ind: The indentation level.
+        :type ind: int
+        :return: The formatted string representation of the TypedDict structure.
+        :rtype: str
+        """
+        prefix = " " * ind
+
+        # Leaf (not TypedDict)
+        if not is_typeddict(tp):
+            if key is None:
+                return prefix + type_to_str(tp) + "\n"
+            return prefix + f"{key}: {type_to_str(tp)}\n"
+
+        # TypedDict
+        hints = get_type_hints(tp, include_extras=True)
+        if not hints:
+            return ""
+
+        lines = []
+        if key is not None:
+            lines.append(prefix + key + ":\n")
+            ind += 2
+            prefix = " " * ind
+
+        for name, ann in hints.items():
+            is_nr = get_origin(ann) is NotRequired
+            core = get_args(ann)[0] if is_nr else ann
+            display = name + (" (NotRequired)" if is_nr else "")
+
+            origin = get_origin(core)
+            args = get_args(core)
+
+            # Nested TypedDict
+            if is_typeddict(core):
+                lines.append(render(core, display, ind))
+
+            # dict[K, V]
+            elif origin is dict and args:
+                ktype, vtype = args
+                if contains_typeddict(vtype):
+                    lines.append(prefix + display + ":\n")
+                    lines.append(
+                        " " * (ind + 2) + f"<{type_to_str(ktype)}>:\n"
+                    )
+                    lines.append(render(vtype, None, ind + 4))
+                else:
+                    lines.append(
+                        prefix
+                        + f"{display}: dict[{type_to_str(ktype)}, {type_to_str(vtype)}]\n"
+                    )
+
+            # list/set/tuple
+            elif origin in (list, set, tuple) and args:
+                elem = args[0]
+                if contains_typeddict(elem):
+                    lines.append(prefix + display + ":\n")
+                    lines.append(" " * (ind + 2) + "-\n")
+                    lines.append(render(elem, None, ind + 4))
+                else:
+                    lines.append(
+                        prefix
+                        + f"{display}: {origin.__name__}[{type_to_str(elem)}]\n"
+                    )
+
+            # Union
+            elif origin in (Union, types.UnionType):
+                parts = [
+                    type_to_str(a) if not contains_typeddict(a) else "<...>"
+                    for a in args
+                ]
+                lines.append(
+                    prefix + f"{display}: " + " | ".join(parts) + "\n"
+                )
+
+            # Simple inline
+            else:
+                lines.append(prefix + f"{display}: {type_to_str(core)}\n")
+
+        return "".join(lines)
+
+    result = render(td, None, indent)
 
     if as_str:
-        return rmsg
+        return result
     else:
-        print(rmsg)
+        print(result)
         return
-
-
-def _print_field(key: str, tp: Any, indent: int) -> str:
-    """
-    Return a single field of a TypedDict, handling nested TypedDicts and containers.
-
-    :param key: Field name to print
-    :type key: str
-    :param tp: Type of the field
-    :type tp: Any
-    :param indent: Indentation level (number of spaces)
-    :type indent: int
-    :return: A formatted string representing the field and its type
-    :rtype: str
-    """
-    origin = get_origin(tp)
-
-    # TypedDict -> newline then recurse
-    if _is_typed_dict(tp):
-        rmsg = " " * indent + key + ":\n"
-        return f"{rmsg}{print_typed_dict_types(tp, indent + 2, as_str=True)}"
-
-    # dict[K, V] where V contains TypedDict -> print <K>: then recurse into V
-    if origin is dict and (args := get_args(tp)):
-        ktype, vtype = args
-        if _container_has_typed_dict(vtype):
-            rmsg = " " * indent + key + ":\n"
-            rmsg += " " * (indent + 2) + f"<{_type_name(ktype)}>:\n"
-            return f"{rmsg}{_print_container_as_fields(vtype, indent + 4)}"
-
-        # plain dict printed inline
-        return (
-            " " * indent
-            + key
-            + f": dict[{_type_to_str(ktype)}, {_type_to_str(vtype)}]\n"
-        )
-
-    # list/set/tuple containing TypedDict -> print key then recurse into element
-    if (
-        origin in (list, set, tuple)
-        and (args := get_args(tp))
-        and _container_has_typed_dict(args[0])
-    ):
-        rmsg = " " * indent + key + ":\n"
-        rmsg += " " * (indent + 2) + "-\n"
-        return f"{rmsg}{_print_container_as_fields(args[0], indent + 4)}"
-
-    # Union (PEP 604 or typing.Union)
-    if origin in (Union, types.UnionType):
-        parts = []
-        for a in get_args(tp):
-            parts.append(
-                _type_to_str(a)
-                if not _container_has_typed_dict(a)
-                else "<...>"
-            )
-        return " " * indent + key + ": " + " | ".join(parts) + "\n"
-
-    # fallback: simple inline type
-    return " " * indent + key + ": " + _type_to_str(tp) + "\n"
-
-
-def _print_container_as_fields(tp: Any, indent: int) -> str:
-    """
-    Print the contents of a container type (dict, list, set, tuple) as fields.
-
-    :param tp: Type of the container
-    :type tp: Any
-    :param indent: Indentation level (number of spaces)
-    :type indent: int
-    :return: A formatted string representing the container's fields
-    :rtype: str
-    """
-    if _is_typed_dict(tp):
-        return f"{print_typed_dict_types(tp, indent, as_str=True)}"
-    origin = get_origin(tp)
-    args = get_args(tp)
-    if origin is dict and args:
-        rmsg = " " * indent + f"<{_type_name(args[0])}>:\n"
-        return f"{rmsg}{_print_container_as_fields(args[1], indent + 2)}"
-    elif origin in (list, set, tuple) and args:
-        return f"{_print_container_as_fields(args[0], indent)}"
-    else:
-        return " " * indent + _type_to_str(tp) + "\n"
-
-
-def _container_has_typed_dict(tp: Any) -> bool:
-    """
-    Return True if this type is or contains a TypedDict.
-
-    :param tp: The type to check
-    :type tp: Any
-    :return: True if the type is or contains a TypedDict, False otherwise
-    :rtype: bool
-    """
-    if _is_typed_dict(tp):
-        return True
-    origin = get_origin(tp)
-    args = get_args(tp)
-    if origin is dict and args:
-        return _container_has_typed_dict(args[1])
-    if origin in (list, set, tuple) and args:
-        return _container_has_typed_dict(args[0])
-    return False
-
-
-def _type_name(tp: Any) -> str:
-    """
-    Get the name of a type.
-
-    :param tp: The type to get the name of
-    :type tp: Any
-    :return: The name of the type
-    :rtype: str
-    """
-    return getattr(tp, "__name__", str(tp))
-
-
-def _type_to_str(tp: Any) -> str:
-    """
-    Convert a type annotation to a human-readable string.
-
-    :param tp: The type to convert to a string
-    :type tp: Any
-    :return: A human-readable string representation of the type
-    :rtype: str
-    """
-    if tp is None or tp is type(None):
-        return "None"
-    if isinstance(tp, type):
-        return tp.__name__
-    origin = get_origin(tp)
-    args = get_args(tp)
-    if origin in (list, set, tuple):
-        inner = _type_to_str(args[0]) if args else ""
-        return f"{origin.__name__}[{inner}]"
-    if origin is dict and args:
-        return f"dict[{_type_to_str(args[0])}, {_type_to_str(args[1])}]"
-    if origin in (Union, types.UnionType):
-        return " | ".join(_type_to_str(a) for a in args)
-    return str(tp)
-
-
-def _is_inline_type(tp: Any) -> bool:
-    """
-    Determine if a type should be printed inline.
-
-    :param tp: The type to check
-    :type tp: Any
-    :return: True if the type should be printed inline, False otherwise
-    :rtype: bool
-    """
-    if _is_typed_dict(tp):
-        return False
-    origin = get_origin(tp)
-    args = get_args(tp)
-    if origin is dict and args:
-        return not _container_has_typed_dict(args[1])
-    if origin in (list, set, tuple) and args:
-        return not _container_has_typed_dict(args[0])
-    if origin in (Union, type(Union)):
-        # inline if none of the union types are TypedDicts
-        return all(not _container_has_typed_dict(a) for a in args)
-    return True

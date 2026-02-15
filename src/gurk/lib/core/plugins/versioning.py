@@ -1,13 +1,14 @@
 from pathlib import Path
 
 from gurk.lib.core.context.registry_manager import get_plugin_registration
-from gurk.lib.utils.common import PathLike, check_version
+from gurk.lib.utils.common import PathLike, check_version, typecheck
 from gurk.lib.utils.configs import load_toml
 from gurk.lib.utils.remotes import get_commit, parse_git_query
 
 from .common import PluginSpecification
 
 
+@typecheck
 def get_local_plugin_version(plugin_path: PathLike) -> str | None:
     """
     Return the version string from the pyproject.toml file in a local repository path, or None if not found.
@@ -29,6 +30,7 @@ def get_local_plugin_version(plugin_path: PathLike) -> str | None:
         return None
 
 
+@typecheck
 def get_plugin_version(plugin: PluginSpecification) -> str | None:
     """
     Return the version string of a local plugin, or None if not found.
@@ -46,9 +48,14 @@ def get_plugin_version(plugin: PluginSpecification) -> str | None:
     plugin_registration_entry = next(iter(plugin_registration.values()))
 
     local_path = plugin_registration_entry["local"]
-    return get_local_plugin_version(local_path) if local_path else None
+    return (
+        get_local_plugin_version(local_path)
+        if local_path is not None
+        else None
+    )
 
 
+@typecheck
 def get_plugin_commit(plugin_spec: PluginSpecification) -> str | None:
     """
     Return the current git commit hash of a local plugin.

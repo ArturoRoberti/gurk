@@ -62,7 +62,7 @@ def main(argv, prog, description):
                 continue
 
             # Create plugin venv
-            if plugin_name != "gurk":
+            if plugin_name != "gurk" and not venv_exists(plugin_name):
                 if not create_plugin_venv(plugin_name):
                     ctx.logger.error(
                         f"Failed to create virtual environment for plugin '{plugin_name}'",

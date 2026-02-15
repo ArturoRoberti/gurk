@@ -1,6 +1,9 @@
+import filecmp
 import shutil
 import subprocess
 from pathlib import Path
+
+from packaging.version import Version
 
 from gurk.lib.core.context import get_logger
 from gurk.lib.core.context.registry_manager import (
@@ -15,14 +18,21 @@ from gurk.lib.core.plugins.virtual_environments import (
     remove_venv,
     venv_exists,
 )
-from gurk.lib.utils.common import PathLike, check_version, generate_random_path
+from gurk.lib.utils.common import (
+    PathLike,
+    check_version,
+    generate_random_path,
+    typecheck,
+)
 from gurk.lib.utils.configs import load_toml, load_yaml
 from gurk.lib.utils.remotes import (
     GIT_QUERY_VERSIONING_FIELDS,
     GitQuery,
+    commit2version,
     determine_ref,
     edit_url,
     extract_url,
+    get_latest_version,
     git_clone,
     is_git_repo,
     parse_git_query,
@@ -36,23 +46,23 @@ from .common import (
     PluginSpecification,
     PluginSpecificationEnum,
 )
-from .getters import get_plugin_data
-from .versioning import get_plugin_commit
+from .getters import get_plugin_data, get_relevant_plugin_files
+from .versioning import get_plugin_commit, get_plugin_version
 
 #########################################################################################
 #################################### Minor utilities ####################################
 #########################################################################################
 
 
-# TODO: Version/commit check?
+@typecheck
 def is_plugin_installed(
-    plugin: PluginSpecification, *, require_venv: bool = True
+    plugin_spec: PluginSpecification, *, require_venv: bool = True
 ) -> bool:
     """
     Check if a plugin is validly installed, optionally requiring that its venv exists.
 
-    :param plugin: Name, PathLike, or GitQuery of the plugin
-    :type plugin: PluginSpecification
+    :param plugin_spec: Name, PathLike, or GitQuery of the plugin. If a GitQuery is provided, the plugin is considered installed if a plugin with the same remote URL and version/commit (if specified) is installed.
+    :type plugin_spec: PluginSpecification
     :param require_venv: Whether to check if the plugin's virtual environment exists
     :type require_venv: bool
     :return: True if the plugin is installed (and its venv exists if require_venv is True), False otherwise
@@ -63,22 +73,45 @@ def is_plugin_installed(
 
     # Check that the plugin is validly installed
     try:
-        plugin_data = get_plugin_data(plugin)
+        plugin_data = get_plugin_data(plugin_spec)
     except ModuleNotFoundError as e:
         if is_plugin_registered(
-            plugin, home_registry=True, package_registry=True
+            plugin_spec, home_registry=True, package_registry=True
         ):
             logger.debug(
-                f"Plugin '{plugin}' is installed but invalid ({e}) - please fix or remove it"
+                f"Plugin '{plugin_spec}' is installed but invalid ({e}) - please fix or remove it"
             )
         else:
-            logger.debug(f"Plugin '{plugin}' is not installed.")
+            logger.debug(f"Plugin '{plugin_spec}' is not installed.")
         return False
+
+    # Check that the specified version/commit is installed
+    parsed = parse_git_query(str(plugin_spec))
+    if any(parsed[f] for f in GIT_QUERY_VERSIONING_FIELDS) and is_git_repo(
+        plugin_spec
+    ):
+        installed_commit = get_plugin_commit(plugin_spec)
+        specified_commit = determine_ref(plugin_spec, to_commit=True)
+        if installed_commit != specified_commit:
+            msg = (
+                f"Plugin '{plugin_spec}' is installed at a "
+                "different version than specified:\n- specified: "
+            )
+            possibly_specified_commit = determine_ref(
+                plugin_spec, to_commit=False
+            )
+            if specified_commit == possibly_specified_commit:
+                msg += possibly_specified_commit
+            else:
+                specified_ref = determine_ref(plugin_spec, to_commit=False)
+                msg += f"{specified_ref} -> {specified_commit}"
+            logger.debug(f"{msg}\n- installed: {installed_commit}")
+            return False
 
     # Check that the plugin venv exists
     if require_venv and not venv_exists(plugin_data["metadata"]["name"]):
         logger.debug(
-            f"Plugin '{plugin}' is installed but its venv is missing."
+            f"Plugin '{plugin_spec}' is installed but its venv is missing."
         )
         return False
 
@@ -90,6 +123,7 @@ def is_plugin_installed(
 #########################################################################################
 
 
+@typecheck
 def create_plugin_venv(plugin_name: str) -> bool:
     """
     Create a virtual environment for a plugin based on its dependencies in pyproject.toml.
@@ -116,6 +150,7 @@ def create_plugin_venv(plugin_name: str) -> bool:
     return create_venv(plugin_name, dependencies)
 
 
+@typecheck
 def _install_local_plugin(plugin_path: PathLike) -> bool:
     """
     Import a plugin from a local directory.
@@ -130,12 +165,22 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
 
     # Get plugin manifest
     plugin_path = Path(plugin_path)
-    manifest_data: PluginManifest = load_yaml(
-        plugin_path / GURK_MANIFEST_FILENAME
-    )
-    if not manifest_data:
+    manifest_file = plugin_path / GURK_MANIFEST_FILENAME
+    if not manifest_file.is_file():
         logger.error(
-            f"Plugin at '{plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file or it is empty/invalid YAML",
+            f"Plugin at '{plugin_path}' has no '{GURK_MANIFEST_FILENAME}' file."
+        )
+        return False
+
+    # Load manifest data
+    manifest_data: PluginManifest = load_yaml(manifest_file)
+    if not manifest_data:
+        raw_manifest = manifest_file.read_text(
+            encoding="utf-8", errors="replace"
+        )
+        logger.error(
+            f"Plugin at '{plugin_path}' has empty/invalid YAML in '{GURK_MANIFEST_FILENAME}': "
+            f"Preview (max 100 chars):\n{raw_manifest[:100]}"
         )
         return False
 
@@ -171,16 +216,23 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
 
     # Pull imported plugins recursively
     for imp in manifest_data.get("imports", []):
-        if not is_plugin_installed(imp, require_venv=False):
+        if not is_plugin_installed(extract_url(imp), require_venv=False):
             if not install_plugin(imp):
                 logger.error(
                     f"Failed to pull imported plugin '{imp}' for plugin '{plugin_path}'",
                 )
                 return False
         else:
-            logger.debug(
-                f"Imported plugin '{imp}' for plugin '{plugin_path}' is already installed. Skipping pull."
-            )
+            if is_plugin_installed(imp, require_venv=False):
+                logger.debug(
+                    f"Imported plugin '{imp}' for plugin '{plugin_path}' is already installed. Skipping pull."
+                )
+            else:
+                logger.warning(
+                    f"Imported plugin '{imp}' for plugin '{plugin_path}' is already installed "
+                    f"but with a different version. Please explicitly pull the desired version "
+                    f"via 'gurk pull {imp}' to ensure the correct version is installed."
+                )
 
     # Check validity of local plugin
     if not check_local_plugin(plugin_path, verbose=True):
@@ -203,15 +255,15 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
     )
     registration_entry = next(iter(registration.values()))
     dest = registration_entry.get("local")
-    if not dest:
+    if dest is None:
         logger.error(
-            f"Registry entry for plugin '{plugin_name}' has invalid 'local' "
-            f"path, although it should have been inferred: {registration_entry}",
+            f"Registry entry for plugin '{plugin_name}' has no local path, "
+            f"although it should have been inferred: {registration_entry}",
         )
         return False
 
     # Add plugin folder
-    if Path(dest).exists():
+    if dest.exists():
         logger.warning(
             f"Destination path '{dest}' for plugin '{plugin_name}' already exists. Overwriting it..."
         )
@@ -236,7 +288,7 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
     return True
 
 
-# TODO: Check that version/commit specified exists
+@typecheck
 def _install_remote_plugin(plugin: GitQuery) -> bool:
     """
     Import a plugin from a remote Git repository.
@@ -323,103 +375,16 @@ def _install_remote_plugin(plugin: GitQuery) -> bool:
         )
         return False
 
-    # Import manifest to random file
-    temp_manifest = generate_random_path(suffix=".yaml", create=False)
-    try:
-        git_clone(edit_url(plugin, path=GURK_MANIFEST_FILENAME), temp_manifest)
-    except subprocess.CalledProcessError as e:
-        error(
-            f"Failed to clone '{GURK_MANIFEST_FILENAME}' "
-            f"from remote plugin repository '{plugin}': {e}",
-            temp_manifest,
-        )
-        return False
-
-    # Determine relevant files
-    relevant_files = {GURK_MANIFEST_FILENAME, "pyproject.toml"}
-    try:
-        # Load manifest file with basic validation
-        manifest_data = load_yaml(temp_manifest)
-        if not manifest_data:
-            raise ValueError("Empty or invalid YAML")
-
-        # Defined tasks
-        tasks = manifest_data.get("tasks", {})
-        if isinstance(tasks, dict):
-            for task in tasks.values():
-                if isinstance(task, dict):
-                    # Script
-                    script = task.get("script")
-                    if not isinstance(script, str):
-                        raise ValueError(
-                            f"Invalid 'script' field in task: {task}"
-                        )
-                    relevant_files.add(script)
-
-                    # Config file
-                    config_file = task.get("config_file")
-                    if config_file is not None and not isinstance(
-                        config_file, str
-                    ):
-                        raise ValueError(
-                            f"Invalid 'config_file' field in task: {task}"
-                        )
-                    elif config_file is not None:
-                        relevant_files.add(config_file)
-                else:
-                    raise ValueError(
-                        f"Invalid task type in 'tasks': {type(task)} (expected dict)"
-                    )
-        else:
-            raise ValueError(
-                f"Invalid 'tasks' section type: {type(tasks)} (expected dict)"
-            )
-
-        # Options
-        options = manifest_data.get("options", {})
-        if isinstance(options, dict):
-            for option in options.values():
-                if isinstance(option, dict):
-                    for task in option.values():
-                        # Config file
-                        config_file = task.get("config_file")
-                        if config_file is not None and not isinstance(
-                            config_file, str
-                        ):
-                            raise ValueError(
-                                f"Invalid 'config_file' field in task: {task}"
-                            )
-                        elif config_file is not None:
-                            relevant_files.add(config_file)
-                else:
-                    raise ValueError(
-                        f"Invalid task option type in 'options': {type(option)} (expected dict)"
-                    )
-        else:
-            raise ValueError(
-                f"Invalid 'options' section type: {type(options)} (expected dict)"
-            )
-    except Exception as e:
-        error(
-            f"Remote plugin repository '{plugin}' has an invalid '{GURK_MANIFEST_FILENAME}' file: {e}",
-            temp_manifest,
-        )
-        return False
-
     # Clone only relevant files to temporary directory
-    temp_plugin_path = generate_random_path(
-        prefix="gurk_plugin_import_", create=False
-    )
-    for file in relevant_files:
-        pullfile = edit_url(plugin, path=file)
-        try:
-            git_clone(pullfile, dest=temp_plugin_path / file)
-        except subprocess.CalledProcessError:
-            error(
-                f"Failed to clone file '{file}' from remote plugin repository '{plugin}'",
-                temp_plugin_path,
-            )
-            return False
+    relevant_files = get_relevant_plugin_files(plugin, relative=False)
+    if relevant_files is None:
+        error(
+            f"Failed to pull relevant files for plugin '{plugin}' from its remote repository"
+        )
+        return False
+    temp_plugin_path = [
+        f for f in relevant_files if f.name == GURK_MANIFEST_FILENAME
+    ][0].parent
 
     # Pull local plugin from temporary directory
     if not _install_local_plugin(temp_plugin_path):
@@ -450,6 +415,7 @@ def _install_remote_plugin(plugin: GitQuery) -> bool:
     return True
 
 
+@typecheck
 def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
     """
     Remove a locally installed plugin.
@@ -479,10 +445,8 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
         remove_msg.append("registry entry")
 
     # Remove plugin folder
-    if plugin_entry["local"]:
-        plugin_path = Path(plugin_entry["local"])
-        if plugin_path.is_dir():
-            shutil.rmtree(plugin_path)
+    if plugin_entry["local"] and plugin_entry["local"].is_dir():
+        shutil.rmtree(plugin_entry["local"])
         remove_msg.append("plugin files")
 
     # Remove plugin venv
@@ -491,7 +455,7 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
 
     if verbose:
         if remove_msg:
-            logger.info(
+            logger.success(
                 f"Successfully removed {' and '.join(remove_msg)} for plugin '{plugin_name}'"
             )
         else:
@@ -507,6 +471,7 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
     )
 
 
+@typecheck
 def install_plugin(
     plugin_source: PluginSource, reinstall: bool = False
 ) -> bool:
@@ -605,7 +570,7 @@ def install_plugin(
             return False
 
         if success:
-            logger.info(
+            logger.success(
                 f"Successfully installed plugin from '{plugin_source}'"
             )
         else:
@@ -613,7 +578,7 @@ def install_plugin(
         return success
 
     # Act depending on whether the plugin is already installed
-    if not is_plugin_installed(plugin_spec, require_venv=False):
+    if not is_plugin_installed(extract_url(plugin_spec), require_venv=False):
         # Handle existing venv
         if venv_exists(plugin_spec):
             if not reinstall:
@@ -663,29 +628,14 @@ def install_plugin(
                     f"existing plugin first using 'gurk remove {plugin_spec}'."
                 )
                 return False
-            installed_commit = get_plugin_commit(plugin_spec)
-            specified_commit = determine_ref(plugin_spec, to_commit=True)
-            if installed_commit != specified_commit:
+            if not is_plugin_installed(plugin_spec, require_venv=False):
                 if reinstall:
                     reinstall_required = True
                 else:
-                    msg = (
-                        f"Plugin '{plugin_spec}' is installed at a "
-                        "different version than specified:\n- specified: "
-                    )
-                    possibly_specified_commit = determine_ref(
-                        plugin_spec, to_commit=False
-                    )
-                    if specified_commit == possibly_specified_commit:
-                        msg += possibly_specified_commit
-                    else:
-                        specified_ref = determine_ref(
-                            plugin_spec, to_commit=False
-                        )
-                        msg += f"{specified_ref} -> {specified_commit}"
                     logger.error(
-                        f"{msg}\n- installed: {installed_commit}\nUse "
-                        "'--replace' to reinstall and use the specified version."
+                        f"Plugin '{plugin_spec}' is installed at a different "
+                        "version than specified (see full log). Use '--replace' "
+                        "to reinstall and use the specified version."
                     )
                     return False
         else:
@@ -718,5 +668,181 @@ def install_plugin(
                         f"Failed to create virtual environment for plugin '{plugin_spec}'."
                     )
                     return False
+
+    return True
+
+
+@typecheck
+def upgrade_plugin(
+    plugin_spec: PluginSpecification, require_local: bool = True
+) -> bool:
+    """
+    Upgrade an installed plugin to the latest version available at its registered remote URL.
+
+    :param plugin_spec: Name, PathLike, or GitQuery of the plugin to upgrade. If a GitQuery is provided, it is only used to identify the plugin to upgrade.
+    :type plugin_spec: PluginSpecification
+    :param require_local: Whether to only consider plugins with a local installation when looking for the plugin to upgrade. When upgrading a remote-only plugin, it is not installed here, but its registry entry is updated to point to the new version.
+    :type require_local: bool
+    :return: True if the plugin was upgraded successfully, False otherwise
+    :rtype: bool
+    """
+    # Get logger
+    logger = get_logger()
+
+    # Handle based on if the plugin is installed
+    if not is_plugin_installed(extract_url(plugin_spec), require_venv=False):
+        # Check if the plugin is registered
+        plugin_registration = get_plugin_registration(
+            plugin_spec,
+            home_registry=True,
+            package_registry=True,
+            require_local=require_local,
+        )
+        if not plugin_registration:
+            logger.debug(
+                f"Plugin '{plugin_spec}' is not installed or registered. Skipping..."
+            )
+            return False
+        plugin_registration_entry = next(iter(plugin_registration.values()))
+
+        # Check that the plugin has a registered remote URL
+        if not plugin_registration_entry["remote"]:
+            logger.debug(
+                f"Plugin '{plugin_spec}' has no registered remote URL. Skipping..."
+            )
+            return False
+
+        # Get the current registered version
+        plugin_remote = plugin_registration_entry["remote"]
+        current_commit = parse_git_query(plugin_remote)["commit"]
+        current_version = commit2version(plugin_remote, current_commit)
+        if not current_version or not check_version(current_version):
+            logger.debug(
+                f"Plugin '{plugin_spec}' version cannot be determined. Skipping..."
+            )
+            return False
+
+    else:
+        # Get plugin data
+        plugin_data = get_plugin_data(plugin_spec)
+
+        # Check that the plugin has a registered remote URL
+        plugin_remote = plugin_data["registration"]["remote"]
+        if not plugin_remote:
+            logger.debug(
+                f"Plugin '{plugin_spec}' has no registered remote URL. Skipping..."
+            )
+            return False
+
+        # Get the current installed version
+        current_version = get_plugin_version(plugin_spec)
+        if not current_version or not check_version(current_version):
+            logger.debug(
+                f"Plugin '{plugin_spec}' version cannot be determined. Skipping..."
+            )
+            return False
+
+    # Get the latest version available at the registered remote URL
+    latest_version = get_latest_version(plugin_remote)
+    if not latest_version or not check_version(latest_version):
+        logger.debug(
+            f"Latest version for plugin '{plugin_spec}' cannot be determined. Skipping..."
+        )
+        return False
+
+    # Check if the installed version is already the latest version
+    if Version(current_version) == Version(latest_version):
+        logger.info(
+            f"Plugin '{plugin_spec}' is already at the latest version ({current_version})."
+        )
+        return True
+    elif Version(current_version) > Version(latest_version):
+        logger.debug(
+            f"Plugin '{plugin_spec}' version ({current_version}) is newer than latest ({latest_version})."
+        )
+        return False
+    else:
+        logger.info(
+            f"Upgrading plugin '{plugin_spec}' from {current_version} to {latest_version}..."
+        )
+        # Get the current relevant files
+        current_relevant_files = get_relevant_plugin_files(plugin_spec)
+        if current_relevant_files is None:
+            logger.error(
+                f"Failed to get relevant files for plugin '{plugin_spec}'."
+            )
+            return False
+        current_remote = edit_url(
+            extract_url(plugin_remote), version=current_version
+        )
+
+        # Get the latest relevant files
+        latest_relevant_files = get_relevant_plugin_files(plugin_remote)
+        if latest_relevant_files is None:
+            logger.error(
+                f"Failed to pull relevant files for plugin '{plugin_spec}'."
+            )
+            return False
+        latest_remote = edit_url(
+            extract_url(plugin_remote), version=latest_version
+        )
+
+        # Check if the relevant files have changed
+        if current_relevant_files == latest_relevant_files:
+            abs_current_relevant_files = get_relevant_plugin_files(
+                current_remote, relative=False
+            )
+            abs_latest_relevant_files = get_relevant_plugin_files(
+                latest_remote, relative=False
+            )
+            if len(abs_current_relevant_files) != len(
+                abs_latest_relevant_files
+            ):
+                files_differ = True
+            else:
+                files_differ = False
+                for cfile, lfile in zip(
+                    sorted(current_relevant_files),
+                    sorted(latest_relevant_files),
+                ):
+                    if (
+                        cfile.name == "pyproject.toml"
+                        and lfile.name == "pyproject.toml"
+                    ):
+                        # Skip comparing pyproject.toml, since we already know it has a version change
+                        #   Dependency changes are reflected in other changed files
+                        continue
+                    elif not filecmp.cmp(
+                        cfile,
+                        lfile,
+                        shallow=False,
+                    ):
+                        files_differ = True
+                        break
+
+            if not files_differ:
+                logger.info(
+                    f"Plugin '{plugin_spec}' files unchanged. Skipping..."
+                )
+                return True
+
+    # Handle upgrading to the latest version based on if the plugin is installed
+    if not is_plugin_installed(extract_url(plugin_spec), require_venv=False):
+        # Update registry entry to point to the latest version at the registered remote URL
+        if not update_registry(
+            plugin_spec,
+            {"remote": latest_remote},
+        ):
+            logger.error(
+                f"Failed to update registry entry for plugin '{plugin_spec}' to version {latest_version}."
+            )
+            return False
+    else:
+        # Reinstall plugin at the latest version
+        if not install_plugin(latest_remote, reinstall=True):
+            logger.error(
+                f"Failed to upgrade plugin '{plugin_spec}' to version {latest_version}."
+            )
+            return False
 
     return True

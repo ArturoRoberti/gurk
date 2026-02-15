@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from gurk.lib.core.context import Logger
+from gurk.lib.utils.common import typecheck
 from gurk.lib.utils.interface import (
     PACKAGE_BASH_HELPERS_PATH,
     run_script_function,
@@ -19,6 +20,7 @@ PasswdField = Literal[
 ]
 
 
+@typecheck
 def getent_passwd(
     user: str | int,
     field: PasswdField,
@@ -59,31 +61,13 @@ def getent_passwd(
     return parts[INDEXES[field]]
 
 
-def getent(username: str) -> str | None:
-    """
-    Retrieve user information from the system's user database.
-
-    :param username: The username to look up
-    :type username: str
-    :return: The user information string if found, otherwise None
-    :rtype: str | None
-    """
-    result = subprocess.run(
-        ["getent", "passwd", username],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        return result.stdout.strip()
-    return None
-
-
 class InstallCommandsBase(Enum):
     """
     Predefined installation commands for various package managers.
     """
 
     @staticmethod
+    @typecheck
     def _flock_command(cmd: str) -> str:
         """
         Wraps a command with flock to prevent concurrent executions.
@@ -115,6 +99,7 @@ class BuiltinInstallCommands(InstallCommandsBase):
     # fmt: on
 
 
+@typecheck
 def get_clean_lines(filename: Path) -> list[str]:
     """
     Reads a file and returns a list of lines with comments and extra whitespace removed.
@@ -136,6 +121,7 @@ def get_clean_lines(filename: Path) -> list[str]:
     return clean_lines
 
 
+@typecheck
 def install_packages_from_list(
     install_command: InstallCommandsBase, packages: list[str]
 ) -> None:
@@ -156,6 +142,7 @@ def install_packages_from_list(
             Logger.step(f"Successfully installed package: {pkg}")
 
 
+@typecheck
 def install_packages_from_txt_file(
     install_command: InstallCommandsBase, package_file: Path
 ) -> None:
@@ -170,6 +157,7 @@ def install_packages_from_txt_file(
     install_packages_from_list(install_command, get_clean_lines(package_file))
 
 
+@typecheck
 def add_alias(command: str) -> None:
     """
     Add an alias to ~/.bashrc if it doesn't already exist.

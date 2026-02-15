@@ -6,7 +6,12 @@ from functools import cached_property
 from pathlib import Path
 from typing import TypedDict
 
-from gurk.lib.utils.common import CommandKind, PathLike, ScriptExtension
+from gurk.lib.utils.common import (
+    CommandKind,
+    PathLike,
+    ScriptExtension,
+    typecheck,
+)
 from gurk.lib.utils.patterns import PatternCollection
 
 
@@ -35,6 +40,7 @@ class ScriptBlock(TypedDict):
     # fmt: on
 
 
+@typecheck
 def get_block_spans(
     path: PathLike, top_imports_only: bool = True, merge: bool = True
 ) -> list[ScriptBlock]:
@@ -241,6 +247,7 @@ class Command:
         return f"{Path(self.script).stem}{func_suffix}"
 
 
+@typecheck
 def check_script_blocks(path: Path) -> list[str]:
     """
     Check that a script only contains allowed top-level code:

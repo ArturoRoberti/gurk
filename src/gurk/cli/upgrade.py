@@ -5,18 +5,10 @@ from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
     get_plugin_data,
-    get_plugin_version,
-    install_plugin,
     is_plugin_installed,
+    upgrade_plugin,
 )
-from gurk.lib.utils.remotes import (
-    edit_url,
-    extract_url,
-    get_latest_version,
-    is_git_installed,
-)
-
-# TODO: Only upgrade if relevant files have changed (except for pyproject.toml)
+from gurk.lib.utils.remotes import extract_url, is_git_installed
 
 
 class UpgradeNamespace(DefaultNamespace):
@@ -101,7 +93,9 @@ def main(argv, prog, description):
                 logfunc = ctx.logger.debug
 
             # Check if plugin is installed
-            if not is_plugin_installed(plugin, require_venv=False):
+            if not is_plugin_installed(
+                extract_url(plugin), require_venv=False
+            ):
                 logfunc(
                     f"Plugin '{plugin}' is not validly installed. Skipping upgrade..."
                 )
@@ -123,27 +117,16 @@ def main(argv, prog, description):
             # Exclude specified plugins
             if normalized_exclude & {
                 plugin_name,
-                plugin_local,
+                str(plugin_local),
                 extract_url(plugin_remote),
             }:
                 logfunc(f"Excluding plugin '{plugin}' from upgrade.")
                 continue
 
-            # See if the current version is already the latest
-            latest_version = get_latest_version(plugin_remote)
-            if latest_version == get_plugin_version(plugin):
-                logfunc(
-                    f"Plugin '{plugin}' is already at the latest version. Skipping upgrade..."
-                )
-                continue
-
             # Upgrade plugin from remotes
-            new_remote = edit_url(
-                plugin_remote, version=latest_version, commit=None
-            )
-            if not install_plugin(new_remote, reinstall=True):
+            if not upgrade_plugin(plugin):
                 ctx.logger.error(
-                    f"Failed to upgrade plugin from remote '{new_remote}'."
+                    f"Failed to upgrade plugin '{plugin}' from remote."
                 )
 
         ctx.logger.done("Plugin upgrades complete.")

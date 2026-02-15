@@ -4,8 +4,10 @@ from gurk.lib.core.plugins import (
     TaskParserNamespace,
     get_resolved_plugin_manifest,
 )
+from gurk.lib.utils.common import typecheck
 
 
+@typecheck
 def _extend_task_arguments(parser: GurkArgumentParser, task_name: str) -> None:
     """
     Extend the parser with task-specific arguments defined in a plugin, if any.
@@ -31,6 +33,7 @@ def _extend_task_arguments(parser: GurkArgumentParser, task_name: str) -> None:
         )
 
 
+@typecheck
 def parse_task_args(
     args: list[str],
 ) -> TaskParserNamespace:

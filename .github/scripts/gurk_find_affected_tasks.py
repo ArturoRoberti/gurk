@@ -39,7 +39,7 @@ def _get_changed_remote_plugin_sources() -> set[str]:
         return {
             k: v
             for k, v in registry_data.items()
-            if not v.get("local") and v.get("remote")
+            if v.get("local") is None and v.get("remote") is not None
         }
 
     # Load current registry.yaml

@@ -14,12 +14,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Generic, Sequence, TypeVar
 
-from gurk.lib.utils.common import YES_ANSWERS
+from gurk.lib.utils.common import YES_ANSWERS, typecheck
 from gurk.lib.utils.system_info import SystemInfo
 from gurk.lib.utils.tasks import ArgsDefinition, ArgsDefinitionCollection
-from gurk.lib.utils.typed_dict import validate_typed_dict
+from gurk.lib.utils.typed_dict import full_isinstance
 
 
+@typecheck
 def _create_wildcard_validator(patterns: list[str]) -> tuple:
     """
     Create a validator function for wildcard patterns.
@@ -48,6 +49,7 @@ def _create_wildcard_validator(patterns: list[str]) -> tuple:
     return validate, metavar
 
 
+@typecheck
 def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
     """
     Extend the parser with arguments defined in a plugin.
@@ -61,7 +63,7 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
         isinstance(args_dict, dict)
         and all(isinstance(key, str) for key in args_dict.keys())
         and all(
-            validate_typed_dict(arg_spec, ArgsDefinition)
+            full_isinstance(arg_spec, ArgsDefinition)
             for arg_spec in args_dict.values()
         )
     ):
@@ -307,6 +309,7 @@ class GurkArgumentParser(Generic[T], ArgumentParser):
             help="Path to an existing config file",
         )
 
+    @typecheck
     def add_required_group(self, mutex: bool = False) -> _ArgumentGroup:
         """
         Add a 'required arguments' group to the parser.
@@ -322,6 +325,7 @@ class GurkArgumentParser(Generic[T], ArgumentParser):
         else:
             return required
 
+    @typecheck
     def extend_arguments(self, args_dict: ArgsDefinitionCollection) -> None:
         """
         Extend the parser with arguments defined in a plugin.

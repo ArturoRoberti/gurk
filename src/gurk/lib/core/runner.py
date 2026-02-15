@@ -5,11 +5,13 @@ from gurk.lib.core.context import get_logger
 from gurk.lib.core.plugins import GurkArgumentParser
 from gurk.lib.core.processor import Processor
 from gurk.lib.core.scheduler import Scheduler
+from gurk.lib.utils.common import typecheck
 from gurk.lib.utils.runner import check_askpass, get_sudo_askpass, prompt_setup
 from gurk.lib.utils.system_info import get_system_info
 from gurk.lib.utils.tasks import CustomTaskDictCollection
 
 
+@typecheck
 def main(
     option: CustomTaskDictCollection,
     cli_args: list[str],

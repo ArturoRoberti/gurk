@@ -17,6 +17,7 @@ from gurk.lib.utils.common import (
     PACKAGE_VENVS_PATH,
     CommandKind,
     generate_random_path,
+    typecheck,
 )
 from gurk.lib.utils.interface import run_script_function
 from gurk.lib.utils.patterns import PatternCollection
@@ -47,6 +48,7 @@ class Scheduler:
     # fmt: on
 
     @staticmethod
+    @typecheck
     def _prepare_script(command: Command) -> tuple[Path, int]:
         """
         Prepare a copy of the desired script that
@@ -168,6 +170,7 @@ class Scheduler:
 
         return tmp_path, n_steps
 
+    @typecheck
     def _spawn_and_stream(
         self, proc_cmd: list[str], flog: TextIO, task_id: int
     ) -> TaskTerminationType:
@@ -355,6 +358,7 @@ class Scheduler:
         else:
             return TaskTerminationType.SUCCESS
 
+    @typecheck
     def run_task(
         self,
         task: ResolvedTask,
@@ -468,6 +472,7 @@ class Scheduler:
             flog.close()
             return success
 
+    @typecheck
     def _worker(self, task: ResolvedTask) -> None:
         """
         Run a task in a worker thread.

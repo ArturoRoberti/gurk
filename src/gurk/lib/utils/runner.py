@@ -77,12 +77,9 @@ def get_sudo_askpass() -> Path:
     return askpass_path
 
 
-def prompt_setup(answer: str | bool | None = None) -> None:
+def prompt_setup() -> None:
     """
     Prompt the user to run setup if it has never been run before.
-
-    :param answer: Predefined answer for non-interactive mode (True/False for 'y'/'n').
-    :type answer: str | bool | None
     """
     # Get logger
     logger = get_logger()
@@ -95,7 +92,6 @@ def prompt_setup(answer: str | bool | None = None) -> None:
         )
         if logger.prompt_bool(
             "Would you like to run the setup now?",
-            answer,
         ):
             from gurk.cli.setup import main as setup_main
 

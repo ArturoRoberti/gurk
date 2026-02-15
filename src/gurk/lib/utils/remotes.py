@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from functools import cache, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, TypedDict, get_type_hints, overload
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 
 import requests
 from filelock import FileLock
@@ -16,9 +16,10 @@ from gurk.lib.utils.common import (
     PathLike,
     check_version,
     generate_random_path,
+    typecheck,
 )
 from gurk.lib.utils.configs import dump_yaml, load_toml, load_yaml
-from gurk.lib.utils.typed_dict import fill_typed_dict, validate_typed_dict
+from gurk.lib.utils.typed_dict import fill_typed_dict, full_isinstance
 
 GIT_MIRRORS_DIR = PACKAGE_CACHE_PATH / "git_mirrors"
 GIT_MIRRORS_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,6 +71,7 @@ GIT_QUERY_VERSIONING_FIELDS = {"branch", "commit", "version"}
 GitQuery: TypeAlias = str
 
 
+@typecheck
 def _parse_git_query(repo: GitQuery) -> GitQueryDict:
     """
     Parse a GitQuery string of the form `<repo_url>[?<param>=<value>&...]` into its components
@@ -103,6 +105,7 @@ def _parse_git_query(repo: GitQuery) -> GitQueryDict:
     }
 
 
+@typecheck
 def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
     """
     Parse a Git repository input which can be either a URL or a GitQuery.
@@ -117,7 +120,7 @@ def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
         parsed = _parse_git_query(repo)
     elif isinstance(repo, dict):
         parsed = fill_typed_dict(repo, GitQueryDict)
-        if not validate_typed_dict(parsed, GitQueryDict):
+        if not full_isinstance(parsed, GitQueryDict):
             # There are extra fields
             extra_fields = set(repo.keys()) - set(
                 get_type_hints(GitQueryDict).keys()
@@ -148,6 +151,7 @@ def parse_git_query(repo: str | GitQuery | GitQueryDict) -> GitQueryDict:
     return parsed
 
 
+@typecheck
 def extract_url(repo: str | GitQuery | GitQueryDict) -> str:
     """
     Extract the URL from a string. If any string other than a GitQuery is given, it is returned as-is.
@@ -160,14 +164,14 @@ def extract_url(repo: str | GitQuery | GitQueryDict) -> str:
     return parse_git_query(repo)["url"]
 
 
-def edit_url(url: str, **kwargs: dict[str, str | None]) -> str:
+@typecheck
+def edit_url(url: str, **kwargs) -> str:
     """
     Add, update, or remove query parameters in a URL.
 
     :param url: Original URL
     :type url: str
     :param kwargs: Query parameters to add/update (key=value) or remove (key=None)
-    :type kwargs: str | None
     :return: Modified URL with updated query parameters
     :rtype: str
     :raises ValueError: If the input kwargs are invalid
@@ -177,7 +181,8 @@ def edit_url(url: str, **kwargs: dict[str, str | None]) -> str:
         for k, v in kwargs.items()
     ):
         raise ValueError(
-            "All keys in kwargs must be strings and values must be strings or None."
+            f"All keys in kwargs must be strings and values "
+            f"must be strings or None, but got: {kwargs}"
         )
 
     parts = urlparse(url)
@@ -189,12 +194,13 @@ def edit_url(url: str, **kwargs: dict[str, str | None]) -> str:
         else:
             query[key] = [value]
 
-    new_query = urlencode(query, doseq=True)
+    new_query = urlencode(query, doseq=True, quote_via=quote, safe="/")
     parts = parts._replace(query=new_query)
     return urlunparse(parts)
 
 
 @cache
+@typecheck
 def _is_git_repo(url: str) -> bool:
     """
     Check if the repository at the given URL exists.
@@ -212,6 +218,7 @@ def _is_git_repo(url: str) -> bool:
     return result.returncode == 0
 
 
+@typecheck
 def is_git_repo(repo: str | GitQuery) -> bool:
     """
     Check if a string is a valid Git repository URL. Also checks existence of the repo.
@@ -240,6 +247,7 @@ def is_git_installed() -> bool:
 
 
 @cache
+@typecheck
 def is_url(url: str) -> bool:
     """
     Check if a string is a valid URL and (optionally) if the URL exists.
@@ -253,6 +261,7 @@ def is_url(url: str) -> bool:
     return response.status_code == 200
 
 
+@typecheck
 def _register_mirror(url: str) -> Path:
     """
     Register a new mirror for the specified Git repository URL.
@@ -289,6 +298,7 @@ def _register_mirror(url: str) -> Path:
     return mirror
 
 
+@typecheck
 def _get_mirror(url: str) -> Path:
     """
     Get the mirror path for the specified Git repository URL, creating it if it doesn't exist.
@@ -306,6 +316,7 @@ def _get_mirror(url: str) -> Path:
 
 
 @cache
+@typecheck
 def _version2commit(
     url: str,
     version: str,
@@ -373,6 +384,7 @@ def _version2commit(
     return None
 
 
+@typecheck
 def version2commit(
     repo: str | GitQuery,
     version: str,
@@ -396,6 +408,7 @@ def version2commit(
 
 
 @cache
+@typecheck
 def get_default_branch(
     url: str,
 ) -> str:
@@ -438,6 +451,7 @@ def get_default_branch(
 
 
 @cache
+@typecheck
 def _git_fetch(repo_path: PathLike) -> None:
     """
     Fetch updates for the Git repository at the specified path.
@@ -455,6 +469,7 @@ def _git_fetch(repo_path: PathLike) -> None:
 
 
 @cache
+@typecheck
 def _get_commit(url: str | GitQuery, commit: str | None) -> str:
     """
     Get the current commit hash of a local Git repository. If a specific commit is provided, checks if it exists and returns its full hash if so.
@@ -493,6 +508,7 @@ def _get_commit(url: str | GitQuery, commit: str | None) -> str:
         return result.stdout.strip()
 
 
+@typecheck
 def get_commit(repo: str | GitQuery, commit: str | None = None) -> str | None:
     """
     Get the current commit hash of a local Git repository. If a specific commit is provided, checks if it exists and returns its full hash if so.
@@ -511,6 +527,7 @@ def get_commit(repo: str | GitQuery, commit: str | None = None) -> str | None:
         return None
 
 
+@typecheck
 def determine_ref(
     repo: str | GitQuery | GitQueryDict, *, to_commit: bool = False
 ) -> str:
@@ -551,6 +568,7 @@ def determine_ref(
     return ref
 
 
+@typecheck
 def git_clone(
     repo: str | GitQuery | GitQueryDict,
     dest: Path | None = None,
@@ -740,6 +758,7 @@ def get_commit_timestamp(
     ...
 
 
+@typecheck
 def get_commit_timestamp(
     repo: str | GitQuery,
     commit: str,
@@ -767,6 +786,7 @@ def get_commit_timestamp(
     )
 
 
+@typecheck
 def commit_exists(
     repo: str | GitQuery,
     commit: str,
@@ -791,6 +811,7 @@ def commit_exists(
 
 
 @cache
+@typecheck
 def _commit2version(
     url: str,
     commit: str | None,
@@ -835,6 +856,7 @@ def _commit2version(
         return version
 
 
+@typecheck
 def commit2version(
     repo: str | GitQuery,
     commit: str | None = None,
@@ -853,6 +875,7 @@ def commit2version(
     return _commit2version(extract_url(repo), commit)
 
 
+@typecheck
 def get_latest_version(
     repo: str | GitQuery,
 ) -> str | None:

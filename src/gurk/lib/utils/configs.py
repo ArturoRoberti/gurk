@@ -7,7 +7,12 @@ import tomllib
 from ruamel.yaml import YAML as RuamelYAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
-from gurk.lib.utils.common import PathLike, resolve_package_path
+from gurk.lib.utils.common import (
+    ListOrTuple,
+    PathLike,
+    resolve_package_path,
+    typecheck,
+)
 
 YAML = RuamelYAML()
 YAML.preserve_quotes = True
@@ -18,6 +23,7 @@ YAML.Representer.add_representer(
 )  # conserve 'null'
 
 
+@typecheck
 def load_toml(toml_file: PathLike) -> dict[str, Any] | None:
     """
     Load a TOML file.
@@ -37,6 +43,7 @@ def load_toml(toml_file: PathLike) -> dict[str, Any] | None:
             return None
 
 
+@typecheck
 def dump_toml(toml_file: PathLike, content: dict[str, Any]) -> None:
     """
     Dump content to a TOML file.
@@ -50,6 +57,7 @@ def dump_toml(toml_file: PathLike, content: dict[str, Any]) -> None:
         tomli_w.dump(content, f)
 
 
+@typecheck
 def load_yaml(
     yaml_file: PathLike, remove_list_duplicates: bool = True
 ) -> dict[str, Any] | None:
@@ -135,6 +143,7 @@ def load_yaml(
     return normalize_yaml(content)
 
 
+@typecheck
 def dump_yaml(content: dict[str, Any], yaml_file: PathLike) -> None:
     """
     Dump content to a YAML file.
@@ -148,13 +157,14 @@ def dump_yaml(content: dict[str, Any], yaml_file: PathLike) -> None:
         YAML.dump(content, f)
 
 
-def overlay_dicts(dicts: list[dict]) -> dict:
+@typecheck
+def overlay_dicts(dicts: ListOrTuple[dict]) -> dict:
     """
     Overlay multiple dictionaries in order, with later
     dictionaries replacing or updating keys in earlier ones.
 
     :param dicts: List of dictionaries to overlay
-    :type dicts: list[dict]
+    :type dicts: ListOrTuple[dict]
     :return: The resulting overlaid dictionary
     :rtype: dict
     :raises ValueError: If any item in dicts is not a dictionary

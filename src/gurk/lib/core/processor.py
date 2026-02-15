@@ -8,7 +8,11 @@ from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
 )
-from gurk.lib.utils.common import PACKAGE_VENVS_PATH, generate_random_path
+from gurk.lib.utils.common import (
+    PACKAGE_VENVS_PATH,
+    generate_random_path,
+    typecheck,
+)
 from gurk.lib.utils.configs import overlay_dicts
 from gurk.lib.utils.scripts import Command
 from gurk.lib.utils.tasks import (
@@ -159,6 +163,7 @@ class Processor:
             )
             self.tasks.append(resolved_task)
 
+    @typecheck
     def enable_dependencies(
         self, tasks: TaskDictCollection
     ) -> TaskDictCollection:
@@ -190,6 +195,7 @@ class Processor:
 
         return tasks
 
+    @typecheck
     def add_preparation_task(
         self,
         tasks: ResolvedTaskDictCollection,

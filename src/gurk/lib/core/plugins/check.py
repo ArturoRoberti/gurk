@@ -7,7 +7,7 @@ import networkx as nx
 
 from gurk.lib.core.context import get_logger
 from gurk.lib.core.context.registry_manager import get_plugin_registration
-from gurk.lib.utils.common import PathLike, check_version
+from gurk.lib.utils.common import PathLike, check_version, typecheck
 from gurk.lib.utils.configs import load_toml, load_yaml
 from gurk.lib.utils.patterns import PatternCollection
 from gurk.lib.utils.remotes import is_git_repo
@@ -17,10 +17,7 @@ from gurk.lib.utils.scripts import (
     get_block_spans,
 )
 from gurk.lib.utils.tasks import DefaultTaskDictCollection
-from gurk.lib.utils.typed_dict import (
-    print_typed_dict_types,
-    validate_typed_dict,
-)
+from gurk.lib.utils.typed_dict import full_isinstance, print_typed_dict_types
 
 from .common import (
     GURK_MANIFEST_FILENAME,
@@ -33,12 +30,13 @@ from .common import (
 from .gurk_argparser import GurkArgumentParser, check_args_dict
 
 
-def filter_metadata(metadata: PluginMetadata) -> FilteredPluginMetadata | None:
+@typecheck
+def filter_metadata(metadata: dict) -> FilteredPluginMetadata | None:
     """
     Return a filtered version of the PluginMetadata containing only relevant fields.
 
-    :param metadata: Raw pyproject.toml metadata dictionary
-    :type metadata: PluginMetadata
+    :param metadata: Raw pyproject.toml metadata dictionary (top-level `pyproject.toml` content)
+    :type metadata: dict
     :return: Filtered PluginMetadata
     :rtype: FilteredPluginMetadata
     """
@@ -63,7 +61,7 @@ def filter_metadata(metadata: PluginMetadata) -> FilteredPluginMetadata | None:
     }
 
     # Validate structure
-    if not validate_typed_dict(filtered_metadata, PluginMetadata):
+    if not full_isinstance(filtered_metadata, PluginMetadata):
         return None
 
     # Version
@@ -77,6 +75,7 @@ def filter_metadata(metadata: PluginMetadata) -> FilteredPluginMetadata | None:
     return filtered_metadata
 
 
+@typecheck
 def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
     """
     Check if a local plugin is valid.
@@ -159,8 +158,8 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             else None
         )
         if existing_plugin_registration and (
-            existing_plugin_entry.get("local")
-            and Path(existing_plugin_entry["local"]) != _plugin_path.resolve()
+            existing_plugin_entry.get("local") is not None
+            and existing_plugin_entry["local"] != _plugin_path.resolve()
         ):
             existing_local = (
                 existing_plugin_entry.get("local")
@@ -184,12 +183,12 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             return False
 
         # Validate structure
-        plugin_without_helpers: PluginManifest = {
+        plugin_without_helpers = {
             k: v
             for k, v in plugin.items()
             if isinstance(k, str) and not k.startswith("_")
         }
-        if not validate_typed_dict(plugin_without_helpers, PluginManifest):
+        if not full_isinstance(plugin_without_helpers, PluginManifest):
             error(
                 f"Plugin at '{_plugin_path}' has invalid structure. Expected: "
                 f"{print_typed_dict_types(PluginManifest, indent=2, as_str=True)}"
@@ -349,7 +348,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                 imp, home_registry=True, package_registry=True
             )
             imp_local = next(iter(imp_registration.values()))["local"]
-            if not _check_local_plugin(Path(imp_local)):
+            if not _check_local_plugin(imp_local):
                 error(f"Imported plugin '{imp}' is invalid.")
                 return False
 

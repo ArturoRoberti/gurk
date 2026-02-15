@@ -22,7 +22,7 @@ from rich.progress import (
 )
 from rich.prompt import Confirm, Prompt
 
-from gurk.lib.utils.common import NO_ANSWERS, YES_ANSWERS
+from gurk.lib.utils.common import NO_ANSWERS, YES_ANSWERS, typecheck
 
 
 @dataclass(frozen=True)
@@ -89,6 +89,7 @@ class LoggerSeverity(LoggerEnumBase):
     INFO    = LoggerTextSpec("  INFO ", "blue",    False, False)
     WARNING = LoggerTextSpec("WARNING", "orange1", False, False)
     ERROR   = LoggerTextSpec(" ERROR ", "red",     False, False)
+    SUCCESS = LoggerTextSpec("SUCCESS", "green",   True , False)
     FATAL   = LoggerTextSpec(" FATAL ", "red",     True , True )
     DONE    = LoggerTextSpec("  DONE ", "purple",  True , False)
     # fmt: on
@@ -229,13 +230,48 @@ class Logger:
         if exc_type is KeyboardInterrupt:
             msg = "Process interrupted by user"
         else:
-            traceback_str = "".join(
-                traceback.format_exception(exc_type, exc, tb)
+            traceback_str = self._filter_pydantic_wrapper(
+                "".join(traceback.format_exception(exc_type, exc, tb))
             )
-            msg = f"An Exception occurred: {exc_type.__name__} - {exc}\n\n{traceback_str}"
+            msg = f"An Exception occurred ({exc_type.__name__}):\n\n{traceback_str}"
         self.logrichprint(LoggerSeverity.FATAL, msg)
         raise SystemExit(1)
 
+    @staticmethod
+    def _filter_pydantic_wrapper(traceback_str: str) -> str:
+        """
+        Filter out Pydantic's internal wrapper from error messages to improve readability.
+
+        :param traceback_str: The original traceback string
+        :type traceback_str: str
+        :return: The filtered traceback string
+        :rtype: str
+        """
+        lines = traceback_str.splitlines()
+        cleaned = []
+
+        i = 0
+        while i < len(lines):
+            # look ahead for a line containing _typecheck
+            if i + 1 < len(lines) and "_typecheck(" in lines[i + 1]:
+                # skip until we see validate_python
+                while (
+                    i < len(lines)
+                    and "self.__pydantic_validator__.validate_python("
+                    not in lines[i]
+                ):
+                    i += 1
+
+                # skip the validate_python line and the line after it (if any)
+                i += 2
+                continue
+
+            cleaned.append(lines[i])
+            i += 1
+
+        return "\n".join(cleaned)
+
+    @typecheck
     def log_script(self, script: Path, task_name: str, ext: str) -> None:
         """
         Save the given script to the log directory under 'modified_scripts'.
@@ -264,6 +300,7 @@ class Logger:
             f"Logged modified script for task '{task_name}' to '{dest.as_posix()}'"
         )
 
+    @typecheck
     def add_task(self, task_name: str, total: int = 1) -> TaskID:
         """
         Add a new task to the progress tracker.
@@ -290,6 +327,7 @@ class Logger:
             }
         return task_id
 
+    @typecheck
     def generate_logfile_path(self, task_id: TaskID) -> Path | None:
         """
         Generate a logfile path for a given task name.
@@ -316,6 +354,7 @@ class Logger:
 
         return logfile
 
+    @typecheck
     def set_total(self, task_id: TaskID, total: int) -> None:
         """
         Set the total number of steps for a task, in case it was unknown at creation.
@@ -330,6 +369,7 @@ class Logger:
                 self._task_infos[task_id]["total"] = total
         self._progress.update(task_id, total=total)
 
+    @typecheck
     def update_task(
         self, task_id: TaskID, message: str, advance: bool = True
     ) -> None:
@@ -360,6 +400,7 @@ class Logger:
         )
 
     @staticmethod
+    @typecheck
     def logcolor(severity: LoggerEnum) -> str:
         """
         Generate a rich-formatted color string for the given severity.
@@ -372,6 +413,7 @@ class Logger:
         return f"{'bold 'if severity.bold else ''}{'bright_'if severity.bright else ''}{severity.color}"
 
     @staticmethod
+    @typecheck
     def logstart(severity: LoggerEnum) -> str:
         """
         Generate a rich-formatted severity tag for logging.
@@ -384,7 +426,8 @@ class Logger:
         color = Logger.logcolor(severity)
         return f"[{color}][{severity.label}][/{color}]"
 
-    def log(
+    @typecheck
+    def _log(
         self,
         severity: LoggerSeverity,
         message: str,
@@ -446,32 +489,44 @@ class Logger:
             #   print a simple message to stderr and exit
             print(f"Logging failed: {e}", file=sys.stderr)
 
+    @typecheck
     def debug(self, message: str, syntax_highlight: bool = True) -> None:
         """Log a debug message. See Logger.log for details."""
-        self.log(LoggerSeverity.DEBUG, message, syntax_highlight)
+        self._log(LoggerSeverity.DEBUG, message, syntax_highlight)
 
+    @typecheck
     def info(self, message: str, syntax_highlight: bool = True) -> None:
         """Log an info message. See Logger.log for details."""
-        self.log(LoggerSeverity.INFO, message, syntax_highlight)
+        self._log(LoggerSeverity.INFO, message, syntax_highlight)
 
+    @typecheck
     def warning(self, message: str, syntax_highlight: bool = True) -> None:
         """Log a warning message. See Logger.log for details."""
-        self.log(LoggerSeverity.WARNING, message, syntax_highlight)
+        self._log(LoggerSeverity.WARNING, message, syntax_highlight)
 
+    @typecheck
     def error(self, message: str, syntax_highlight: bool = True) -> None:
         """Log an error message. See Logger.log for details."""
-        self.log(LoggerSeverity.ERROR, message, syntax_highlight)
+        self._log(LoggerSeverity.ERROR, message, syntax_highlight)
 
+    @typecheck
+    def success(self, message: str, syntax_highlight: bool = True) -> None:
+        """Log a success message. See Logger.log for details."""
+        self._log(LoggerSeverity.SUCCESS, message, syntax_highlight)
+
+    @typecheck
     def fatal(self, message: str, syntax_highlight: bool = True) -> None:
         """Log a fatal message and exit(1). See Logger.log for details."""
-        self.log(LoggerSeverity.FATAL, message, syntax_highlight)
+        self._log(LoggerSeverity.FATAL, message, syntax_highlight)
         raise SystemExit(1)
 
+    @typecheck
     def done(self, message: str, syntax_highlight: bool = True) -> None:
         """Log a done message and exit(0). See Logger.log for details."""
-        self.log(LoggerSeverity.DONE, message, syntax_highlight)
+        self._log(LoggerSeverity.DONE, message, syntax_highlight)
         raise SystemExit(0)
 
+    @typecheck
     def finish_task(
         self,
         task_id: int,
@@ -516,6 +571,7 @@ class Logger:
         self._progress.update(task_id, completed=total, description=desc)
 
     @staticmethod
+    @typecheck
     def richprint(
         message: str, color: str | None = None, file: IO[str] | None = None
     ) -> None:
@@ -535,6 +591,7 @@ class Logger:
             richprint(message, file=file)
 
     @staticmethod
+    @typecheck
     def logrichprint(
         severity: LoggerSeverity | None,
         message: str,
@@ -557,6 +614,7 @@ class Logger:
         richprint(f"{logstart} {message}", file=file)
 
     @staticmethod
+    @typecheck
     def padded_print(
         text: str,
         color: str = "white",
@@ -628,7 +686,9 @@ class Logger:
     ) -> str:
         ...
 
+    # TODO. Seems to have list bug (gurk help)
     @staticmethod
+    @typecheck
     def pprint_dict(
         dct: dict[str, Any],
         *,
@@ -717,6 +777,7 @@ class Logger:
         richprint("")
 
     @staticmethod
+    @typecheck
     def step(message: str, warning: bool = False) -> None:
         """
         Log a step message indicating progress. Only to be used from within tasks.
@@ -756,6 +817,7 @@ class Logger:
         else:
             yield
 
+    @typecheck
     def prompt_bool(self, message: str, answer: str | bool = None) -> bool:
         """
         Prompt the user for a yes/no response.
@@ -801,6 +863,7 @@ class Logger:
         with self._suspend_progress():
             return Confirm.ask(message)
 
+    @typecheck
     def ask(self, message: str, password: bool = False) -> str:
         """
         Prompt the user for input.

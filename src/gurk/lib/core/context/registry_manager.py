@@ -11,6 +11,7 @@ from typing import (
     TypeAlias,
     TypedDict,
     TypeVar,
+    get_type_hints,
     overload,
 )
 
@@ -19,20 +20,28 @@ from gurk.lib.utils.common import (
     PACKAGE_SRC_PATH,
     PACKAGE_VENVS_PATH,
     PathLike,
+    typecheck,
 )
 from gurk.lib.utils.configs import dump_yaml, load_yaml, overlay_dicts
-from gurk.lib.utils.remotes import GitQuery, extract_url, is_git_repo
-from gurk.lib.utils.typed_dict import (
-    print_typed_dict_types,
-    validate_typed_dict,
+from gurk.lib.utils.remotes import (
+    GitQuery,
+    GitQueryDict,
+    extract_url,
+    is_git_repo,
+    parse_git_query,
 )
+from gurk.lib.utils.typed_dict import full_isinstance, print_typed_dict_types
 
 from .logger import get_logger
 
 if TYPE_CHECKING:
     from gurk.lib.core.plugins.common import PluginSpecification
+else:
+    # Runtime alias to keep pydantic's type evaluation happy without creating an import cycle
+    PluginSpecification = str | PathLike | GitQuery
 
 
+@typecheck
 def _deepcopy_tuple(tup: tuple) -> tuple:
     """
     Deepcopy a tuple by deepcopying each item and returning a new tuple.
@@ -47,7 +56,7 @@ def _deepcopy_tuple(tup: tuple) -> tuple:
 
 class PluginRegistryEntry(TypedDict):
     # fmt: off
-    local:   None | str
+    local:   None | Path
     remote:  None | GitQuery
     # fmt: on
 
@@ -55,6 +64,7 @@ class PluginRegistryEntry(TypedDict):
 PluginRegistry: TypeAlias = dict[str, PluginRegistryEntry]
 
 
+@typecheck
 def get_plugin_directories(
     home_registry: bool = True, package_registry: bool = True
 ) -> tuple[Path, ...]:
@@ -120,6 +130,7 @@ def _zip_registry_files(
     return tuple(zip(_get_registry_files(), registries))
 
 
+@typecheck
 def _expand_registry_path(
     registry_file: PathLike, path: PathLike, collapse: bool = False
 ) -> Path:
@@ -140,6 +151,68 @@ def _expand_registry_path(
         return Path(path).relative_to(registry_file.parent)
     else:
         return (registry_file.parent / path).expanduser().resolve()
+
+
+@typecheck
+def _is_entry_valid(
+    name: str,
+    entry: PluginRegistryEntry,
+    registry_file: Path,
+    check_local: bool = True,
+) -> bool:
+    """
+    Check if a plugin registry entry is valid.
+
+    :param name: Name of the plugin
+    :param entry: Plugin registry entry to validate
+    :param registry_file: Path to the registry file
+    :param check_local: Whether to check that the local path exists on disk (if specified).
+    :return: Whether the entry is valid
+    """
+    checks: dict[str, bool] = {
+        "Plugin name must be a string": isinstance(name, str),
+        "Entry must conform to PluginRegistryEntry schema": full_isinstance(
+            entry, PluginRegistryEntry
+        ),
+        "Entry must define at least one of 'local' or 'remote'": any(
+            (entry.get("local") is not None, entry.get("remote") is not None)
+        ),
+        "Local path must exist if specified": (
+            entry.get("local") is None
+            or (
+                not check_local
+                or _expand_registry_path(
+                    registry_file, entry["local"]
+                ).is_dir()
+            )
+        ),
+        "Remote must be a valid git repository if specified": (
+            entry.get("remote") is None or is_git_repo(entry["remote"])
+        ),
+        "Remote must define a commit (and nothing else) if specified": (
+            entry.get("remote") is None
+            or (
+                parse_git_query(entry["remote"])["commit"] is not None
+                and all(
+                    parse_git_query(entry["remote"])[f] is None
+                    for f in get_type_hints(GitQueryDict)
+                    if f not in ("url", "commit")
+                )
+            )
+        ),
+    }
+
+    failed_checks = [msg for msg, passed in checks.items() if not passed]
+
+    if failed_checks:
+        failed_msgs = "\n- " + "\n- ".join(failed_checks)
+        get_logger().debug(
+            f"Invalid plugin registry entry '{name}' in "
+            f"{registry_file.as_posix()}:{failed_msgs}"
+        )
+        return False
+
+    return True
 
 
 _current_registries = ContextVar("current_registries", default=None)
@@ -189,56 +262,6 @@ class RegistryManager:
         # Propagate exceptions
         return False
 
-    @staticmethod
-    def is_entry_valid(
-        name: str,
-        entry: PluginRegistryEntry,
-        registry_file: Path,
-        check_local: bool = True,
-    ) -> bool:
-        """
-        Check if a plugin registry entry is valid.
-
-        :param name: Name of the plugin
-        :param entry: Plugin registry entry to validate
-        :param registry_file: Path to the registry file
-        :param check_local: Whether to check that the local path exists on disk (if specified).
-        :return: Whether the entry is valid
-        """
-        checks: dict[str, bool] = {
-            "Plugin name must be a string": isinstance(name, str),
-            "Entry must conform to PluginRegistryEntry schema": validate_typed_dict(
-                entry, PluginRegistryEntry
-            ),
-            "Entry must define at least one of 'local' or 'remote'": any(
-                (entry.get("local"), entry.get("remote"))
-            ),
-            "Local path must exist if specified": (
-                entry.get("local") is None
-                or (
-                    not check_local
-                    or _expand_registry_path(
-                        registry_file, entry["local"]
-                    ).is_dir()
-                )
-            ),
-            "Remote must be a valid git repository if specified": (
-                entry.get("remote") is None or is_git_repo(entry["remote"])
-            ),
-        }
-
-        failed_checks = [msg for msg, passed in checks.items() if not passed]
-
-        if failed_checks:
-            failed_msgs = "\n- " + "\n- ".join(failed_checks)
-            get_logger().debug(
-                f"Invalid plugin registry entry '{name}' in "
-                f"{registry_file.as_posix()}:{failed_msgs}"
-            )
-            return False
-
-        return True
-
     def _delete_invalid_registrations(self) -> None:
         """
         Delete invalid plugin registry entries from the given registries.
@@ -254,7 +277,7 @@ class RegistryManager:
             _zip_registry_files(self.registries)
         ):
             for name, entry in deepcopy(registry).items():
-                if not self.is_entry_valid(name, entry, registry_file):
+                if not _is_entry_valid(name, entry, registry_file):
                     local_msg = "local path of " if is_package_registry else ""
                     warn_msg = (
                         f"Removing {local_msg}invalid plugin registry entry "
@@ -264,7 +287,7 @@ class RegistryManager:
                         logger.warning(warn_msg)
                         del registry[name]
                     elif (
-                        validate_typed_dict(entry, PluginRegistryEntry)
+                        full_isinstance(entry, PluginRegistryEntry)
                         and entry.get("remote") is not None
                     ):
                         logger.warning(warn_msg)
@@ -359,20 +382,20 @@ class RegistryManager:
             if not isinstance(registry, dict):
                 self.registries[ind] = {}
 
+        # Make 'local' entries Path objects and prepend registry path
+        for registry_file, registry in _zip_registry_files(self.registries):
+            for _, entry in registry.items():
+                if isinstance(entry, dict) and entry.get("local") is not None:
+                    entry["local"] = _expand_registry_path(
+                        registry_file, entry["local"]
+                    )
+
         # Cleanup invalidities
         if self.writable:
             self.cleanup()
         else:
             # Just clean up loaded registries for internal use
             self._delete_invalid_registrations()
-
-        # Prepend registry path to 'local' entries
-        for registry_file, registry in _zip_registry_files(self.registries):
-            for _, entry in registry.items():
-                if entry["local"] is not None:
-                    entry["local"] = str(
-                        _expand_registry_path(registry_file, entry["local"])
-                    )  # TODO: Return path instead of string? Would require changes to PluginRegistryEntry definition and validation, but would be more robust and easier to work with internally.
 
     def dump_registries(self) -> None:
         """
@@ -432,6 +455,7 @@ def _filter_by_registries(
     ...
 
 
+@typecheck
 def _filter_by_registries(
     tup: tuple[T, T],
     *,
@@ -488,6 +512,7 @@ def get_registry_files(
     ...
 
 
+@typecheck
 def get_registry_files(
     *, home_registry: bool, package_registry: bool
 ) -> tuple[Path, Path] | Path:
@@ -564,6 +589,7 @@ def get_registries(
     ...
 
 
+@typecheck
 def get_registries(
     *, home_registry: bool, package_registry: bool, combine: bool = False
 ) -> tuple[PluginRegistry, ...] | PluginRegistry:
@@ -632,6 +658,7 @@ def get_zipped_registries(
     ...
 
 
+@typecheck
 def get_zipped_registries(
     *, home_registry: bool, package_registry: bool
 ) -> tuple[ZippedRegistry, ZippedRegistry] | ZippedRegistry:
@@ -653,6 +680,7 @@ def get_zipped_registries(
     )
 
 
+@typecheck
 def _get_plugin_registration(
     plugin: "PluginSpecification",
     *,
@@ -684,9 +712,9 @@ def _get_plugin_registration(
         ),
         None,
     )
-    if plugin in registry:
+    if str(plugin) in registry:
         # Access plugin by name
-        name = plugin
+        name = str(plugin)
     elif name_via_remote:
         # Access plugin by remote
         name = name_via_remote
@@ -702,7 +730,7 @@ def _get_plugin_registration(
     if require_local and (
         entry["local"] is None
         or not _expand_registry_path(registry_file, entry["local"]).is_dir()
-    ):  # TODO: Keep second check?
+    ):
         return None
 
     return {name: entry}
@@ -721,6 +749,7 @@ def get_available_plugin_names() -> set[str]:
     return set(combined_registry.keys())
 
 
+@typecheck
 def get_plugin_registration(
     plugin: "PluginSpecification",
     *,
@@ -769,6 +798,7 @@ def get_plugin_registration(
     return registrations[0]
 
 
+@typecheck
 def is_plugin_registered(
     plugin: "PluginSpecification",
     *,
@@ -814,6 +844,7 @@ class RemotePluginRegistryEntry(TypedDict):
     # fmt: on
 
 
+@typecheck
 def update_registry(
     plugin_name: str,
     entry: LocalPluginRegistryEntry | RemotePluginRegistryEntry | None,
@@ -850,8 +881,8 @@ def update_registry(
     # Validate input
     if entry is not None:
         if not (
-            validate_typed_dict(entry, LocalPluginRegistryEntry)
-            or validate_typed_dict(entry, RemotePluginRegistryEntry)
+            full_isinstance(entry, LocalPluginRegistryEntry)
+            or full_isinstance(entry, RemotePluginRegistryEntry)
         ):
             debug_error(
                 f"'entry' has an invalid structure. Expected (e):\n"
@@ -859,7 +890,9 @@ def update_registry(
                 f"but got:\n{logger.pprint_dict(entry, indent=2, as_str=True)}"
             )
             return False
-        if not (infer_local or entry.get("local")) and not entry.get("remote"):
+        if not (
+            infer_local or entry.get("local") is not None
+        ) and not entry.get("remote"):
             debug_error("'entry' must have at least a local or remote value.")
             return False
 
@@ -930,14 +963,16 @@ def update_registry(
                 return True
         else:
             # Infer local path if applicable
-            if infer_local and not entry.get("local"):
-                entry["local"] = str(registry_file.parent / plugin_name)
+            if infer_local and entry.get("local") is None:
+                entry["local"] = registry_file.parent / plugin_name
+            elif entry.get("local") is not None:
+                entry["local"] = Path(entry["local"]).expanduser()
 
             # Add/update registration
             overlayed = overlay_dicts(
                 [registries[registry_index].get(plugin_name, {}), entry]
             )
-            if RegistryManager.is_entry_valid(
+            if _is_entry_valid(
                 plugin_name, overlayed, registry_file, check_local=False
             ):
                 registries[registry_index][plugin_name] = overlayed
