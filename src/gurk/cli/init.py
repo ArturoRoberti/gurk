@@ -1,13 +1,15 @@
-from gurk.lib.core.context import GurkContext, Logger, get_registries
+from gurk.lib.context import GurkContext, Logger, get_registries
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
     create_plugin_venv,
+    get_venv_gurk_version,
     install_plugin,
     is_plugin_installed,
     remove_venv,
     venv_exists,
 )
+from gurk.lib.utils import GURK_VERSION
 
 
 def main(argv, prog, description):
@@ -24,8 +26,11 @@ def main(argv, prog, description):
             home_registry=True, package_registry=True, combine=True
         )
         for plugin_name, plugin_entry in combined_registry.items():
-            # Remove plugin venv (if any) to ensure the current gurk version is installed
-            if venv_exists(plugin_name):
+            # Remove plugin venv (if any) with different gurk version
+            if (
+                venv_exists(plugin_name)
+                and get_venv_gurk_version(plugin_name) != GURK_VERSION
+            ):
                 ctx.logger.debug(
                     f"Removing existing virtual environment for plugin '{plugin_name}' to ensure it is re-created with the current gurk version."
                 )

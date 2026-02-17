@@ -10,13 +10,13 @@ import tomllib
 from ruamel.yaml import YAML
 
 from gurk.cli._pytest import check_askpass
+from gurk.lib.context import GurkContext, Logger, padded_print
 from gurk.lib.core import runner
-from gurk.lib.core.context import GurkContext, Logger
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
 )
-from gurk.lib.utils.scripts import check_script_blocks
+from gurk.lib.shared.scripts import check_script_blocks
 
 
 def test_task(task: str) -> None:
@@ -127,16 +127,14 @@ def test_task(task: str) -> None:
 
             # Print successful task outputs
             if successful_tasks:
-                ctx.logger.padded_print(
-                    f"Successful tasks ({len(successful_tasks)})"
-                )
+                padded_print(f"Successful tasks ({len(successful_tasks)})")
                 print_task_outputs(successful_tasks)
             else:
                 ctx.logger.error("No successful tasks")
 
             # Print failed task outputs
             if failed_tasks:
-                ctx.logger.padded_print(
+                padded_print(
                     f"Failed tasks ({len(failed_tasks)})", file=sys.stderr
                 )
                 print_task_outputs(failed_tasks, file=sys.stderr)

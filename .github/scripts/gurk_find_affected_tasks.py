@@ -1,15 +1,15 @@
 try:
-    from gurk.lib.core.context import GurkContext
+    from gurk.lib.context import GurkContext
     from gurk.lib.core.plugins import (
         get_available_plugin_tasks,
         install_plugin,
         iter_configs,
         iter_scripts,
     )
-    from gurk.lib.utils.configs import load_yaml
-    from gurk.lib.utils.remotes import get_commit_timestamp
-    from gurk.lib.utils.scripts import ScriptBlockTypes, get_block_spans
-    from gurk.lib.utils.tasks import RUNNER_SPECIFIC_TASKS
+    from gurk.lib.shared.configs import load_yaml
+    from gurk.lib.shared.remotes import get_commit_timestamp
+    from gurk.lib.shared.scripts import ScriptBlockTypes, get_block_spans
+    from gurk.lib.utils import RUNNER_SPECIFIC_TASKS
 except ImportError:
     raise ImportError(
         "The gurk package needs to be installed to run this script."
@@ -97,7 +97,7 @@ def _get_changed_remote_plugin_sources() -> set[str]:
 def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
     """
     Parse a unified diff text and return a mapping of file paths to changed line numbers.
-        NOTE: This currently also counts changed comments and blank lines.
+        :NOTE: This currently also counts changed comments and blank lines.
 
     :param diff_text: The unified diff text
     :type diff_text: str
@@ -130,7 +130,7 @@ def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
 def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
     """
     Determine which top-level blocks (functions/entrypoint) are affected by the changed lines.
-        NOTE: Assumes scripts are valid, i.e. only contain functions and an entrypoint (and imports for Python)
+        :NOTE: Assumes scripts are valid, i.e. only contain functions and an entrypoint (and imports for Python)
 
     :param path: Path to the script file
     :type path: Path

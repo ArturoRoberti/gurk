@@ -5,30 +5,26 @@ import pty
 import subprocess
 import termios
 from dataclasses import dataclass, field
+from io import TextIOWrapper
 from pathlib import Path
 from queue import Queue
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from textwrap import dedent
 from threading import Event, Lock, Thread
-from typing import TextIO
 
-from gurk.lib.core.context import Logger, TaskTerminationType, get_logger
-from gurk.lib.utils.common import (
-    PACKAGE_VENVS_PATH,
-    CommandKind,
-    generate_random_path,
-    typecheck,
-)
-from gurk.lib.utils.interface import run_script_function
-from gurk.lib.utils.patterns import PatternCollection
-from gurk.lib.utils.scripts import (
+from gurk.lib.context import Logger, TaskTerminationType, get_logger
+from gurk.lib.core.plugins import get_venv_dir
+from gurk.lib.shared.scripts import (
     Command,
+    CommandKind,
+    SchedulerTask,
     ScriptBlock,
     ScriptBlockTypes,
     get_block_spans,
+    run_script_function,
 )
-from gurk.lib.utils.system_info import get_system_info
-from gurk.lib.utils.tasks import ResolvedTask
+from gurk.lib.shared.system_info import get_system_info
+from gurk.lib.utils import PatternCollection, generate_random_path, typecheck
 
 
 @dataclass
@@ -36,12 +32,12 @@ class Scheduler:
     """Schedules and runs tasks with dependencies, handling logging and progress tracking."""
 
     # fmt: off
-    tasks:        list[ResolvedTask] = field(repr=False)
-    askpass_file: Path               = field(repr=False)
+    tasks:        list[SchedulerTask] = field(repr=False)
+    askpass_file: Path                = field(repr=False)
+    logger:       Logger              = field(init=False, repr=False)
 
-    logger:    Logger                                  = field(init=False, repr=False)
-    results:   dict[ResolvedTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
-    scheduled: set[ResolvedTask]                       = field(init=False, repr=False, default_factory=set)
+    results:   dict[SchedulerTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
+    scheduled: set[SchedulerTask]                       = field(init=False, repr=False, default_factory=set)
 
     lock:      Lock  = field(init=False, repr=False, default_factory=Lock)
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
@@ -83,7 +79,9 @@ class Scheduler:
                 ]
                 if not curr_block:
                     curr_block = ScriptBlock(
-                        type=ScriptBlockTypes.OTHER, name=None, lines=(0, 0)
+                        type=ScriptBlockTypes.OTHER,
+                        name=None,
+                        lines=(0, 0),
                     )
                 else:
                     curr_block = curr_block[0]
@@ -172,7 +170,7 @@ class Scheduler:
 
     @typecheck
     def _spawn_and_stream(
-        self, proc_cmd: list[str], flog: TextIO, task_id: int
+        self, proc_cmd: list[str], flog: TextIOWrapper, task_id: int
     ) -> TaskTerminationType:
         """
         Spawn a subprocess and stream its output to the logfile and progress tracker.
@@ -180,7 +178,7 @@ class Scheduler:
         :param proc_cmd: Command to run
         :type proc_cmd: list[str]
         :param flog: Log file to write output to
-        :type flog: TextIO
+        :type flog: TextIOWrapper
         :param task_id: ID of the task for progress tracking
         :type task_id: int
         :return: Task termination type (SUCCESS, FAILURE, PARTIAL)
@@ -361,14 +359,14 @@ class Scheduler:
     @typecheck
     def run_task(
         self,
-        task: ResolvedTask,
+        task: SchedulerTask,
         task_id: int,
     ) -> TaskTerminationType:
         """
         Run a single task, logging its output and tracking progress.
 
         :param task: The task to run
-        :type task: ResolvedTask
+        :type task: SchedulerTask
         :param task_id: ID of the task for progress tracking
         :type task_id: int
         :return: Task termination type indicating success, failure, or partial completion
@@ -397,7 +395,10 @@ class Scheduler:
                     pass
 
         # Create args
-        args = task.args + ("--system-info", json.dumps(get_system_info()))
+        args = task.args + (
+            "--system-info",
+            json.dumps(get_system_info()),
+        )
         if task.config_file:
             args += ("--config-file", task.config_file)
         args = (task.name,) + args
@@ -418,7 +419,7 @@ class Scheduler:
             if plugin_name == "gurk":
                 venv_path = None  # Use current venv
             else:
-                venv_path = PACKAGE_VENVS_PATH / plugin_name
+                venv_path = get_venv_dir(plugin_name)
 
             # Write
             wrapper_src = run_script_function(
@@ -432,9 +433,9 @@ class Scheduler:
             tmpwrap.flush()
             tmpwrap.close()
             os.chmod(tmpwrap_path, os.stat(tmpwrap_path).st_mode | 0o700)
-        except Exception:
+        except Exception as e:
             safe_unlink(tmpwrap_path)
-            raise
+            raise e
 
         # Get executable to run file. Also, use unbuffered output
         if task.command.kind == CommandKind.PYTHON:
@@ -473,12 +474,12 @@ class Scheduler:
             return success
 
     @typecheck
-    def _worker(self, task: ResolvedTask) -> None:
+    def _worker(self, task: SchedulerTask) -> None:
         """
         Run a task in a worker thread.
 
         :param task: The task to run
-        :type task: ResolvedTask
+        :type task: SchedulerTask
         """
         task_id = self.logger.add_task(task.name, total=1)
         try:
@@ -491,7 +492,7 @@ class Scheduler:
         finally:
             self.logger.finish_task(task_id, success)
             self.logger.debug(
-                f"Task '{task.name}' completed {'sucessfully' if success == TaskTerminationType.SUCCESS else 'with errors'}"
+                f"Task '{task.name}' completed {'successfully' if success == TaskTerminationType.SUCCESS else 'with errors'}"
             )
             with self.lock:
                 self.results[task] = success

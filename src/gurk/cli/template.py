@@ -1,14 +1,14 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.core.context import GurkContext, Logger
-from gurk.lib.core.plugins import (
+from gurk.lib.context import GurkContext, Logger
+from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
+from gurk.lib.shared.configs import dump_toml, dump_yaml, load_toml, load_yaml
+from gurk.lib.utils import (
     GURK_MANIFEST_FILENAME,
-    DefaultNamespace,
-    GurkArgumentParser,
+    GURK_METADATA_FILENAME,
+    PACKAGE_SRC_PATH,
 )
-from gurk.lib.utils.common import PACKAGE_SRC_PATH
-from gurk.lib.utils.configs import dump_toml, dump_yaml, load_toml, load_yaml
 
 
 class TemplateNamespace(DefaultNamespace):
@@ -65,7 +65,7 @@ def main(argv, prog, description):
         ctx.logger.debug(f"Copied template plugin to '{dest.as_posix()}'")
 
         # Replace plugin name
-        versioning_file = dest / "pyproject.toml"
+        versioning_file = dest / GURK_METADATA_FILENAME
         metadata = load_toml(versioning_file)
         metadata["project"]["name"] = args.name
         dump_toml(versioning_file, metadata)

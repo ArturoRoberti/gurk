@@ -1,5 +1,5 @@
-from gurk.lib.core.context import GurkContext, Logger
-from gurk.lib.utils.runner import check_askpass
+from gurk.lib.context import GurkContext, Logger
+from gurk.lib.core.runner import check_askpass
 
 
 def main(argv):

@@ -3,21 +3,26 @@ from argparse import ArgumentTypeError
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import get_type_hints
 
+from gurk.lib.context import GurkContext, Logger
 from gurk.lib.core import runner
-from gurk.lib.core.context import GurkContext, Logger
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
-    PluginSpecificationEnum,
     get_plugin_data,
     get_raw_plugin_manifest,
     install_plugin,
     is_plugin_installed,
 )
-from gurk.lib.utils.configs import load_toml
-from gurk.lib.utils.remotes import is_git_installed, is_git_repo
-from gurk.lib.utils.tasks import COMMON_RESOLVED_TASK_DICT_FIELDS
+from gurk.lib.shared.configs import load_toml
+from gurk.lib.shared.plugins import PluginSpecificationEnum
+from gurk.lib.shared.remotes import is_git_installed, is_git_repo
+from gurk.lib.shared.tasks import (
+    ResolvedCustomTaskDict,
+    ResolvedDefaultTaskDict,
+)
+from gurk.lib.utils import GURK_METADATA_FILENAME
 
 
 @dataclass(frozen=True)
@@ -207,7 +212,8 @@ def main(argv, prog, description):
             ):
                 try:
                     plugin_spec = load_toml(
-                        Path(args.specification.plugin) / "pyproject.toml"
+                        Path(args.specification.plugin)
+                        / GURK_METADATA_FILENAME
                     )["project"]["name"]
                 except Exception as e:
                     ctx.logger.fatal(
@@ -265,12 +271,15 @@ def main(argv, prog, description):
                 )
             ## For any common fields, if they are missing in the raw
             ##  option, remove them (to be filled later) to use defaults
+            common_fields = set(
+                get_type_hints(ResolvedDefaultTaskDict).keys()
+            ) & set(get_type_hints(ResolvedCustomTaskDict).keys())
             raw_plugin_yaml = get_raw_plugin_manifest(plugin_spec)
             raw_option = raw_plugin_yaml["options"][args.specification.option]
             for (_, task), raw_task in zip(
                 option.items(), raw_option.values()
             ):
-                for field in COMMON_RESOLVED_TASK_DICT_FIELDS:
+                for field in common_fields:
                     if field not in raw_task and field in task:
                         del task[field]
 

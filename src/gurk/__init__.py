@@ -1,8 +1,6 @@
-# flake8: noqa
-from importlib.metadata import version
-
-from .lib.core.context import Logger, LoggerSeverity
-from .lib.helpers import *
+# flake8: noqa: F401
+from .lib.context import Logger, LoggerSeverity
 from .lib.utils import *
+from .plugin_helpers import *
 
-__version__ = version("gurk")
+__version__ = GURK_VERSION

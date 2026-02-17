@@ -1,6 +1,7 @@
 import click
 
-from gurk.cli import (
+from . import __version__ as GURK_VERSION
+from .cli import (
     _pytest,
     check,
     help,
@@ -12,17 +13,16 @@ from gurk.cli import (
     template,
     upgrade,
 )
-from gurk.cli.utils import (
+from .utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
-    VERSION,
     OrderedGroup,
     get_prog,
 )
 
 
 @click.group(cls=OrderedGroup, context_settings=GROUP_CONTEXT_SETTINGS)
-@click.version_option(version=VERSION, prog_name="gurk")
+@click.version_option(version=GURK_VERSION, prog_name="gurk")
 def main():
     """gurk - Package manager making computer setup easy"""
     pass

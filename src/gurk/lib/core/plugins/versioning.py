@@ -1,18 +1,22 @@
 from pathlib import Path
 
-from gurk.lib.core.context.registry_manager import get_plugin_registration
-from gurk.lib.utils.common import PathLike, check_version, typecheck
-from gurk.lib.utils.configs import load_toml
-from gurk.lib.utils.remotes import get_commit, parse_git_query
-
-from .common import PluginSpecification
+from gurk.lib.context.registry import get_plugin_registration
+from gurk.lib.shared.configs import load_toml
+from gurk.lib.shared.plugins import PluginSpecification
+from gurk.lib.shared.remotes import get_commit, parse_git_query
+from gurk.lib.utils import (
+    GURK_METADATA_FILENAME,
+    PathLike,
+    check_version,
+    typecheck,
+)
 
 
 @typecheck
 def get_local_plugin_version(plugin_path: PathLike) -> str | None:
     """
     Return the version string from the pyproject.toml file in a local repository path, or None if not found.
-        NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
+        :NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml under the [project] section
 
     :param plugin_path: Path to the local repository
     :type plugin_path: PathLike
@@ -20,9 +24,9 @@ def get_local_plugin_version(plugin_path: PathLike) -> str | None:
     :rtype: str | None
     """
     try:
-        version = load_toml(Path(plugin_path) / "pyproject.toml")["project"][
-            "version"
-        ]
+        version = load_toml(Path(plugin_path) / GURK_METADATA_FILENAME)[
+            "project"
+        ]["version"]
         if not check_version(version):
             raise ValueError
         return version

@@ -148,13 +148,14 @@ def get_changed_plugin_folders() -> set[Path]:
 
 def main():
     # Bump main pyproject.toml version, if necessary
-    version_file = Path(__file__).parents[2] / "pyproject.toml"
+    GURK_METADATA_FILENAME = "pyproject.toml"
+    version_file = Path(__file__).parents[2] / GURK_METADATA_FILENAME
     bump_toml_version_if_necessary(version_file)
 
     # Bump local plugin versions, if necessary
     changed_plugins = get_changed_plugin_folders()
     for plugin_path in changed_plugins:
-        plugin_version_file = plugin_path / "pyproject.toml"
+        plugin_version_file = plugin_path / GURK_METADATA_FILENAME
         bump_toml_version_if_necessary(plugin_version_file)
 
 

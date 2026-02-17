@@ -3,23 +3,14 @@ import subprocess
 from pathlib import Path
 from typing import Iterator
 
-from gurk.lib.core.context.logger import get_logger
-from gurk.lib.core.context.registry_manager import (
+from gurk.lib.context.logger import get_logger
+from gurk.lib.context.registry import (
     get_available_plugin_names,
     get_plugin_registration,
 )
-from gurk.lib.utils.common import generate_random_path, typecheck
-from gurk.lib.utils.configs import load_toml, load_yaml
-from gurk.lib.utils.remotes import GitQuery, edit_url, git_clone, is_git_repo
-from gurk.lib.utils.tasks import (
-    ResolvedDefaultTaskDictCollection,
-    TaskDictCollection,
-)
-from gurk.lib.utils.typed_dict import fill_typed_dict, full_isinstance
-
-from .check import check_local_plugin, filter_metadata
-from .common import (
-    GURK_MANIFEST_FILENAME,
+from gurk.lib.shared.configs import load_toml, load_yaml
+from gurk.lib.shared.dicts import fill_typed_dict
+from gurk.lib.shared.plugins import (
     FilteredPluginMetadata,
     PluginData,
     PluginManifest,
@@ -27,6 +18,21 @@ from .common import (
     PluginSpecification,
     ResolvedPluginManifest,
 )
+from gurk.lib.shared.remotes import GitQuery, edit_url, git_clone, is_git_repo
+from gurk.lib.shared.tasks import (
+    ResolvedDefaultTaskDictCollection,
+    TaskDictCollection,
+)
+from gurk.lib.utils import (
+    GURK_MANIFEST_FILENAME,
+    GURK_METADATA_FILENAME,
+    PathLike,
+    full_isinstance,
+    generate_random_path,
+    typecheck,
+)
+
+from .check import check_local_plugin, filter_metadata
 
 
 @typecheck
@@ -36,7 +42,7 @@ def get_raw_plugin_manifest(
     """
     Get the raw manifest of a plugin if it exists locally.
 
-    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :param plugin: Name, utils.PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
     :return: Plugin manifest if the plugin exists locally, None otherwise
     :rtype: PluginManifest | None
@@ -69,7 +75,7 @@ def get_resolved_plugin_manifest(
     - all paths resolved and converted to "Path" objects
     - missing properties filled with default values
 
-    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :param plugin: Name, utils.PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
     :return: Plugin configuration with resolved paths and filled properties if the plugin exists locally, None otherwise
     :rtype: ResolvedPluginManifest | None
@@ -117,7 +123,7 @@ def _get_plugin_metadata(
     """
     Get the pyproject.toml metadata of a local plugin.
 
-    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :param plugin: Name, utils.PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
     :return: Plugin metadata if the plugin exists locally, None otherwise
     :rtype: FilteredPluginMetadata | None
@@ -133,7 +139,7 @@ def _get_plugin_metadata(
         return None
 
     toml_data = load_toml(
-        plugin_registration_entry["local"] / "pyproject.toml"
+        plugin_registration_entry["local"] / GURK_METADATA_FILENAME
     )
     if not toml_data:
         return None
@@ -142,11 +148,13 @@ def _get_plugin_metadata(
 
 
 @typecheck
-def get_plugin_data(plugin: PluginSpecification) -> PluginData:
+def get_plugin_data(
+    plugin: PluginSpecification,
+) -> PluginData:
     """
     Get the registry entry, manifest and pyproject.toml metadata of a local plugin.
 
-    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :param plugin: Name, utils.PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
     :return: Plugin data containing registry entry, manifest and metadata
     :rtype: PluginData
@@ -217,9 +225,9 @@ def iter_scripts() -> Iterator[Path]:
 
 def iter_configs() -> Iterator[Path]:
     """
-    Yields all script files of installed plugins.
+    Yields all config files of installed plugins.
 
-    :return: Iterator of Paths to script files
+    :return: Iterator of Paths to config files
     :rtype: Iterator[Path]
     """
     all_tasks = get_available_plugin_tasks()
@@ -230,13 +238,13 @@ def iter_configs() -> Iterator[Path]:
 
 @typecheck
 def _get_relevant_files_local(
-    plugin_manifest: Path, *, relative: bool = True
+    plugin_path: PathLike, *, relative: bool = True
 ) -> set[Path] | None:
     """
-    Get the set of relevant plugin files (script, config_file, manifest) for a plugin given its manifest path.
+    Get the set of relevant plugin files (script, config_file, manifest) for a plugin given its local path.
 
-    :param plugin_manifest: Path to the plugin manifest file
-    :type plugin_manifest: Path
+    :param plugin_path: Path to a local directory containing a plugin manifest
+    :type plugin_path: PathLike
     :param relative: Whether to return paths relative to the plugin path
     :type relative: bool
     :return: Set of Paths to relevant plugin files
@@ -247,9 +255,10 @@ def _get_relevant_files_local(
         return (
             Path(path_str)
             if relative
-            else (plugin_manifest.parent / path_str).expanduser().resolve()
+            else (Path(plugin_path) / path_str).expanduser().resolve()
         )
 
+    plugin_manifest = Path(plugin_path) / GURK_MANIFEST_FILENAME
     if not plugin_manifest.exists():
         return None
 
@@ -262,7 +271,7 @@ def _get_relevant_files_local(
     # Defined tasks
     relevant_files = {
         rel_path(GURK_MANIFEST_FILENAME),
-        rel_path("pyproject.toml"),
+        rel_path(GURK_METADATA_FILENAME),
     }
     for task in raw_plugin_yaml.get("tasks", {}).values():
         # 'script'
@@ -303,15 +312,14 @@ def _get_relevant_files_remote(
     temp_manifest = temp_dir / GURK_MANIFEST_FILENAME
     try:
         git_clone(
-            edit_url(plugin_remote, path=GURK_MANIFEST_FILENAME), temp_manifest
+            edit_url(plugin_remote, path=GURK_MANIFEST_FILENAME),
+            temp_manifest,
         )
     except subprocess.CalledProcessError:
         return None
 
     # Determine relevant files
-    relevant_files = _get_relevant_files_local(
-        temp_manifest, relative=relative
-    )
+    relevant_files = _get_relevant_files_local(temp_dir, relative=relative)
 
     # Clone all relevant files to temporary directory if absolute paths are requested
     def reverse_rel_path(path: Path) -> Path:
@@ -355,9 +363,8 @@ def get_relevant_plugin_files(
     :rtype: set[Path] | None
     :raises ValueError: If the plugin source is invalid
     """
-    gurk_manifest_path = Path(plugin_source) / GURK_MANIFEST_FILENAME
-    if gurk_manifest_path.exists():
-        return _get_relevant_files_local(gurk_manifest_path, relative=relative)
+    if plugin_source.exists():
+        return _get_relevant_files_local(plugin_source, relative=relative)
     elif is_git_repo(plugin_source):
         return _get_relevant_files_remote(plugin_source, relative=relative)
     else:

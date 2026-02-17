@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.core.context import (
+from gurk.lib.context import (
     GurkContext,
     Logger,
     get_plugin_directories,
@@ -14,7 +14,7 @@ from gurk.lib.core.plugins import (
     GurkArgumentParser,
     remove_plugin,
 )
-from gurk.lib.utils.remotes import is_git_repo
+from gurk.lib.shared.remotes import is_git_repo
 
 
 class RemoveNamespace(DefaultNamespace):

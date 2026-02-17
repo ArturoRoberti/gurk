@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from gurk.lib.core.context import GurkContext, Logger, get_registries
+from gurk.lib.context import GurkContext, Logger, get_registries
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
@@ -8,7 +8,7 @@ from gurk.lib.core.plugins import (
     is_plugin_installed,
     upgrade_plugin,
 )
-from gurk.lib.utils.remotes import extract_url, is_git_installed
+from gurk.lib.shared.remotes import extract_url, is_git_installed
 
 
 class UpgradeNamespace(DefaultNamespace):

@@ -1,5 +1,5 @@
 try:
-    from gurk.lib.core.context import GurkContext, Logger, get_registries
+    from gurk.lib.context import GurkContext, Logger, get_registries
     from gurk.lib.core.plugins import upgrade_plugin
 except ImportError:
     raise ImportError(

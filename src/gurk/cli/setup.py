@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
 
-from gurk.lib.core.context import GurkContext, Logger, get_logger
+from gurk.lib.context import GurkContext, Logger, get_logger, padded_print
 from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
-from gurk.lib.utils.common import SETUP_DONE_FILE
-from gurk.lib.utils.system_info import get_manufacturer
+from gurk.lib.shared.system_info import get_manufacturer
+from gurk.lib.utils import SETUP_DONE_FILE
 
 
 @dataclass
@@ -45,12 +45,10 @@ class SSHKeysManager:
     def setup_key(self) -> None:
         # Get logger
         logger = get_logger()
-        logger.padded_print("New SSH Key", "cyan", 64)
+        padded_print("New SSH Key", "cyan", 64)
 
         # Get key name
-        logger.padded_print(
-            "SSH Key Name", "yellow", 32, top=False, bottom=False
-        )
+        padded_print("SSH Key Name", "yellow", 32, top=False, bottom=False)
         while True:
             key_name = logger.ask(
                 "Enter a name for your SSH key (e.g. id_ed25519)"
@@ -68,9 +66,7 @@ class SSHKeysManager:
                 logger.warning("Key name cannot be empty. Please try again.\n")
 
         # Get key password
-        logger.padded_print(
-            "SSH Key Password", "yellow", 32, top=False, bottom=False
-        )
+        padded_print("SSH Key Password", "yellow", 32, top=False, bottom=False)
         while True:
             password = logger.ask(
                 "Enter a password for the SSH key (can be empty)",
@@ -101,9 +97,7 @@ class SSHKeysManager:
         subprocess.run(["ssh-add", curr_ssh_key])
 
         # Prompt the user to upload the public SSH key
-        logger.padded_print(
-            "SSH Key Upload", "yellow", 32, top=False, bottom=False
-        )
+        padded_print("SSH Key Upload", "yellow", 32, top=False, bottom=False)
         logger.richprint(
             f"Please upload the public key ({ssh_key_pub_path}) to your account settings (GitHub, GitLab, etc.). Public key:"
         )
@@ -175,12 +169,10 @@ class GitCredentialsManager:
         """Set up git user name and email."""
         # Get logger
         logger = get_logger()
-        logger.padded_print("Git User Info", "cyan", 64)
+        padded_print("Git User Info", "cyan", 64)
 
         # Prompt for username
-        logger.padded_print(
-            "Git User Name", "yellow", 32, top=False, bottom=False
-        )
+        padded_print("Git User Name", "yellow", 32, top=False, bottom=False)
         while True:
             self.user_name = logger.ask("Enter your Git username").strip()
             if not self.user_name:
@@ -189,9 +181,7 @@ class GitCredentialsManager:
             break
 
         # Prompt for email
-        logger.padded_print(
-            "Git User Email", "yellow", 32, top=False, bottom=False
-        )
+        padded_print("Git User Email", "yellow", 32, top=False, bottom=False)
         while True:
             self.user_email = logger.ask("Enter your Git email").strip()
             if not self.user_email:
@@ -223,7 +213,7 @@ def print_secure_boot_steps() -> None:
     """
     # Get logger
     logger = get_logger()
-    logger.padded_print("Disable Secure Boot Steps", "cyan", 64)
+    padded_print("Disable Secure Boot Steps", "cyan", 64)
 
     # Table of common manufacturers → probable keys
     key_table = {

@@ -5,8 +5,8 @@ from pathlib import Path
 
 from packaging.version import Version
 
-from gurk.lib.core.context import get_logger
-from gurk.lib.core.context.registry_manager import (
+from gurk.lib.context import get_logger, pprint_dict
+from gurk.lib.context.registry import (
     get_plugin_directories,
     get_plugin_registration,
     get_registries,
@@ -18,15 +18,14 @@ from gurk.lib.core.plugins.virtual_environments import (
     remove_venv,
     venv_exists,
 )
-from gurk.lib.utils.common import (
-    PathLike,
-    check_version,
-    generate_random_path,
-    typecheck,
+from gurk.lib.shared.configs import load_toml, load_yaml
+from gurk.lib.shared.plugins import (
+    PluginManifest,
+    PluginSource,
+    PluginSpecification,
+    PluginSpecificationEnum,
 )
-from gurk.lib.utils.configs import load_toml, load_yaml
-from gurk.lib.utils.remotes import (
-    GIT_QUERY_VERSIONING_FIELDS,
+from gurk.lib.shared.remotes import (
     GitQuery,
     commit2version,
     determine_ref,
@@ -37,15 +36,17 @@ from gurk.lib.utils.remotes import (
     is_git_repo,
     parse_git_query,
 )
+from gurk.lib.utils import (
+    GIT_QUERY_VERSIONING_FIELDS,
+    GURK_MANIFEST_FILENAME,
+    GURK_METADATA_FILENAME,
+    PathLike,
+    check_version,
+    generate_random_path,
+    typecheck,
+)
 
 from .check import check_local_plugin
-from .common import (
-    GURK_MANIFEST_FILENAME,
-    PluginManifest,
-    PluginSource,
-    PluginSpecification,
-    PluginSpecificationEnum,
-)
 from .getters import get_plugin_data, get_relevant_plugin_files
 from .versioning import get_plugin_commit, get_plugin_version
 
@@ -185,10 +186,10 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
         return False
 
     # Get plugin metadata
-    metadata = load_toml(plugin_path / "pyproject.toml")
+    metadata = load_toml(plugin_path / GURK_METADATA_FILENAME)
     if not metadata:
         logger.error(
-            f"Plugin at '{plugin_path}' has an invalid or missing 'pyproject.toml' file",
+            f"Plugin at '{plugin_path}' has an invalid or missing '{GURK_METADATA_FILENAME}' file",
         )
         return False
 
@@ -197,7 +198,7 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
         plugin_name: str = metadata["project"]["name"]
     except KeyError as e:
         logger.error(
-            f"Plugin at '{plugin_path}' has an invalid 'pyproject.toml' file: missing key {e}",
+            f"Plugin at '{plugin_path}' has an invalid '{GURK_METADATA_FILENAME}' file: missing key {e}",
         )
         return False
 
@@ -333,10 +334,13 @@ def _install_remote_plugin(plugin: GitQuery) -> bool:
     # Import metadata to random file
     temp_metadata = generate_random_path(suffix=".toml", create=False)
     try:
-        git_clone(edit_url(plugin, path="pyproject.toml"), temp_metadata)
+        git_clone(
+            edit_url(plugin, path=GURK_METADATA_FILENAME),
+            temp_metadata,
+        )
     except subprocess.CalledProcessError as e:
         error(
-            f"Failed to clone 'pyproject.toml' from "
+            f"Failed to clone '{GURK_METADATA_FILENAME}' from "
             f"remote plugin repository '{plugin}': {e}",
             temp_metadata,
         )
@@ -354,7 +358,7 @@ def _install_remote_plugin(plugin: GitQuery) -> bool:
             raise ValueError(f"Invalid version string: {plugin_version}")
     except KeyError as e:
         error(
-            f"Plugin '{plugin}' has an invalid 'pyproject.toml' file: invalid key {e}",
+            f"Plugin '{plugin}' has an invalid '{GURK_METADATA_FILENAME}' file: invalid key {e}",
             temp_metadata,
         )
         return False
@@ -464,7 +468,7 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
             )
 
     logger.error(
-        logger.pprint_dict(
+        pprint_dict(
             get_registries(home_registry=False, package_registry=True),
             as_str=True,
         )
@@ -520,9 +524,9 @@ def install_plugin(
 
         # Get the plugin name
         try:
-            plugin_spec = load_toml(plugin_path / "pyproject.toml")["project"][
-                "name"
-            ]
+            plugin_spec = load_toml(plugin_path / GURK_METADATA_FILENAME)[
+                "project"
+            ]["name"]
         except Exception as e:
             logger.error(
                 f"Failed to load plugin name from '{plugin_path}': {str(e)}"
@@ -806,8 +810,8 @@ def upgrade_plugin(
                     sorted(latest_relevant_files),
                 ):
                     if (
-                        cfile.name == "pyproject.toml"
-                        and lfile.name == "pyproject.toml"
+                        cfile.name == GURK_METADATA_FILENAME
+                        and lfile.name == GURK_METADATA_FILENAME
                     ):
                         # Skip comparing pyproject.toml, since we already know it has a version change
                         #   Dependency changes are reflected in other changed files

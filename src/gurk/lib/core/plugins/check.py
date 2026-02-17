@@ -5,28 +5,34 @@ from typing import get_type_hints
 
 import networkx as nx
 
-from gurk.lib.core.context import get_logger
-from gurk.lib.core.context.registry_manager import get_plugin_registration
-from gurk.lib.utils.common import PathLike, check_version, typecheck
-from gurk.lib.utils.configs import load_toml, load_yaml
-from gurk.lib.utils.patterns import PatternCollection
-from gurk.lib.utils.remotes import is_git_repo
-from gurk.lib.utils.scripts import (
-    ScriptBlockTypes,
-    check_script_blocks,
-    get_block_spans,
-)
-from gurk.lib.utils.tasks import DefaultTaskDictCollection
-from gurk.lib.utils.typed_dict import full_isinstance, print_typed_dict_types
-
-from .common import (
-    GURK_MANIFEST_FILENAME,
+from gurk.lib.context import get_logger
+from gurk.lib.context.registry import get_plugin_registration
+from gurk.lib.shared.configs import load_toml, load_yaml
+from gurk.lib.shared.dicts import print_typed_dict_types
+from gurk.lib.shared.plugins import (
     FilteredPluginMetadata,
     PluginManifest,
     PluginMetadata,
     PluginMetadataDependencies,
     PluginOptions,
 )
+from gurk.lib.shared.remotes import is_git_repo
+from gurk.lib.shared.scripts import (
+    ScriptBlockTypes,
+    check_script_blocks,
+    get_block_spans,
+)
+from gurk.lib.shared.tasks import DefaultTaskDictCollection
+from gurk.lib.utils import (
+    GURK_MANIFEST_FILENAME,
+    GURK_METADATA_FILENAME,
+    PathLike,
+    PatternCollection,
+    check_version,
+    full_isinstance,
+    typecheck,
+)
+
 from .gurk_argparser import GurkArgumentParser, check_args_dict
 
 
@@ -79,7 +85,7 @@ def filter_metadata(metadata: dict) -> FilteredPluginMetadata | None:
 def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
     """
     Check if a local plugin is valid.
-        NOTE: All imported plugins (recursively) must also be local and valid.
+        :NOTE: All imported plugins (recursively) must also be local and valid.
 
     :param plugin_path: Path to the local plugin directory
     :type plugin_path: PathLike
@@ -108,16 +114,16 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                 logger.debug(msg)
 
         # Load pyproject.toml
-        pyproject_file = _plugin_path / "pyproject.toml"
+        pyproject_file = _plugin_path / GURK_METADATA_FILENAME
         if not pyproject_file.is_file():
             error(
-                f"Plugin source '{_plugin_path}' is missing a 'pyproject.toml' file."
+                f"Plugin source '{_plugin_path}' is missing a '{GURK_METADATA_FILENAME}' file."
             )
             return False
         pyproject_data = load_toml(pyproject_file)
         if not pyproject_data:
             error(
-                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' file"
+                f"Plugin source '{_plugin_path}' has an invalid '{GURK_METADATA_FILENAME}' file"
             )
             return False
 
@@ -125,7 +131,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         project_metadata = filter_metadata(pyproject_data)
         if not project_metadata:
             error(
-                f"Plugin source '{_plugin_path}' has an invalid 'pyproject.toml' "
+                f"Plugin source '{_plugin_path}' has an invalid '{GURK_METADATA_FILENAME}' "
                 "file: invalid 'project' section structure. Expected:\n"
                 f"{print_typed_dict_types(PluginMetadata, indent=2, as_str=True)}"
             )
@@ -136,7 +142,8 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         if not plugin_name:
             error(
                 f"Plugin source '{_plugin_path}' has an invalid "
-                "'pyproject.toml' file: 'project.name' is missing or empty."
+                f"'{GURK_METADATA_FILENAME}' file: 'project.name' "
+                "is missing or empty."
             )
             return False
         elif not PatternCollection.NAMING.patterns.match(plugin_name):
@@ -359,7 +366,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         def expand_graph(graph: nx.DiGraph, field: str) -> bool:
             """
             Expand a directed graph with edges from a task field.
-                NOTE: The direction is the same, as this is only used for cycle detection.
+                :NOTE: The direction is the same, as this is only used for cycle detection.
 
             :param graph: The directed graph to expand
             :type graph: nx.DiGraph

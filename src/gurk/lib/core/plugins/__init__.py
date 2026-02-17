@@ -1,11 +1,4 @@
 from .check import check_local_plugin
-from .common import (
-    GURK_MANIFEST_FILENAME,
-    PluginManifest,
-    PluginMetadata,
-    PluginSpecificationEnum,
-    ResolvedPluginManifest,
-)
 from .core import (
     create_plugin_venv,
     install_plugin,
@@ -27,16 +20,16 @@ from .gurk_argparser import (
     TaskParserNamespace,
 )
 from .versioning import get_plugin_version
-from .virtual_environments import remove_venv, venv_exists
+from .virtual_environments import (
+    get_venv_dir,
+    get_venv_gurk_version,
+    remove_venv,
+    venv_exists,
+)
 
 __all__ = [
     "DefaultNamespace",
     "GurkArgumentParser",
-    "GURK_MANIFEST_FILENAME",
-    "PluginManifest",
-    "PluginMetadata",
-    "PluginSpecificationEnum",
-    "ResolvedPluginManifest",
     "TaskParserNamespace",
     "check_local_plugin",
     "create_plugin_venv",
@@ -45,6 +38,8 @@ __all__ = [
     "get_plugin_version",
     "get_raw_plugin_manifest",
     "get_resolved_plugin_manifest",
+    "get_venv_dir",
+    "get_venv_gurk_version",
     "install_plugin",
     "is_plugin_installed",
     "iter_configs",

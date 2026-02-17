@@ -2,20 +2,29 @@ from argparse import Namespace
 from collections import defaultdict
 from copy import deepcopy
 
-from gurk.lib.core.context import GurkContext, Logger, get_registries
+from gurk.lib.context import (
+    GurkContext,
+    Logger,
+    get_registries,
+    padded_print,
+    pprint_dict,
+    richprint,
+)
 from gurk.lib.core.plugins import (
-    GURK_MANIFEST_FILENAME,
     GurkArgumentParser,
-    PluginManifest,
-    PluginMetadata,
     get_available_plugin_tasks,
     get_plugin_data,
     is_plugin_installed,
 )
-from gurk.lib.utils.common import PACKAGE_SRC_PATH
-from gurk.lib.utils.configs import load_toml
-from gurk.lib.utils.system_info import get_system_info
-from gurk.lib.utils.typed_dict import print_typed_dict_types
+from gurk.lib.shared.configs import load_toml
+from gurk.lib.shared.dicts import print_typed_dict_types
+from gurk.lib.shared.plugins import PluginManifest, PluginMetadata
+from gurk.lib.shared.system_info import get_system_info
+from gurk.lib.utils import (
+    GURK_MANIFEST_FILENAME,
+    GURK_METADATA_FILENAME,
+    PACKAGE_SRC_PATH,
+)
 
 
 class HelpNamespace(Namespace):
@@ -75,12 +84,12 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute without writing to plugins
-    with GurkContext(logger=Logger(False, False), writable=False) as ctx:
+    with GurkContext(logger=Logger(False, False, None), writable=False) as ctx:
         # Print help about gurk itself
         if not any(vars(args).values()):
             # Load help from pyproject.toml
             gurk_toml = load_toml(
-                PACKAGE_SRC_PATH.parents[1] / "pyproject.toml"
+                PACKAGE_SRC_PATH.parents[1] / GURK_METADATA_FILENAME
             )
 
             # Dictionary linking to gurk help
@@ -90,10 +99,10 @@ def main(argv, prog, description):
             }
 
             # Link to documentation
-            ctx.logger.richprint(
+            richprint(
                 "For detailed help, visit the Gurk documentation:", "green"
             )
-            ctx.logger.pprint_dict(gurk_help, color="yellow", indent=2)
+            pprint_dict(gurk_help, color="yellow", indent=2)
 
         # Show help for specific plugins
         elif args.plugins:
@@ -110,30 +119,24 @@ def main(argv, prog, description):
                 plugin_name = plugin_data["metadata"]["name"]
 
                 # Print general info
-                ctx.logger.padded_print(
-                    f"Plugin '{plugin_name}' General Info", "green"
-                )
+                padded_print(f"Plugin '{plugin_name}' General Info", "green")
                 general_info = deepcopy(plugin_data["metadata"])
                 general_info["source"] = (
                     plugin_data["registration"]["remote"]
                     or plugin_data["registration"]["local"]
                 )
 
-                ctx.logger.pprint_dict(
-                    general_info, color="yellow", capitalize=True
-                )
-                ctx.logger.newline()
+                pprint_dict(general_info, color="yellow", capitalize=True)
 
                 # Print tasks defined by the plugin
                 plugin_manifest = plugin_data["manifest"]
                 if plugin_manifest.get("tasks"):
-                    ctx.logger.padded_print("Defined Tasks", "cyan")
+                    padded_print("Defined Tasks", "cyan")
                     for task_name, task_info in plugin_manifest[
                         "tasks"
                     ].items():
-                        ctx.logger.richprint(f"- {task_name}:", "yellow")
-                        ctx.logger.pprint_dict(task_info, color="cyan")
-                        ctx.logger.newline()
+                        richprint(f"- {task_name}:", "yellow")
+                        pprint_dict(task_info, color="cyan")
 
                 # Print imported plugins
                 if plugin_manifest.get("imports"):
@@ -151,27 +154,25 @@ def main(argv, prog, description):
                                 or plugin_data["registration"]["local"]
                             )
 
-                    ctx.logger.padded_print("Imported Plugins", "cyan")
-                    ctx.logger.pprint_dict(imports, color="yellow")
-                    ctx.logger.newline()
+                    padded_print("Imported Plugins", "cyan")
+                    pprint_dict(imports, color="yellow")
 
                 # Print 'options' section
-                ctx.logger.padded_print("Run Options", "cyan")
+                padded_print("Run Options", "cyan")
                 for option_name, option in plugin_manifest["options"].items():
                     key = plugin_name + (
                         " (default)"
                         if option_name == "default"
-                        else f"={option_name}"
+                        else f":{option_name}"
                     )
-                    ctx.logger.richprint(f"- {key}: ", "yellow")
-                    ctx.logger.pprint_dict(option, color="cyan")
-                    ctx.logger.newline()
+                    richprint(f"- {key}", "yellow")
+                    pprint_dict(option, color="cyan")
 
         # Show help for specific tasks
         elif args.tasks:
             # Get all available tasks
             tasks = get_available_plugin_tasks()
-            ctx.logger.padded_print("Task Information", "cyan")
+            padded_print("Task Information", "cyan")
 
             for task_full_name in args.tasks:
                 # Get task (if installed)
@@ -183,22 +184,20 @@ def main(argv, prog, description):
                     continue
 
                 # Print task info
-                ctx.logger.richprint(f"Task '{task_full_name}':", "green")
-                ctx.logger.pprint_dict(
+                richprint(f"Task '{task_full_name}':", "green")
+                pprint_dict(
                     task_info, color="yellow", capitalize=True, indent=2
                 )
-                ctx.logger.newline()
 
         # Show available plugins
         elif args.available_plugins:
-            ctx.logger.padded_print("Available Plugins", "cyan")
+            padded_print("Available Plugins", "cyan")
             combined_registry = get_registries(
                 home_registry=True, package_registry=True, combine=True
             )
             for plugin_name, plugin_info in combined_registry.items():
-                ctx.logger.richprint(f"{plugin_name}:", "green")
-                ctx.logger.pprint_dict(plugin_info, color="yellow", indent=2)
-                ctx.logger.newline()
+                richprint(f"{plugin_name}:", "green")
+                pprint_dict(plugin_info, color="yellow", indent=2)
 
         # Show available tasks
         elif args.available_tasks:
@@ -210,22 +209,20 @@ def main(argv, prog, description):
                 grouped[group].append(key)
 
             # Print available tasks
-            ctx.logger.padded_print("Available Tasks", "cyan")
+            padded_print("Available Tasks", "cyan")
             for plugin_name, task_list in grouped.items():
-                ctx.logger.richprint(f"- {plugin_name}:", "green")
+                richprint(f"- {plugin_name}:", "green")
                 for task_name in task_list:
-                    ctx.logger.richprint(f"  - {task_name}", "yellow")
+                    richprint(f"  - {task_name}", "yellow")
 
         # Show required plugin structure
         elif args.structure:
-            ctx.logger.padded_print(
-                f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan"
-            )
+            padded_print(f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan")
             print_typed_dict_types(PluginManifest)
-            ctx.logger.newline()
 
-            ctx.logger.padded_print(
-                "Structure of 'project' section in 'pyproject.toml'", "cyan"
+            padded_print(
+                f"Structure of 'project' section in '{GURK_METADATA_FILENAME}'",
+                "cyan",
             )
             print_typed_dict_types(PluginMetadata)
 
@@ -236,7 +233,5 @@ def main(argv, prog, description):
             del system_info["simulate_hardware"]
 
             # Print system info
-            ctx.logger.padded_print("System information", "cyan")
-            ctx.logger.pprint_dict(
-                system_info, color="yellow", capitalize=True
-            )
+            padded_print("System information", "cyan")
+            pprint_dict(system_info, color="yellow", capitalize=True)

@@ -3,8 +3,9 @@ from pathlib import Path
 from subprocess import DEVNULL, CalledProcessError, check_call
 from venv import EnvBuilder
 
-from gurk.lib.core.context import get_logger
-from gurk.lib.utils.common import (
+from gurk.lib.context import get_logger
+from gurk.lib.utils import (
+    GURK_VERSION,
     PACKAGE_SRC_PATH,
     PACKAGE_VENVS_PATH,
     typecheck,
@@ -12,7 +13,7 @@ from gurk.lib.utils.common import (
 
 
 @typecheck
-def _get_venv_dir(plugin_name: str) -> Path:
+def get_venv_dir(plugin_name: str) -> Path:
     """
     Get the path to the virtual environment directory for a plugin.
 
@@ -25,6 +26,19 @@ def _get_venv_dir(plugin_name: str) -> Path:
 
 
 @typecheck
+def _get_venv_gurk_file(plugin_name: str) -> Path:
+    """
+    Get the path to the GURK version file for a plugin's virtual environment.
+
+    :param plugin_name: Name of the plugin
+    :type plugin_name: str
+    :return: Path to the GURK version file in the virtual environment
+    :rtype: Path
+    """
+    return get_venv_dir(plugin_name) / "GURK_VERSION"
+
+
+@typecheck
 def venv_exists(venv_name: str) -> bool:
     """
     Check if a virtual environment exists for a plugin.
@@ -34,7 +48,7 @@ def venv_exists(venv_name: str) -> bool:
     :return: True if the virtual environment exists, False otherwise
     :rtype: bool
     """
-    return _get_venv_dir(venv_name).is_dir()
+    return get_venv_dir(venv_name).is_dir()
 
 
 @typecheck
@@ -53,7 +67,7 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
     logger = get_logger()
 
     # Check if venv already exists
-    venv_dir = _get_venv_dir(venv_name)
+    venv_dir = get_venv_dir(venv_name)
     if venv_exists(venv_name):
         logger.error(
             f"Virtual environment for plugin '{venv_name}' already exists at {venv_dir}"
@@ -83,6 +97,9 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
         remove_venv(venv_name)
         return False
 
+    # Write the gurk version to a file in the venv directory for later reference
+    _get_venv_gurk_file(venv_name).write_text(GURK_VERSION + "\n")
+
     logger.success(
         f"Successfully created virtual environment for plugin '{venv_name}'"
     )
@@ -99,7 +116,7 @@ def remove_venv(venv_name: str) -> bool:
     :return: True if the virtual environment was removed successfully, False otherwise
     :rtype: bool
     """
-    venv_path = _get_venv_dir(venv_name)
+    venv_path = get_venv_dir(venv_name)
     if venv_path.is_dir():
         try:
             shutil.rmtree(venv_path)
@@ -108,3 +125,19 @@ def remove_venv(venv_name: str) -> bool:
         else:
             return True
     return False
+
+
+@typecheck
+def get_venv_gurk_version(venv_name: str) -> str | None:
+    """
+    Get the GURK version associated with a virtual environment.
+
+    :param venv_name: Name of the virtual environment (same as the plugin name)
+    :type venv_name: str
+    :return: The GURK version if available, None otherwise
+    :rtype: str | None
+    """
+    gurk_version_file = _get_venv_gurk_file(venv_name)
+    if gurk_version_file.is_file():
+        return gurk_version_file.read_text().strip()
+    return None

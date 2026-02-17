@@ -3,27 +3,25 @@ from textwrap import dedent
 
 import networkx as nx
 
-from gurk.lib.core.context import get_logger
+from gurk.lib.context import get_logger
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
 )
-from gurk.lib.utils.common import (
-    PACKAGE_VENVS_PATH,
-    generate_random_path,
-    typecheck,
-)
-from gurk.lib.utils.configs import overlay_dicts
-from gurk.lib.utils.scripts import Command
-from gurk.lib.utils.tasks import (
+from gurk.lib.shared.dicts import fill_typed_dict
+from gurk.lib.shared.scripts import Command, SchedulerTask
+from gurk.lib.shared.tasks import (
     CustomTaskDictCollection,
     ResolvedArgsDefinitionCollection,
-    ResolvedTask,
     ResolvedTaskDict,
     ResolvedTaskDictCollection,
-    TaskDictCollection,
 )
-from gurk.lib.utils.typed_dict import fill_typed_dict
+from gurk.lib.utils import (
+    PACKAGE_VENVS_PATH,
+    generate_random_path,
+    overlay_dicts,
+    typecheck,
+)
 
 
 @dataclass
@@ -34,7 +32,7 @@ class Processor:
     option:      CustomTaskDictCollection = field()
     cli_args:    list[str]                = field()
     parser_base: GurkArgumentParser       = field()
-    tasks:       list[ResolvedTask]       = field(init=False, default_factory=list)
+    tasks:       list[SchedulerTask]      = field(init=False, default_factory=list)
     # fmt: on
 
     def __post_init__(self):
@@ -146,12 +144,12 @@ class Processor:
         # Prepend system preparation task
         tasks = self.add_preparation_task(tasks)
 
-        # Convert to ResolvedTask list
+        # Convert to SchedulerTask list
         for task_name, task in tasks.items():
             if task_name not in self.option:
                 continue
 
-            resolved_task = ResolvedTask(
+            resolved_task = SchedulerTask(
                 name=task_name,
                 command=Command(task["script"], task["function"]),
                 config_file=str(task["config_file"])
@@ -165,15 +163,15 @@ class Processor:
 
     @typecheck
     def enable_dependencies(
-        self, tasks: TaskDictCollection
-    ) -> TaskDictCollection:
+        self, tasks: ResolvedTaskDictCollection
+    ) -> ResolvedTaskDictCollection:
         """
         Enable dependencies of enabled tasks.
 
         :param tasks: Tasks to process
-        :type tasks: TaskDictCollection
+        :type tasks: ResolvedTaskDictCollection
         :return: Processed tasks with dependencies enabled
-        :rtype: TaskDictCollection
+        :rtype: ResolvedTaskDictCollection
         """
         # Get logger
         logger = get_logger()

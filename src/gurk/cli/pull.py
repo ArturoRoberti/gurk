@@ -1,10 +1,10 @@
-from gurk.lib.core.context import GurkContext, Logger
+from gurk.lib.context import GurkContext, Logger
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
     install_plugin,
 )
-from gurk.lib.utils.remotes import is_git_installed
+from gurk.lib.shared.remotes import is_git_installed
 
 
 class PullNamespace(DefaultNamespace):

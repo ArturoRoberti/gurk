@@ -1,4 +1,4 @@
-from gurk.lib.core.context import GurkContext, Logger
+from gurk.lib.context import GurkContext, Logger
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,

@@ -14,10 +14,9 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Generic, Sequence, TypeVar
 
-from gurk.lib.utils.common import YES_ANSWERS, typecheck
-from gurk.lib.utils.system_info import SystemInfo
-from gurk.lib.utils.tasks import ArgsDefinition, ArgsDefinitionCollection
-from gurk.lib.utils.typed_dict import full_isinstance
+from gurk.lib.shared.system_info import SystemInfo
+from gurk.lib.shared.tasks import ArgsDefinition, ArgsDefinitionCollection
+from gurk.lib.utils import YES_ANSWERS, full_isinstance, typecheck
 
 
 @typecheck
