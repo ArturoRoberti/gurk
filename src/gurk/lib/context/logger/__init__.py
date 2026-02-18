@@ -1,6 +1,6 @@
 from .logger import DummyLogger, Logger, get_logger
-from .logger_interface import padded_print, pprint_dict, richprint
 from .logger_types import LoggerSeverity, TaskTerminationType
+from .logger_utils import logrichprint
 
 __all__ = [
     "DummyLogger",
@@ -8,7 +8,5 @@ __all__ = [
     "LoggerSeverity",
     "TaskTerminationType",
     "get_logger",
-    "padded_print",
-    "pprint_dict",
-    "richprint",
+    "logrichprint",
 ]

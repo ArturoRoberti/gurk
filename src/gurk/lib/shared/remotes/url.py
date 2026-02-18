@@ -115,10 +115,7 @@ def edit_url(url: str, **kwargs) -> str:
     :rtype: str
     :raises ValueError: If the input kwargs are invalid
     """
-    if not all(
-        isinstance(k, str) and (isinstance(v, str) or v is None)
-        for k, v in kwargs.items()
-    ):
+    if not full_isinstance(kwargs, dict[str, str | None]):
         raise ValueError(
             f"All keys in kwargs must be strings and values "
             f"must be strings or None, but got: {kwargs}"

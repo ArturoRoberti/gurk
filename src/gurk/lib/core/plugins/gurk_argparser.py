@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Generic, Sequence, TypeVar
 
 from gurk.lib.shared.system_info import SystemInfo
-from gurk.lib.shared.tasks import ArgsDefinition, ArgsDefinitionCollection
+from gurk.lib.shared.tasks import ArgsDefinitionCollection
 from gurk.lib.utils import YES_ANSWERS, full_isinstance, typecheck
 
 
@@ -57,17 +57,6 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
     :type args_dict: ArgsDefinitionCollection
     :raises ArgumentTypeError: If argument definitions are invalid
     """
-    # Validate structure
-    if not (
-        isinstance(args_dict, dict)
-        and all(isinstance(key, str) for key in args_dict.keys())
-        and all(
-            full_isinstance(arg_spec, ArgsDefinition)
-            for arg_spec in args_dict.values()
-        )
-    ):
-        raise ArgumentTypeError("Invalid argument definitions structure")
-
     # Validate mutually exclusive groups
     mutex_groups = defaultdict(list)
     for name, spec in args_dict.items():
@@ -104,11 +93,7 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
         choices = spec.get("choices")
         if choices is not None:
             # Validate choices structure
-            if (
-                not isinstance(choices, list)
-                or not choices
-                or not all(isinstance(c, str) for c in choices)
-            ):
+            if not full_isinstance(choices, list[str]) or not choices:
                 raise ArgumentTypeError(
                     f"Invalid choices structure for argument '{name}'"
                 )
@@ -119,7 +104,7 @@ def check_args_dict(args_dict: ArgsDefinitionCollection) -> None:
                     default = [default]
 
                 # Validate default structure
-                if not default or not all(isinstance(d, str) for d in default):
+                if not full_isinstance(default, list[str]) or not default:
                     raise ArgumentTypeError(
                         f"Invalid default structure for argument '{name}'"
                     )

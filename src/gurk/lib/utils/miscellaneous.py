@@ -3,7 +3,8 @@ import shutil
 from copy import deepcopy
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
-from typing import Any, TypeGuard, TypeVar
+from types import GenericAlias
+from typing import Any, TypeGuard, TypeVar, overload
 
 from packaging.version import InvalidVersion, Version
 from pydantic import TypeAdapter, ValidationError
@@ -64,17 +65,52 @@ def check_version(version: str) -> bool:
 
 
 T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
+
+
+@overload
+def full_isinstance(value: Any, expected_type: type[T], /) -> TypeGuard[T]:
+    ...
+
+
+@overload
+def full_isinstance(
+    value: Any, expected_type: type[set[T]], /
+) -> TypeGuard[set[T]]:
+    ...
+
+
+@overload
+def full_isinstance(
+    value: Any, expected_type: type[list[T]], /
+) -> TypeGuard[list[T]]:
+    ...
+
+
+@overload
+def full_isinstance(
+    value: Any, expected_type: type[dict[K, V]], /
+) -> TypeGuard[dict[K, V]]:
+    ...
+
+
+@overload
+def full_isinstance(
+    value: Any, expected_type: type[tuple[T, ...]], /
+) -> TypeGuard[tuple[T, ...]]:
+    ...
 
 
 @typecheck
-def full_isinstance(value: Any, expected_type: type[T]) -> TypeGuard[T]:
+def full_isinstance(value: Any, expected_type: type | GenericAlias, /) -> bool:
     """
     Check if a value is an instance of the expected type.
 
     :param value: The value to check.
     :type value: Any
     :param expected_type: The expected type (can be a plain type, Union, TypedDict, etc.).
-    :type expected_type: type[T]
+    :type expected_type: type | GenericAlias
     :return: True if the value matches the expected type, False otherwise.
     :rtype: bool
     """
@@ -139,3 +175,8 @@ def overlay_dicts(dicts: ListOrTuple[dict]) -> dict:
         overlayed_dict = _overlay_two_dicts(overlayed_dict, current_dict)
 
     return overlayed_dict
+
+
+def identity(x: T) -> T:
+    """Return the input value unchanged."""
+    return x

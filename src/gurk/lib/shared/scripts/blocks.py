@@ -4,13 +4,13 @@ from pathlib import Path
 
 from gurk.lib.utils import PathLike, PatternCollection, typecheck
 
-from .command_kind import CommandKind
+from .command import CommandKind
 from .script_types import ScriptBlock, ScriptBlockTypes
 
 
 @typecheck
 def get_block_spans(
-    path: PathLike, top_imports_only: bool = True, merge: bool = True
+    path: PathLike, top_imports_only: bool = True, merge_other: bool = True
 ) -> list[ScriptBlock]:
     """
     Returns list of (block_type, start_line, end_line) for top-level script blocks in the given file.
@@ -19,8 +19,8 @@ def get_block_spans(
     :type path: PathLike
     :param top_imports_only: Whether to count only top-level import blocks as IMPORT type
     :type top_imports_only: bool
-    :param merge: Whether to merge adjacent blocks of the same type. Comes at the cost of losing block names.
-    :type merge: bool
+    :param merge_other: Whether to merge adjacent OTHER blocks. Comes at the cost of losing block names.
+    :type merge_other: bool
     :return: List of ScriptBlock dictionaries with block type and line spans
     :rtype: list[ScriptBlock]
     """
@@ -149,7 +149,7 @@ def get_block_spans(
                 block["type"] = ScriptBlockTypes.OTHER
 
     # Merge adjacent OTHER blocks for readability
-    if merge:
+    if merge_other:
         merged_positions = []
         for block in positions:
             if (
@@ -171,7 +171,7 @@ def get_block_spans(
 
 
 @typecheck
-def check_script_blocks(path: Path) -> list[str]:
+def check_script_blocks(path: PathLike) -> list[str]:
     """
     Check that a script only contains allowed top-level code:
     - Only functions and an entrypoint (and imports for Python)
@@ -180,7 +180,7 @@ def check_script_blocks(path: Path) -> list[str]:
         :NOTE: Any block start with an added comment after will be considered invalid/OTHER.
 
     :param path: Path to the script file
-    :type path: Path
+    :type path: PathLike
     :return: List of error messages if the script does not meet the criteria, empty list otherwise
     :rtype: list[str]
     """
@@ -216,11 +216,11 @@ def check_script_blocks(path: Path) -> list[str]:
         )
 
     # Check that python functions only capture '*args'
-    if CommandKind.from_script(path.name) == CommandKind.PYTHON:
+    if CommandKind.from_script(path) == CommandKind.PYTHON:
         pattern = PatternCollection.PYTHON.patterns["FUNCTION"]
         matches = [
             match
-            for line in path.read_text().splitlines()
+            for line in Path(path).read_text().splitlines()
             if (match := pattern.search(line.strip()))
         ]
         for match in matches:
@@ -264,3 +264,49 @@ def check_script_blocks(path: Path) -> list[str]:
 
     # Return errors if any
     return errors
+
+
+def check_script_function(script: PathLike, function: str | None) -> list[str]:
+    """
+    Check that a script meets the criteria for being used as a function/entrypoint script:
+
+    :param script: Path to the script file
+    :type script: PathLike
+    :param function: Name of the function to check for, or None if checking for an entrypoint
+    :type function: str | None
+    :return: List of error messages if the script does not meet all criteria, empty list otherwise
+    :rtype: list[str]
+    """
+    # Check script exists
+    if not Path(script).is_file():
+        return [f"Script '{script}' does not exist"]
+
+    # Check script type is supported
+    try:
+        CommandKind.from_script(script)
+    except ValueError:
+        return [f"Script '{script}' has an unsupported extension"]
+
+    # Check that the script meets the block criteria
+    errors = check_script_blocks(script)
+    if errors:
+        return errors
+
+    # Check function/entrypoint exists in script
+    blocks = get_block_spans(script)
+    if function is not None:
+        available_functions = [
+            b["name"] for b in blocks if b["type"] == ScriptBlockTypes.FUNCTION
+        ]
+        if function not in available_functions:
+            return [
+                f"Function '{function}' does not exist in script '{script}'"
+            ]
+    else:
+        entrypoint = [
+            b for b in blocks if b["type"] == ScriptBlockTypes.ENTRYPOINT
+        ]
+        if not entrypoint:
+            return [f"Script '{script}' does not have an ENTRYPOINT block"]
+
+    return []

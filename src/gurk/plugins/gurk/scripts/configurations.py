@@ -6,7 +6,6 @@ from typing import Any
 import requests
 
 from gurk import (
-    Logger,
     LoggerSeverity,
     PatternCollection,
     get_clean_lines,
@@ -14,6 +13,8 @@ from gurk import (
     is_git_repo,
     is_url,
     load_yaml,
+    log_step,
+    logrichprint,
     parse_task_args,
     resolve_package_path,
     revert_sudo_permissions,
@@ -58,7 +59,7 @@ def configure_filestructure(*args: list[str]) -> None:
             if (content is None or isinstance(content, str)) and (
                 dest_path.exists() and not overwrite
             ):
-                Logger.step(
+                log_step(
                     f"Path {dest_path} already exists. Skipping creation...",
                     warning=True,
                 )
@@ -82,7 +83,7 @@ def configure_filestructure(*args: list[str]) -> None:
                     content if not symlink_match else symlink_match.group(1)
                 )
                 if content is None:
-                    Logger.step(
+                    log_step(
                         f"Package resource in path '{content}' could not be resolved. Skipping...",
                         warning=True,
                     )
@@ -90,19 +91,19 @@ def configure_filestructure(*args: list[str]) -> None:
 
                 # Get content based on type
                 if is_git_repo(content):
-                    Logger.step(
+                    log_step(
                         f"Cloning git repository {content} into {dest_path}..."
                     )
                     try:
                         git_clone(content, dest_path, overwrite)
                     except subprocess.CalledProcessError:
-                        Logger.step(
+                        log_step(
                             f"Failed to clone git repository {content}. Skipping...",
                             warning=True,
                         )
                         continue
                 elif is_url(content):
-                    Logger.step(
+                    log_step(
                         f"Downloading file from {content} to {dest_path}..."
                     )
                     response = requests.get(
@@ -111,7 +112,7 @@ def configure_filestructure(*args: list[str]) -> None:
                     if response.status_code == 200:
                         dest_path.write_bytes(response.content)
                     else:
-                        Logger.step(
+                        log_step(
                             f"Failed to download file from {content}. HTTP status code: {response.status_code}",
                             warning=True,
                         )
@@ -133,19 +134,19 @@ def configure_filestructure(*args: list[str]) -> None:
                         ).resolve()
 
                     if not content.exists():
-                        Logger.step(
+                        log_step(
                             f"Source '{content}' does not exist. Skipping...",
                             warning=True,
                         )
                         continue
 
                     if symlink_match:
-                        Logger.step(
+                        log_step(
                             f"Creating symlink from {content} to {dest_path}..."
                         )
                         dest_path.symlink_to(content)
                     else:
-                        Logger.step(
+                        log_step(
                             f"Copying from local path {content} to {dest_path}..."
                         )
                         if content.is_file():
@@ -157,7 +158,7 @@ def configure_filestructure(*args: list[str]) -> None:
                 dest_path.mkdir(exist_ok=True)
                 recursive_create_structure(dest_path, content, overwrite, sudo)
             else:
-                Logger.step(
+                log_step(
                     f"Unsupported entry type '{type(content).__name__}' for {content}. Skipping...",
                     warning=True,
                 )
@@ -169,7 +170,7 @@ def configure_filestructure(*args: list[str]) -> None:
     # Check file structure
     config_data = load_yaml(task_args.config_file)
     if config_data is None:
-        Logger.logrichprint(
+        logrichprint(
             LoggerSeverity.FATAL,
             f"Invalid YAML file provided for file structure configuration: {task_args.config_file}",
         )
@@ -185,7 +186,7 @@ def configure_filestructure(*args: list[str]) -> None:
         )
     if config_data.get("ROOT"):
         if not task_args.gurk_configure_root_filestructure:
-            Logger.logrichprint(
+            logrichprint(
                 LoggerSeverity.WARNING,
                 "Skipping root (/) file structure configuration, as "
                 "'--gurk-configure-root-filestructure' flag is not provided.",

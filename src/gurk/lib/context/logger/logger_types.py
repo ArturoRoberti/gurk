@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypeVar
 
 
 @dataclass(frozen=True)
@@ -72,6 +71,3 @@ class LoggerSeverity(_LoggerEnumBase):
     FATAL   = LoggerTextSpec(" FATAL ", "red",     True , True )
     DONE    = LoggerTextSpec("  DONE ", "purple",  True , False)
     # fmt: on
-
-
-LoggerEnum = TypeVar("LoggerEnum", bound=_LoggerEnumBase)

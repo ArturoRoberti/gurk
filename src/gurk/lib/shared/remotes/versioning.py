@@ -1,19 +1,238 @@
+import re
 import subprocess
 from functools import cache
 from typing import Literal, overload
 
-from gurk.lib.utils import (
-    GURK_METADATA_FILENAME,
-    check_version,
-    generate_random_path,
-    typecheck,
-)
+from gurk.lib.utils import GURK_METADATA_FILENAME, check_version, typecheck
 
 from ..configs import load_toml
-from .clone import _get_mirror, _git_fetch, _repo_lock, git_clone
-from .git_utils import _git_run, is_git_repo
-from .types import GitQuery
-from .url import edit_url, extract_url
+from .types import GitQuery, GitQueryDict
+from .url import edit_url, extract_url, parse_git_query
+from .utils import _get_mirror, _git_run, _repo_lock, is_git_repo
+
+
+@cache
+@typecheck
+def _version2commit(
+    url: str,
+    version: str,
+) -> str | None:
+    """
+    Return the commit hash where a specified version change was made in the pyproject.toml file of a git repo, or None if not found.
+        :NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
+
+    :param url: Git repository URL
+    :type url: str
+    :param version: Version string to search for
+    :type version: str
+    :return: Commit hash where the version was added, or None if not found
+    :rtype: str | None
+    :raises ValueError: If the repository does not exist or if the version string is invalid
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that version is valid
+    if not check_version(version):
+        raise ValueError(f"Invalid version string: '{version}'")
+
+    # Check that the repo exists
+    if not is_git_repo(url):
+        raise ValueError(
+            f"Repository {url} does not exist or is not accessible."
+        )
+
+    # Fetch updates
+    mirror = _get_mirror(url)
+    with _repo_lock(mirror):
+        # Get commits that touched the versioning file, newest first
+        result = _git_run(
+            ["git", "rev-list", "HEAD", "--", GURK_METADATA_FILENAME],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        revisions = result.stdout.splitlines()
+
+        # Search for version addition in diffs
+        version_re = re.compile(
+            rf'^\+version\s*=\s*"{re.escape(version)}"\s*$'
+        )
+        for commit in revisions:
+            result = _git_run(
+                ["git", "show", commit, "--", GURK_METADATA_FILENAME],
+                cwd=mirror,
+                capture_output=True,
+                text=True,
+                check=True,
+                errors="ignore",
+            )
+            diff = result.stdout.splitlines()
+
+            for line in diff:
+                if version_re.match(line):
+                    return commit
+
+    return None
+
+
+@typecheck
+def version2commit(
+    repo: str | GitQuery,
+    version: str,
+) -> str | None:
+    """
+    Return the commit hash where a specified version change was made in the pyproject.toml file of a git repo, or None if not found.
+        :NOTE: Assumes version is specified as `version = "<version>"` in pyproject.toml
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param version: Version string to search for
+    :type version: str
+    :return: Commit hash where the version was added, or None if not found
+    :rtype: str | None
+    :raises ValueError: If the repository does not exist or if the version string is invalid
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    return _version2commit(extract_url(repo), version)
+
+
+@cache
+@typecheck
+def get_default_branch(
+    url: str,
+) -> str:
+    """
+    Determine the default branch of a Git repository.
+
+    :param url: Git repository URL
+    :type url: str
+    :return: Name of the default branch
+    :rtype: str
+    :raises ValueError: If the repository does not exist or is not a valid Git repository
+    :raises CalledProcessError: If git commands fail for various reasons
+    :raises RuntimeError: If the default branch cannot be determined
+    """
+    # Fetch updates
+    mirror = _get_mirror(url)
+    with _repo_lock(mirror):
+        # Get default branch from remote info
+        result = _git_run(
+            ["git", "remote", "show", "origin"],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    # Parse default branch
+    origin = result.stdout.splitlines()
+    head_line = next(
+        (line for line in origin if line.strip().startswith("HEAD branch:")),
+        None,
+    )
+    if head_line is None:
+        raise RuntimeError("Could not determine remote HEAD branch")
+
+    # Return default branch
+    return head_line.split(":", 1)[1].strip()
+
+
+@cache
+@typecheck
+def _get_commit(url: str | GitQuery, commit: str | None) -> str:
+    """
+    Get the current commit hash of a local Git repository. If a specific commit is provided, checks if it exists and returns its full hash if so.
+
+    :param url: Git repository URL
+    :type url: str | GitQuery
+    :param commit: Optional commit hash to check and expand. If None, returns the current HEAD commit.
+    :type commit: str | None
+    :return: Current commit hash
+    :rtype: str
+    :raises ValueError: If the path is not a valid Git repository
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    # Check that the repo exists
+    if not is_git_repo(url):
+        raise ValueError(
+            f"Repository {url} does not exist or is not accessible."
+        )
+
+    if commit is None:
+        commit = "HEAD"
+
+    # Fetch updates
+    mirror = _get_mirror(url)
+    with _repo_lock(mirror):
+        # Get commit hash
+        result = _git_run(
+            ["git", "rev-parse", commit],
+            cwd=mirror,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+
+@typecheck
+def get_commit(repo: str | GitQuery, commit: str | None = None) -> str | None:
+    """
+    Get the current commit hash of a local Git repository. If a specific commit is provided, checks if it exists and returns its full hash if so.
+
+    :param repo: Git repository URL or GitQuery (in which case only the URL is used)
+    :type repo: str | GitQuery
+    :param commit: Optional commit hash to check and expand. If None, returns the current HEAD commit.
+    :type commit: str | None
+    :return: Current commit hash or None if the commit does not exist
+    :rtype: str | None
+    :raises ValueError: If the path is not a valid Git repository
+    """
+    try:
+        return _get_commit(extract_url(repo), commit)
+    except subprocess.CalledProcessError:
+        return None
+
+
+@typecheck
+def determine_ref(
+    repo: str | GitQuery | GitQueryDict, *, to_commit: bool = False
+) -> str:
+    """
+    Determine the appropriate git ref (branch, version, or commit) to use for the given repository.
+
+    :param repo: Git repository URL, GitQuery string, or GitQueryDict dictionary
+    :type repo: str | GitQuery | GitQueryDict
+    :param to_commit: Whether to resolve to a commit hash. If False, returns branch or version if available.
+    :type to_commit: bool
+    :return: Git ref to use (branch name, version string, or commit hash)
+    :rtype: str
+    :raises ValueError: If the repository does not exist or if version cannot be resolved to a commit
+    :raises CalledProcessError: If git commands fail for various reasons
+    """
+    parsed = parse_git_query(repo)
+
+    if parsed["commit"]:
+        ref = parsed["commit"]
+    elif parsed["version"]:
+        # Find commit for version
+        commit = version2commit(parsed["url"], parsed["version"])
+        if not commit:
+            raise ValueError(
+                f"Version '{parsed['version']}' not found in repository '{parsed['url']}'"
+            )
+        ref = commit
+    elif parsed["branch"]:
+        ref = parsed["branch"]
+    else:
+        # Get default branch
+        ref = get_default_branch(parsed["url"])
+
+    if to_commit:
+        # Resolve to commit hash
+        ref = get_commit(parsed["url"], ref)
+
+    return ref
 
 
 @cache
@@ -44,10 +263,8 @@ def _get_commit_timestamp(
 
     # Fetch updates
     mirror = _get_mirror(url)
-    _git_fetch(mirror)
-
-    # Get commit timestamp
     with _repo_lock(mirror):
+        # Get commit timestamp
         format_str = "%cI" if human_readable else "%ct"
         result = _git_run(
             ["git", "show", "--no-patch", f"--format={format_str}", commit],
@@ -57,7 +274,8 @@ def _get_commit_timestamp(
             check=True,
         )
         stdout = result.stdout.strip()
-        return stdout if human_readable else int(stdout)
+
+    return stdout if human_readable else int(stdout)
 
 
 @overload
@@ -157,27 +375,29 @@ def _commit2version(
             f"Repository {url} does not exist or is not accessible."
         )
 
-    # Save the versioning file to a temporary location
-    tmp_file = generate_random_path(suffix=".toml")
+    # Fetch updates
+    mirror = _get_mirror(url)
+    with _repo_lock(mirror):
+        # Get the versioning file
+        ref = determine_ref(edit_url(url, commit=commit))
+        versioning_file = _git_run(
+            ["git", "show", f"{ref}:{GURK_METADATA_FILENAME}"],
+            cwd=mirror,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
-    try:
-        # Clone the versioning file
-        git_query = edit_url(url, commit=commit, path=GURK_METADATA_FILENAME)
-        git_clone(
-            git_query, dest=tmp_file
-        )  # TODO: Do without cloning resp. via git show? Then, versioning can include other functions and come above clone.py in hierarchy
+    # Load the version
+    version = load_toml(versioning_file.stdout, from_str=True)["project"][
+        "version"
+    ]
 
-        # Load the versioning file
-        version = load_toml(tmp_file)["project"]["version"]
-
-        # Parse version
-        if not check_version(version):
-            raise ValueError
-    except Exception:
-        version = None
-    finally:
-        tmp_file.unlink()
+    # Parse version
+    if check_version(version):
         return version
+    else:
+        return None
 
 
 @typecheck

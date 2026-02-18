@@ -2,14 +2,7 @@ from argparse import Namespace
 from collections import defaultdict
 from copy import deepcopy
 
-from gurk.lib.context import (
-    GurkContext,
-    Logger,
-    get_registries,
-    padded_print,
-    pprint_dict,
-    richprint,
-)
+from gurk.lib.context import GurkContext, Logger, get_registries
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
@@ -17,8 +10,9 @@ from gurk.lib.core.plugins import (
     is_plugin_installed,
 )
 from gurk.lib.shared.configs import load_toml
-from gurk.lib.shared.dicts import print_typed_dict_types
+from gurk.lib.shared.dicts import pprint_dict, pprint_typed_dict
 from gurk.lib.shared.plugins import PluginManifest, PluginMetadata
+from gurk.lib.shared.printers import padded_print, richprint
 from gurk.lib.shared.system_info import get_system_info
 from gurk.lib.utils import (
     GURK_MANIFEST_FILENAME,
@@ -218,13 +212,13 @@ def main(argv, prog, description):
         # Show required plugin structure
         elif args.structure:
             padded_print(f"Structure of '{GURK_MANIFEST_FILENAME}'", "cyan")
-            print_typed_dict_types(PluginManifest)
+            pprint_typed_dict(PluginManifest)
 
             padded_print(
                 f"Structure of 'project' section in '{GURK_METADATA_FILENAME}'",
                 "cyan",
             )
-            print_typed_dict_types(PluginMetadata)
+            pprint_typed_dict(PluginMetadata)
 
         # Print system information
         elif args.system_info:

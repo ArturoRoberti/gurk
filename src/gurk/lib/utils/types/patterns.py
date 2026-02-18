@@ -98,7 +98,6 @@ class _EnumValue(Protocol[T]):
     patterns: T
 
 
-# TODO: Use direct instantiation e.g. _StepPatterns(any=...), and remove _EnumValue?
 class PatternCollection(Enum):
     """Collection of regex patterns for various utilities."""
 

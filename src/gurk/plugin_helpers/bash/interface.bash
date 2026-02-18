@@ -1,6 +1,6 @@
 log_step() {
 	: "
-	Log a step message without advancing progress.
+	Log a step message without advancing progress. Only to be used from within tasks.
 
 	Args:
 	  - message:   Message to log.

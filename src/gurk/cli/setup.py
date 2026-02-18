@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
 
-from gurk.lib.context import GurkContext, Logger, get_logger, padded_print
+from gurk.lib.context import GurkContext, Logger, get_logger
 from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
+from gurk.lib.shared.printers import padded_print, richprint
 from gurk.lib.shared.system_info import get_manufacturer
 from gurk.lib.utils import SETUP_DONE_FILE
 
@@ -98,11 +99,11 @@ class SSHKeysManager:
 
         # Prompt the user to upload the public SSH key
         padded_print("SSH Key Upload", "yellow", 32, top=False, bottom=False)
-        logger.richprint(
+        richprint(
             f"Please upload the public key ({ssh_key_pub_path}) to your account settings (GitHub, GitLab, etc.). Public key:"
         )
         with open(ssh_key_pub_path) as f:
-            logger.richprint(f.read().strip(), "green")
+            richprint(f.read().strip(), color="green")
         input("After uploading your key, press anything to continue...")
 
     def setup_keys(self) -> None:
@@ -246,7 +247,7 @@ def print_secure_boot_steps() -> None:
         all_keys_str = ", ".join([key for _, keys in matches for key in keys])
 
     # Print steps
-    logger.richprint(
+    richprint(
         dedent(
             f"""\
             1. Reboot your computer. During the initial boot screen, repeatedly press one of the following keys to enter the UEFI/BIOS setup: {all_keys_str}

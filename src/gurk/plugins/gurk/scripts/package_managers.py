@@ -3,12 +3,13 @@ import time
 
 from gurk import (
     BuiltinInstallCommands,
-    Logger,
     LoggerSeverity,
     add_alias,
     get_clean_lines,
     install_packages_from_list,
     install_packages_from_txt_file,
+    log_step,
+    logrichprint,
     parse_task_args,
 )
 
@@ -58,7 +59,7 @@ def install_flatpak_packages(*args: list[str]) -> None:
 
     # Add aliases for flatpak packages
     if task_args.gurk_flatpak_create_aliases:
-        Logger.step("Adding aliases for flatpak packages...")
+        log_step("Adding aliases for flatpak packages...")
         for pkg in get_clean_lines(task_args.config_file):
             # Use probable package name for alias
             pkg_name = pkg.split(".")[-1]
@@ -96,7 +97,7 @@ def install_snap_packages(*args: list[str]) -> None:
         # Exit if max attempts are reached
         if remaining_attempts <= 0:
             msg = "Failed to start snapd service after multiple attempts."
-            Logger.logrichprint(
+            logrichprint(
                 LoggerSeverity.FATAL,
                 msg,
             )
@@ -115,14 +116,14 @@ def install_snap_packages(*args: list[str]) -> None:
             running = False
 
         if running:
-            Logger.logrichprint(
+            logrichprint(
                 LoggerSeverity.INFO,
                 "snapd service is running.",
             )
             return
 
         # Try to start snapd if not running
-        Logger.logrichprint(
+        logrichprint(
             LoggerSeverity.WARNING,
             "Attempting to start snapd service...",
         )
@@ -130,7 +131,7 @@ def install_snap_packages(*args: list[str]) -> None:
             subprocess.run(["sudo", "systemctl", "start", "snapd"], check=True)
             time.sleep(3)  # Wait a bit for the service to start
         except subprocess.CalledProcessError:
-            Logger.logrichprint(
+            logrichprint(
                 LoggerSeverity.WARNING,
                 "Attempt to start snapd service failed.",
             )

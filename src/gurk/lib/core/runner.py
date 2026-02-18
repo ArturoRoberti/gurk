@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from rich.markup import escape
+
 from gurk.lib.context import get_logger
 from gurk.lib.core.plugins import GurkArgumentParser
 from gurk.lib.core.processor import Processor
@@ -56,7 +58,7 @@ def get_sudo_askpass() -> Path:
         attempts = 3
         while attempts > 0:
             response = logger.ask(
-                f"\\[gurk] password for {getpass.getuser()}", True
+                f"{escape('[gurk]')} password for {getpass.getuser()}", True
             )
             test_response = subprocess.run(
                 ["sudo", "-S", "-v"],

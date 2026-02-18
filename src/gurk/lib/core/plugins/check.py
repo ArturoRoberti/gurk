@@ -8,7 +8,7 @@ import networkx as nx
 from gurk.lib.context import get_logger
 from gurk.lib.context.registry import get_plugin_registration
 from gurk.lib.shared.configs import load_toml, load_yaml
-from gurk.lib.shared.dicts import print_typed_dict_types
+from gurk.lib.shared.dicts import pprint_typed_dict
 from gurk.lib.shared.plugins import (
     FilteredPluginMetadata,
     PluginManifest,
@@ -133,7 +133,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             error(
                 f"Plugin source '{_plugin_path}' has an invalid '{GURK_METADATA_FILENAME}' "
                 "file: invalid 'project' section structure. Expected:\n"
-                f"{print_typed_dict_types(PluginMetadata, indent=2, as_str=True)}"
+                f"{pprint_typed_dict(PluginMetadata, indent=2, as_str=True)}"
             )
             return False
 
@@ -198,7 +198,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         if not full_isinstance(plugin_without_helpers, PluginManifest):
             error(
                 f"Plugin at '{_plugin_path}' has invalid structure. Expected: "
-                f"{print_typed_dict_types(PluginManifest, indent=2, as_str=True)}"
+                f"{pprint_typed_dict(PluginManifest, indent=2, as_str=True)}"
             )
             return False
 
@@ -301,9 +301,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
         # Check that the 'imports' section is valid
         imports = plugin.get("imports", [])
-        if not isinstance(imports, list) or not all(
-            isinstance(imp, str) for imp in imports
-        ):
+        if not full_isinstance(imports, list[str]):
             error(
                 f"Plugin 'imports' section is not a list of strings, but of type '{type(imports)}'."
             )

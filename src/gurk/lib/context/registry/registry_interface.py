@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal, overload
 
-from gurk.lib.shared.dicts import print_typed_dict_types
+from gurk.lib.shared.dicts import pprint_dict, pprint_typed_dict
 from gurk.lib.shared.plugins import (
     LocalPluginRegistryEntry,
     PluginRegistry,
@@ -13,7 +13,7 @@ from gurk.lib.shared.plugins import (
 from gurk.lib.shared.remotes import extract_url
 from gurk.lib.utils import full_isinstance, overlay_dicts, typecheck
 
-from ..logger import get_logger, pprint_dict
+from ..logger import get_logger
 from .registry_manager import _get_registries
 from .registry_utils import (
     _expand_registry_path,
@@ -395,7 +395,7 @@ def update_registry(
         ):
             debug_error(
                 f"'entry' has an invalid structure. Expected (e):\n"
-                f"{print_typed_dict_types(PluginRegistryEntry, indent=2, as_str=True)}"
+                f"{pprint_typed_dict(PluginRegistryEntry, indent=2, as_str=True)}"
                 f"but got:\n{pprint_dict(entry, indent=2, as_str=True)}"
             )
             return False

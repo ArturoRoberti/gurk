@@ -22,7 +22,7 @@ from gurk.lib.shared.tasks import (
     ResolvedCustomTaskDict,
     ResolvedDefaultTaskDict,
 )
-from gurk.lib.utils import GURK_METADATA_FILENAME
+from gurk.lib.utils import GURK_METADATA_FILENAME, identity
 
 
 @dataclass(frozen=True)
@@ -62,9 +62,6 @@ def parse_specification(specification: str) -> ParsedSpecification:
         check_function: Callable[[str], bool],
         transform: Callable[[str], str] | None = None,
     ) -> ParsedSpecification | None:
-        def identity(x: str) -> str:
-            return x
-
         if transform is None:
             transform = identity
 
@@ -150,9 +147,20 @@ class RunNamespace(DefaultNamespace):
 
 def main(argv, prog, description):
     # Only parse 'run' specific args, keep the rest for later
-    positional_ind = next(
-        (i for i, arg in enumerate(argv) if not arg.startswith("-")), len(argv)
-    )
+    positional_ind = 0
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg.startswith("-"):
+            i += 1
+            if arg in ("-A", "--askpass"):
+                i += 1  # Skip the argument value
+            continue
+        else:
+            positional_ind = i
+            break
+    else:
+        positional_ind = len(argv)
     run_argv, remaining = (
         argv[: positional_ind + 1],
         argv[positional_ind + 1 :],

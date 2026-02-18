@@ -5,6 +5,7 @@ from .miscellaneous import (
     check_version,
     full_isinstance,
     generate_random_path,
+    identity,
     overlay_dicts,
 )
 from .type_check import typecheck
@@ -15,8 +16,9 @@ __all__ = [
     *types__all__,
     *variables__all__,
     "check_version",
-    "generate_random_path",
     "full_isinstance",
+    "generate_random_path",
+    "identity",
     "overlay_dicts",
     "typecheck",
 ]

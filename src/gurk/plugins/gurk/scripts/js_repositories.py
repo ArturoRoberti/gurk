@@ -7,12 +7,12 @@ from packaging import version
 
 from gurk import (
     BuiltinInstallCommands,
-    Logger,
     add_alias,
     extract_url,
     get_clean_lines,
     git_clone,
     install_packages_from_list,
+    log_step,
     parse_task_args,
 )
 
@@ -27,7 +27,7 @@ def install_js_repositories(*args: list[str]) -> None:
     # Get JS repositories info
     repos = get_clean_lines(task_args.config_file)
     if not repos:
-        Logger.step(
+        log_step(
             "Skipping installation of JS repositories, as no repositories are specified",
         )
         return
@@ -53,7 +53,7 @@ def install_js_repositories(*args: list[str]) -> None:
             try:
                 git_clone(repo, tmp)
             except subprocess.CalledProcessError:
-                Logger.step(
+                log_step(
                     f"Failed to clone repository {repo}, skipping.",
                     warning=True,
                 )
@@ -62,7 +62,7 @@ def install_js_repositories(*args: list[str]) -> None:
             # Get package name from package.json if possible
             pkg_json = tmp / "package.json"
             if not pkg_json.exists():
-                Logger.step(
+                log_step(
                     f"No package.json found in {repo}, skipping.", warning=True
                 )
                 continue
@@ -94,7 +94,7 @@ def install_js_repositories(*args: list[str]) -> None:
                 max_version = version.parse(max_version_str)
 
                 if not (min_version <= node_version <= max_version):
-                    Logger.step(
+                    log_step(
                         f"Skipping installation of {pkg_name}, as Node.js version {node_version} does not satisfy required range {node_range}.",
                         warning=True,
                     )
@@ -122,7 +122,7 @@ def install_js_repositories(*args: list[str]) -> None:
                     check=True,
                 )
             except subprocess.CalledProcessError:
-                Logger.step(
+                log_step(
                     f"Failed to install package {pkg_name}, skipping.",
                     warning=True,
                 )
@@ -134,7 +134,7 @@ def install_js_repositories(*args: list[str]) -> None:
                 if task_args.force:
                     subprocess.run(["sudo", "rm", "-rf", str(target)])
                 else:
-                    Logger.step(
+                    log_step(
                         f"Package {pkg_name} already exists at {target}, skipping.",
                         warning=True,
                     )
@@ -147,4 +147,4 @@ def install_js_repositories(*args: list[str]) -> None:
                     f"{pkg_name}='(cd {target} && {package_manager} start > /dev/null &)'"
                 )
 
-            Logger.step(f"Successfully installed {pkg_name} to {target}")
+            log_step(f"Successfully installed {pkg_name} to {target}")

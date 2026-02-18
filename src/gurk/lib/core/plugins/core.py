@@ -5,7 +5,7 @@ from pathlib import Path
 
 from packaging.version import Version
 
-from gurk.lib.context import get_logger, pprint_dict
+from gurk.lib.context import get_logger
 from gurk.lib.context.registry import (
     get_plugin_directories,
     get_plugin_registration,
@@ -19,6 +19,7 @@ from gurk.lib.core.plugins.virtual_environments import (
     venv_exists,
 )
 from gurk.lib.shared.configs import load_toml, load_yaml
+from gurk.lib.shared.dicts import pprint_dict
 from gurk.lib.shared.plugins import (
     PluginManifest,
     PluginSource,

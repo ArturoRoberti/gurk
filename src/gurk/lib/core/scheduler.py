@@ -12,6 +12,8 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from textwrap import dedent
 from threading import Event, Lock, Thread
 
+from rich.markup import escape
+
 from gurk.lib.context import Logger, TaskTerminationType, get_logger
 from gurk.lib.core.plugins import get_venv_dir
 from gurk.lib.shared.scripts import (
@@ -455,7 +457,8 @@ class Scheduler:
         log_file = self.logger.generate_logfile_path(task_id)
         self.logger.set_total(task_id, n_steps + 1)  # +1 for finishing step
         self.logger.info(
-            f"\\[{task.name}] Logging to {log_file}", syntax_highlight=False
+            f"{escape(f'[{task.name}]')} Logging to {log_file}",
+            syntax_highlight=False,
         )
         flog = log_file.open("w", encoding="utf-8", errors="replace")
 

@@ -61,13 +61,18 @@ def resolve_package_path(raw_script: PathLike) -> PathLike | None:
 
 @typecheck
 def load_yaml(
-    yaml_file: PathLike, remove_list_duplicates: bool = True
+    yaml_file_or_str: PathLike,
+    *,
+    from_str: bool = False,
+    remove_list_duplicates: bool = True,
 ) -> dict[str, Any] | None:
     """
-    Load a YAML file and normalize its content.
+    Load a YAML content and normalize it.
 
-    :param yaml_file: Path to the YAML file to load
-    :type yaml_file: PathLike
+    :param yaml_file_or_str: Path to the YAML file to load or a string containing YAML content (if 'from_str' is True)
+    :type yaml_file_or_str: PathLike
+    :param from_str: Whether 'yaml_file_or_str' is a string containing YAML content (True) or a file path (False, default)
+    :type from_str: bool
     :param remove_list_duplicates: Whether to remove duplicates in lists
     :type remove_list_duplicates: bool
     :return: Normalized content of the YAML file, or None if loading fails
@@ -134,14 +139,19 @@ def load_yaml(
             # Should not happen
             pass
 
-    if not Path(yaml_file).is_file():
-        return None
-
-    with open(yaml_file, "r") as f:
+    if from_str:
         try:
-            content = YAML.load(f) or {}
+            content = YAML.load(yaml_file_or_str) or {}
         except Exception:
             return None
+    else:
+        if not Path(yaml_file_or_str).is_file():
+            return None
+        with open(yaml_file_or_str, "r") as f:
+            try:
+                content = YAML.load(f) or {}
+            except Exception:
+                return None
     return normalize_yaml(content)
 
 

@@ -4,15 +4,15 @@ The progress bar is updated via `STEP` statements in both Bash and Python script
 | Print Format                   | Purpose                                                               | Example Implementation                                                                                           |
 |--------------------------------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
 | `__STEP__`                     | Updates progress bar text and progress                                | `# (STEP) Description`<br>Comment is replaced by `__STEP__` print in scheduler, see [scheduler.md](scheduler.md) |
-| `__STEP_NO_PROGRESS__`         | Updates progress bar text only                                        | **Bash:** `log_step "Description"`<br>**Python:** `Logger.step("Description")`                                   |
-| `__STEP_NO_PROGRESS_WARNING__` | Updates progress bar text only, marks task as warning/partial success | **Bash:** `log_step "Description" true`<br>**Python:** `Logger.step("Description", warning=True)`                |
+| `__STEP_NO_PROGRESS__`         | Updates progress bar text only                                        | **Bash:** `log_step "Description"`<br>**Python:** `log_step("Description")`                                      |
+| `__STEP_NO_PROGRESS_WARNING__` | Updates progress bar text only, marks task as warning/partial success | **Bash:** `log_step "Description" true`<br>**Python:** `log_step("Description", warning=True)`                   |
 
 **Example (Python):**
 ```python
-from gurk import Logger
+from gurk import log_step
 # (STEP) Some step with progress
-Logger.step("Some step without progress")
-Logger.step("Some step with warning", warning=True)
+log_step("Some step without progress")
+log_step("Some step with warning", warning=True)
 ```
 
 **Example (Bash):**
@@ -42,16 +42,16 @@ def my_task_function(*args: list[str]) -> None:
     task_args = parse_task_args(args)
     ...
 
-    # (pathlib.Path) Config file
+    # Config file (pathlib.Path)
     config_file = task_args.config_file
 
-    # (bool) Force flag
+    # Force flag (bool)
     force = task_args.force
 
-    # (dict[str, str]) System info
+    # System info (dict[str, str])
     system_info = task_args.system_info
 
-    # (Any) Remaining parsed task args (NOTE: --some-arg -> some_arg)
+    # Remaining parsed task args (Any) (NOTE: --some-arg -> some_arg)
     some_arg = task_args.some_arg
     ...
 ```
@@ -67,19 +67,19 @@ my_task_function() {
     # Parse task args
 	parse_task_args "$@"
 
-    # (str) Config file
+    # Config file (str)
     local config_file="${CONFIG_FILE}"
 
-    # (bool) Force flag
+    # Force flag ("bool" i.e. "true"/"false" str)
     local force="${FORCE}"
 
-    # (associative array) System info
+    # System info (associative array)
     for key in "${!SYSTEM_INFO[@]}"; do
         echo "Key: $key, Value: ${SYSTEM_INFO[$key]}"
     done
     local version="${SYSTEM_INFO[version]}"
 
-    # (Any) Remaining parsed task args (NOTE: --some-arg -> SOME_ARG)
+    # Remaining parsed task args (any type) (NOTE: --some-arg -> SOME_ARG)
     SOME_ARG="${SOME_ARG}"
     ...
 }

@@ -1,7 +1,5 @@
 import types
 from typing import (
-    Any,
-    Mapping,
     NotRequired,
     TypeVar,
     Union,
@@ -11,17 +9,15 @@ from typing import (
     is_typeddict,
 )
 
-from gurk.lib.utils import typecheck
-
-T = TypeVar("T", bound=Mapping[str, Any])
+T = TypeVar("T")
 
 
-@typecheck  # TODO: Does this work with TypeVar? Otherwise, check isinstance(dct, dict) manually
 def fill_typed_dict(dct: dict, tp: type[T]) -> T:
     """
     Recursively fill a TypedDict (or nested structures containing TypedDicts) with default values.
+        :NOTE: This function recursively calls itself with different input types, so it is not strictly type-safe.
 
-    :param dct: The dict to fill (can be a dict or None).
+    :param dct: The dict to fill.
     :type dct: dict
     :param tp: The TypedDict type to use for filling.
     :type tp: type[T]

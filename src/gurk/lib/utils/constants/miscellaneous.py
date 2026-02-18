@@ -9,7 +9,7 @@ PACKAGE_VENVS_PATH.mkdir(parents=True, exist_ok=True)
 SETUP_DONE_FILE = PACKAGE_HOME_PATH / "setup.done"
 
 PACKAGE_BASH_HELPERS_PATH = (
-    PACKAGE_SRC_PATH / "lib" / "helpers" / "bash" / "helpers.bash"
+    PACKAGE_SRC_PATH / "plugin_helpers" / "bash" / "helpers.bash"
 )
 
 GURK_MANIFEST_FILENAME = "gurk-manifest.yaml"

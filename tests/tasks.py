@@ -10,12 +10,13 @@ import tomllib
 from ruamel.yaml import YAML
 
 from gurk.cli._pytest import check_askpass
-from gurk.lib.context import GurkContext, Logger, padded_print
+from gurk.lib.context import GurkContext, Logger
 from gurk.lib.core import runner
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
 )
+from gurk.lib.shared.printers import padded_print
 from gurk.lib.shared.scripts import check_script_blocks
 
 

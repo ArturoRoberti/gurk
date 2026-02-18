@@ -4,6 +4,7 @@ from tempfile import NamedTemporaryFile
 from textwrap import dedent
 from typing import Any, Literal, overload
 
+from gurk.lib.shared.scripts import check_script_function
 from gurk.lib.utils import (
     PACKAGE_BASH_HELPERS_PATH,
     PIPX_PYTHON_PATH,
@@ -12,8 +13,7 @@ from gurk.lib.utils import (
     typecheck,
 )
 
-from .command import Command
-from .command_kind import CommandKind
+from .command import CommandKind
 
 
 @overload
@@ -73,15 +73,18 @@ def run_script_function(
     if args is None:
         args = []
 
-    # Check existence of script & function fields
-    command = Command(script, function, check)
+    if check:
+        # Check script and function exist and are valid
+        errors = check_script_function(script, function)
+        if errors:
+            raise FileNotFoundError("\n".join(errors))
 
     # Check venv existence
     if venv and not venv.exists():
         raise FileNotFoundError(f"Virtual environment not found: {venv}")
 
     # Run respective command
-    if command.kind == CommandKind.PYTHON:
+    if CommandKind.from_script(script) == CommandKind.PYTHON:
         return _run_python_script_function(
             script, function, args, run, capture_output, venv, sudo
         )

@@ -6,6 +6,7 @@ from .common import (
     PACKAGE_SRC_PATH,
     PACKAGE_TESTS_PATH,
     PIPX_PYTHON_PATH,
+    TIMESTAMP,
 )
 from .miscellaneous import (
     GURK_MANIFEST_FILENAME,
@@ -36,6 +37,7 @@ __all__ = [
     "PACKAGE_VENVS_PATH",
     "RUNNER_SPECIFIC_TASKS",
     "SETUP_DONE_FILE",
+    "TIMESTAMP",
     "GIT_MIRRORS_DIR",
     "GIT_QUERY_VERSIONING_FIELDS",
     "GURK_MANIFEST_FILENAME",

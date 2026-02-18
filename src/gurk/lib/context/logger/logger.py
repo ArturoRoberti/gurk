@@ -1,15 +1,14 @@
+import os
 import shutil
 import sys
 import traceback
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import IO, TypedDict
+from typing import TypedDict
 
-from rich import print as richprint
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -21,14 +20,11 @@ from rich.progress import (
 )
 from rich.prompt import Confirm, Prompt
 
-from gurk.lib.utils import NO_ANSWERS, YES_ANSWERS, typecheck
+from gurk.lib.utils import NO_ANSWERS, TIMESTAMP, YES_ANSWERS, typecheck
+from gurk.lib.utils.miscellaneous import identity
 
 from .logger_types import LoggerSeverity, TaskTerminationType
-from .logger_utils import (
-    filter_pydantic_wrapper,
-    logrichprint as _logrichprint,
-    logstart,
-)
+from .logger_utils import _filter_pydantic_wrapper, logrichprint
 
 _current_logger = ContextVar("current_logger", default=None)
 
@@ -116,20 +112,20 @@ class Logger:
 
         if self.log_to_msg is not None:
             # Logging directory
-            self._logdir = (
-                Path.home()
-                / ".gurk"
-                / "logs"
-                / datetime.now().strftime("%Y%m%d_%H%M%S")
-            )
+            self._logdir = Path.home() / ".gurk" / "logs" / TIMESTAMP
             self._logdir.mkdir(parents=True, exist_ok=True)
             if self.verbose:
                 script_logdir = self._logdir / "modified_scripts"
                 script_logdir.mkdir(parents=True, exist_ok=True)
 
             # Main logfile
-            self._logfile = self._logdir / "full.log"
-            self._logfile.touch(exist_ok=True)
+            if self.log_to_msg is not None:
+                if self.log_to_msg:
+                    logfile_name = self.log_to_msg.lower().replace(" ", "_")
+                else:
+                    logfile_name = "full"
+                self._logfile = self._logdir / f"{logfile_name}.log"
+                self._logfile.touch(exist_ok=True)
 
     def __enter__(self):
         # start live-render
@@ -162,11 +158,15 @@ class Logger:
         if exc_type is KeyboardInterrupt:
             msg = "Process interrupted by user"
         else:
-            traceback_str = filter_pydantic_wrapper(
+            if os.getenv("GURK_FULL_TRACEBACK", "false") in YES_ANSWERS:
+                transform = identity
+            else:
+                transform = _filter_pydantic_wrapper
+            traceback_str = transform(
                 "".join(traceback.format_exception(exc_type, exc, tb))
             )
             msg = f"An Exception occurred ({exc_type.__name__}):\n\n{traceback_str}"
-        self.logrichprint(LoggerSeverity.FATAL, msg)
+        logrichprint(LoggerSeverity.FATAL, msg)
         raise SystemExit(1)
 
     @typecheck
@@ -324,7 +324,7 @@ class Logger:
         def _log_first(line: str, enriched: bool = True) -> str:
             # First line: include the severity tag
             return (
-                f"{logstart(severity)} {line}"
+                logrichprint(severity, line, as_str=True)
                 if enriched
                 else f"[{severity.label}] {line}"
             )
@@ -397,14 +397,6 @@ class Logger:
         self._log(LoggerSeverity.DONE, message, syntax_highlight)
         raise SystemExit(0)
 
-    @staticmethod
-    @typecheck
-    def logrichprint(
-        severity: LoggerSeverity, message: str, file: IO[str] | None = None
-    ) -> None:
-        """Log a message using richprint with severity-based formatting."""
-        _logrichprint(severity, message, file=file)
-
     @typecheck
     def finish_task(
         self,
@@ -448,29 +440,6 @@ class Logger:
         if logfile:
             desc += f" [blue](log: {logfile})[/blue]"
         self._progress.update(task_id, completed=total, description=desc)
-
-    @staticmethod
-    def newline() -> None:
-        """Print a newline to the console output."""
-        richprint("")
-
-    @staticmethod
-    @typecheck
-    def step(message: str, warning: bool = False) -> None:
-        """
-        Log a step message indicating progress. Only to be used from within tasks.
-
-        :param message: Message to log
-        :type message: str
-        :param warning: Whether or not this is a warning (default: false)
-        :type warning: bool
-        :param progress: Whether to progress the task
-        :type progress: bool
-        """
-        step_type = "STEP_NO_PROGRESS"
-        if warning:
-            step_type += "_WARNING"
-        print(f"\n__{step_type}__: {message}")
 
     @property
     def _can_prompt(self) -> bool:

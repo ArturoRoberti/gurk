@@ -4,8 +4,8 @@ import commentjson
 
 from gurk import (
     InstallCommandsBase,
-    Logger,
     install_packages_from_list,
+    log_step,
     parse_task_args,
 )
 
@@ -38,7 +38,7 @@ def install_docker_images(*args: list[str]) -> None:
         for item in docker_images_info
     ]
     if not docker_images:
-        Logger.step(
+        log_step(
             "No docker images found in the provided config file. Skipping pulling of docker images.",
         )
         return

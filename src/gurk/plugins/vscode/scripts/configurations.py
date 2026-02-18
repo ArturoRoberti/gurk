@@ -2,7 +2,7 @@ from pathlib import Path
 
 import commentjson
 
-from gurk import Logger, LoggerSeverity, parse_task_args
+from gurk import LoggerSeverity, log_step, logrichprint, parse_task_args
 
 
 def configure_vscode_keybindings(*args: list[str]) -> None:
@@ -16,7 +16,7 @@ def configure_vscode_keybindings(*args: list[str]) -> None:
     vscode_keys = Path.home() / ".config/Code/User/keybindings.json"
     vscode_keys.parent.mkdir(parents=True, exist_ok=True)
     if not vscode_keys.exists():
-        Logger.logrichprint(
+        logrichprint(
             LoggerSeverity.WARNING,
             "VSCode keybindings file does not exist, creating an empty one.",
         )
@@ -35,4 +35,4 @@ def configure_vscode_keybindings(*args: list[str]) -> None:
     vscode_keys.write_text(
         commentjson.dumps(merged, indent=2), encoding="utf-8"
     )
-    Logger.step("VSCode keybindings configured successfully.")
+    log_step("VSCode keybindings configured successfully.")

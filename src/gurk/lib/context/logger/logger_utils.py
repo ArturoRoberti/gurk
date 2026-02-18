@@ -1,14 +1,15 @@
-from typing import IO
+from typing import IO, Literal, overload
 
-from rich import print as richprint
+from rich.markup import escape
 
+from gurk.lib.shared.printers import richprint
 from gurk.lib.utils import typecheck
 
-from .logger_types import LoggerEnum, LoggerSeverity
+from .logger_types import LoggerSeverity
 
 
 @typecheck
-def filter_pydantic_wrapper(traceback_str: str) -> str:
+def _filter_pydantic_wrapper(traceback_str: str) -> str:
     """
     Filter out Pydantic's internal wrapper from error messages to improve readability.
 
@@ -42,39 +43,33 @@ def filter_pydantic_wrapper(traceback_str: str) -> str:
     return "\n".join(cleaned)
 
 
-@typecheck
-def _logcolor(severity: LoggerEnum) -> str:
-    """
-    Generate a rich-formatted color string for the given severity.
-
-    :param severity: Severity level
-    :type severity: LoggerEnum
-    :return: The rich-formatted color string
-    :rtype: str
-    """
-    return f"{'bold 'if severity.bold else ''}{'bright_'if severity.bright else ''}{severity.color}"
+@overload
+def logrichprint(
+    severity: LoggerSeverity,
+    message: str,
+    as_str: Literal[False] = ...,
+    file: IO[str] | None = ...,
+) -> None:
+    ...
 
 
-@typecheck
-def logstart(severity: LoggerEnum) -> str:
-    """
-    Generate a rich-formatted severity tag for logging.
-
-    :param severity: Severity level
-    :type severity: LoggerEnum
-    :return: The rich-formatted severity tag
-    :rtype: str
-    """
-    color = _logcolor(severity)
-    return f"[{color}][{severity.label}][/{color}]"
+@overload
+def logrichprint(
+    severity: LoggerSeverity,
+    message: str,
+    as_str: Literal[True] = ...,
+    file: IO[str] | None = ...,
+) -> str:
+    ...
 
 
 @typecheck
 def logrichprint(
     severity: LoggerSeverity,
     message: str,
+    as_str: bool = False,
     file: IO[str] | None = None,
-) -> None:
+) -> str | None:
     """
     Print a rich-formatted log message with the specified severity.
 
@@ -82,7 +77,16 @@ def logrichprint(
     :type severity: LoggerSeverity
     :param message: The message to print
     :type message: str
+    :param as_str: If True, return the formatted message as a string instead of printing it
+    :type as_str: bool
     :param file: The output file (stdout/stderr). If None, defaults to stdout.
     :type file: IO[str] | None
+    :return: The formatted message if as_str is True, otherwise None
+    :rtype: str | None
     """
-    richprint(f"{logstart(severity)} {message}", file=file)
+    color = f"{'bold 'if severity.bold else ''}{'bright_'if severity.bright else ''}{severity.color}"
+    msg = f"{richprint(escape(f'[{severity.label}]'), color=color, as_str=True)} {message}"
+    if as_str:
+        return msg
+    else:
+        richprint(msg, file=file)

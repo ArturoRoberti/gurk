@@ -8,23 +8,32 @@ from gurk.lib.utils import PathLike, typecheck
 
 
 @typecheck
-def load_toml(toml_file: PathLike) -> dict[str, Any] | None:
+def load_toml(
+    toml_file_or_str: PathLike, *, from_str: bool = False
+) -> dict[str, Any] | None:
     """
-    Load a TOML file.
+    Load TOML content.
 
-    :param toml_file: Path to the TOML file to load
-    :type toml_file: PathLike
+    :param toml_file_or_str: Path to the TOML file to load or a string containing TOML content (if 'from_str' is True)
+    :type toml_file_or_str: PathLike
+    :param from_str: Whether 'toml_file_or_str' is a string containing TOML content (True) or a file path (False, default)
+    :type from_str: bool
     :return: Content of the TOML file, or None if loading fails
     :rtype: dict[str, Any] | None
     """
-    if not Path(toml_file).is_file():
-        return None
-
-    with open(toml_file, "rb") as f:
+    if from_str:
         try:
-            return tomllib.load(f) or {}
+            return tomllib.loads(toml_file_or_str) or {}
         except tomllib.TOMLDecodeError:
             return None
+    else:
+        if not Path(toml_file_or_str).is_file():
+            return None
+        with open(toml_file_or_str, "rb") as f:
+            try:
+                return tomllib.load(f) or {}
+            except tomllib.TOMLDecodeError:
+                return None
 
 
 @typecheck

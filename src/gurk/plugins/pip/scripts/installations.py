@@ -7,9 +7,10 @@ import commentjson
 
 from gurk import (
     InstallCommandsBase,
-    Logger,
     LoggerSeverity,
     install_packages_from_txt_file,
+    log_step,
+    logrichprint,
     parse_task_args,
 )
 
@@ -46,7 +47,7 @@ def install_pip_environments(*args: list[str]) -> None:
         task_args.config_file.open("r", encoding="utf-8")
     )
     if not pip_envs:
-        Logger.step(
+        log_step(
             "Skipping installation of pip packages, as no environments are specified",
         )
         return
@@ -55,7 +56,7 @@ def install_pip_environments(*args: list[str]) -> None:
     base_venv_dir = Path.home() / ".virtualenvs"
     for venv_name, packages in pip_envs.items():
         if not packages:
-            Logger.step(
+            log_step(
                 f"Skipping installation of pip packages for environment '{venv_name}', as no packages are specified",
                 warning=True,
             )
@@ -65,13 +66,13 @@ def install_pip_environments(*args: list[str]) -> None:
         venv_dir = base_venv_dir / venv_name
         if venv_dir.exists():
             if not task_args.force:
-                Logger.step(
+                log_step(
                     f"Skipping creation of environment '{venv_name}', as it already exists",
                     warning=True,
                 )
                 continue
             else:
-                Logger.logrichprint(
+                logrichprint(
                     LoggerSeverity.WARNING,
                     f"Removing existing '{venv_name}' environment to create a new one",
                 )
@@ -86,11 +87,11 @@ def install_pip_environments(*args: list[str]) -> None:
             [str(pip_executable), "install", *packages],
         )
         if result.returncode != 0:
-            Logger.step(
+            log_step(
                 f"Failed to install packages for environment '{venv_name}'",
                 warning=True,
             )
         else:
-            Logger.step(
+            log_step(
                 f"Successfully installed packages for environment '{venv_name}'"
             )

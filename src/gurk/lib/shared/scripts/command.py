@@ -1,12 +1,59 @@
+import shutil
 from dataclasses import dataclass, field
+from enum import Enum
 from functools import cached_property
 from pathlib import Path
 
-from gurk.lib.utils import PathLike
+from gurk.lib.utils import PIPX_PYTHON_PATH, PathLike
 
-from .blocks import get_block_spans
-from .command_kind import CommandKind
-from .script_types import ScriptBlockTypes, _ScriptExtension
+from .script_types import _ScriptExtension
+
+
+class CommandKind(Enum):
+    """Enumeration of supported command kinds with their executables."""
+
+    # fmt: off
+    BASH   = shutil.which("bash")
+    PYTHON = str(PIPX_PYTHON_PATH)
+    # fmt: on
+
+    @property
+    def exe(self) -> str:
+        """Get the executable associated with the command kind."""
+        return self.value
+
+    @property
+    def ext(self) -> str:
+        """
+        Get the file extension associated with the command kind.
+
+        :param self: Instance of CommandKind
+        :return: File extension as a string
+        :rtype: str
+        :raises ValueError: If the CommandKind is unsupported
+        """
+        try:
+            return _ScriptExtension[self.name].value
+        except KeyError:
+            raise ValueError(f"Unsupported CommandKind: {self.name}")
+
+    @staticmethod
+    def from_script(script: PathLike) -> "CommandKind":
+        """
+        Determine the command kind based on the script file extension.
+
+        :param script: Path to the script file
+        :type script: PathLike
+        :return: CommandKind corresponding to the script type
+        :rtype: CommandKind
+        """
+        if not isinstance(script, (Path, str)):
+            raise ValueError(
+                f"Expected script to be a Path or str, got {type(script)}"
+            )
+
+        suffix = Path(script).suffix.replace(".", "")
+        return CommandKind[_ScriptExtension(suffix).name]
 
 
 @dataclass(frozen=True)
@@ -16,46 +63,11 @@ class Command:
     # fmt: off
     script:     PathLike      = field()
     function:   None | str    = field(default=None)
-    check_func: bool          = field(default=True)
     # fmt: on
-
-    def __post_init__(
-        self,
-    ) -> (
-        None
-    ):  # TODO: Make "check_command" a separate function, then group with CommandKind?
-        # Check 'script'
-        if not Path(self.script).is_file():
-            raise FileNotFoundError(f"Script file not found: {self.script}")
-        try:
-            self.kind  # Trigger 'kind' property to validate script type
-        except ValueError:
-            raise ValueError(
-                f"Unsupported script type for file {self.script} - supported "
-                f"types: {[ext.name.lower() for ext in _ScriptExtension]}"
-            )
-
-        # Check 'function'
-        blocks = get_block_spans(self.script)
-        if self.check_func and self.function is not None:
-            available_functions = [
-                b["name"]
-                for b in blocks
-                if b["type"] == ScriptBlockTypes.FUNCTION
-            ]
-            if self.function not in available_functions:
-                raise FileNotFoundError(
-                    f"'{self.function}' function not found in script "
-                    f"{self.script}\nAvailable functions: {available_functions}",
-                )
 
     @cached_property
     def kind(self) -> CommandKind:
         return CommandKind.from_script(self.script)
-
-    def __str__(self) -> str:
-        func_suffix = f"@{self.function}" if self.function else ""
-        return f"{Path(self.script).stem}{func_suffix}"
 
 
 @dataclass(frozen=True)
