@@ -195,9 +195,9 @@ def main(argv, prog, description):
     # Execute with writing to plugins
     with GurkContext(
         logger=Logger(
-            args.verbose,
-            args.non_interactive,
-            log_to_msg="Processing plugin specification",
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description="Processing plugin specification",
         ),
         writable=True,
     ) as ctx:
@@ -294,9 +294,9 @@ def main(argv, prog, description):
     # Execute without writing to plugins and with writing to logs
     with GurkContext(
         logger=Logger(
-            args.verbose,
-            args.non_interactive,
-            log_to_msg="Running specification",
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description="Running specification",
         ),
         writable=False,
     ) as ctx:

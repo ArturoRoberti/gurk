@@ -25,7 +25,12 @@ def main(argv, prog, description):
 
     # Execute without writing to plugins
     with GurkContext(
-        logger=Logger(args.verbose, args.non_interactive), writable=False
+        logger=Logger(
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description="Checking plugins",
+        ),
+        writable=False,
     ) as ctx:
         for source in args.paths:
             if not check_local_plugin(source, True):

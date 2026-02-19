@@ -83,7 +83,12 @@ def test_task(task: str) -> None:
     if check_askpass():
         # For now, only run in GitHub Actions runner to avoid askpass prompts
         captured = []
-        with GurkContext(logger=Logger(False, True), writable=False) as ctx:
+        with GurkContext(
+            logger=Logger(
+                verbose=False, non_interactive=True, store_logs=False
+            ),
+            writable=False,
+        ) as ctx:
             with pytest.raises(SystemExit) as e:
                 runner.main(
                     option={task: {}},
@@ -145,7 +150,12 @@ def test_task(task: str) -> None:
             if failed_tasks:
                 ctx.logger.fatal("Some tasks failed during testing.")
     else:
-        with GurkContext(logger=Logger(False, True), writable=False) as ctx:
+        with GurkContext(
+            logger=Logger(
+                verbose=False, non_interactive=True, store_logs=False
+            ),
+            writable=False,
+        ) as ctx:
             ctx.logger.warning(
                 "'SUDO_ASKPASS' is not properly set. Skipping task-running tests."
             )

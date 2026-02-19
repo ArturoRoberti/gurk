@@ -8,7 +8,8 @@ except ImportError:
 
 if __name__ == "__main__":
     with GurkContext(
-        logger=Logger(verbose=True, non_interactive=True), writable=True
+        logger=Logger(verbose=True, non_interactive=True, store_logs=False),
+        writable=True,
     ):
         if not all(
             upgrade_plugin(name, require_local=False)

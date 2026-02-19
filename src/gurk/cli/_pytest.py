@@ -3,7 +3,10 @@ from gurk.lib.core.runner import check_askpass
 
 
 def main(argv):
-    with GurkContext(logger=Logger(False, False, None), writable=False) as ctx:
+    with GurkContext(
+        logger=Logger(verbose=False, non_interactive=False, store_logs=False),
+        writable=False,
+    ) as ctx:
         # Check that pytest is installed
         try:
             import pytest

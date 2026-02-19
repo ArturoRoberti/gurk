@@ -9,7 +9,7 @@ from gurk.lib.core.plugins import (
     remove_venv,
     venv_exists,
 )
-from gurk.lib.utils import GURK_VERSION
+from gurk.lib.utils import GURK_VERSION, PACKAGE_NAME
 
 
 def main(argv, prog, description):
@@ -20,7 +20,12 @@ def main(argv, prog, description):
 
     # Execute with writing to plugins
     with GurkContext(
-        logger=Logger(args.verbose, args.non_interactive), writable=True
+        logger=Logger(
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description=f"Initializing {PACKAGE_NAME}",
+        ),
+        writable=True,
     ) as ctx:
         combined_registry = get_registries(
             home_registry=True, package_registry=True, combine=True

@@ -33,7 +33,12 @@ def main(argv, prog, description):
 
     # Execute with writing to plugins
     with GurkContext(
-        logger=Logger(args.verbose, args.non_interactive), writable=True
+        logger=Logger(
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description="Pulling plugins",
+        ),
+        writable=True,
     ) as ctx:
         # Check that git is installed
         if not is_git_installed():

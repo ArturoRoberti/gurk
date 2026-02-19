@@ -36,7 +36,12 @@ def main(argv, prog, description):
 
     # Execute with writing to plugins
     with GurkContext(
-        logger=Logger(args.verbose, args.non_interactive), writable=True
+        logger=Logger(
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description="Removing plugins",
+        ),
+        writable=True,
     ) as ctx:
         for plugin_name in args.plugins:
             # Only allow plugin names

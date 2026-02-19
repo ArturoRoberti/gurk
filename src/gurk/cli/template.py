@@ -40,7 +40,12 @@ def main(argv, prog, description):
 
     # Execute without writing to plugins
     with GurkContext(
-        logger=Logger(args.verbose, args.non_interactive), writable=False
+        logger=Logger(
+            verbose=args.verbose,
+            non_interactive=args.non_interactive,
+            description="Creating template plugin",
+        ),
+        writable=False,
     ) as ctx:
         # Determine destination path
         dest: Path = Path.cwd() / args.name

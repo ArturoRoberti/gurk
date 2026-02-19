@@ -78,7 +78,10 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute without writing to plugins
-    with GurkContext(logger=Logger(False, False, None), writable=False) as ctx:
+    with GurkContext(
+        logger=Logger(verbose=False, non_interactive=False, store_logs=False),
+        writable=False,
+    ) as ctx:
         # Print help about gurk itself
         if not any(vars(args).values()):
             # Load help from pyproject.toml

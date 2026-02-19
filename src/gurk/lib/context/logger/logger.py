@@ -63,9 +63,20 @@ class DummyLogger:
         return self.__repr__()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Logger:
-    """Logger with progress tracking and rich-formatted output."""
+    """
+    Logger with progress tracking and rich-formatted output.
+
+    :param verbose: Whether to enable verbose logging (debug messages)
+    :type verbose: bool
+    :param non_interactive: Whether to disable interactive prompts
+    :type non_interactive: bool
+    :param description: Optional description of the logger's purpose, shown in logs.
+    :type description: str
+    :param store_logs: Whether to store logs to disk (in ~/.gurk/logs). NOTE: Is usually always coupled with a description, which is used to name the logfile.
+    :type store_logs: bool
+    """
 
     class TaskInfo(TypedDict):
         """
@@ -82,9 +93,11 @@ class Logger:
     # fmt: off
     verbose:         bool = field()
     non_interactive: bool = field()
-    log_to_msg:      str | None = field(default="")  # Optional logging purpose description. None to disable logging to disk.
+    description:     str  = field(default="")  # Optional description of the logger's purpose, shown in logs.
+    store_logs:      bool = field(default=True)  # Whether to store logs to disk.
 
     _logdir:         Path = field(init=False)
+    _logfile:        Path = field(init=False)
     _tasks_lock:     Lock = field(init=False, repr=False, default_factory=Lock)
     _task_infos:     dict[TaskID, TaskInfo] = field(init=False, repr=False, default_factory=dict)
 
@@ -110,7 +123,7 @@ class Logger:
             console=self._console_out,
         )
 
-        if self.log_to_msg is not None:
+        if self.store_logs:
             # Logging directory
             self._logdir = Path.home() / ".gurk" / "logs" / TIMESTAMP
             self._logdir.mkdir(parents=True, exist_ok=True)
@@ -119,13 +132,12 @@ class Logger:
                 script_logdir.mkdir(parents=True, exist_ok=True)
 
             # Main logfile
-            if self.log_to_msg is not None:
-                if self.log_to_msg:
-                    logfile_name = self.log_to_msg.lower().replace(" ", "_")
-                else:
-                    logfile_name = "full"
-                self._logfile = self._logdir / f"{logfile_name}.log"
-                self._logfile.touch(exist_ok=True)
+            if self.description:
+                logfile_name = self.description.lower().replace(" ", "_")
+            else:
+                logfile_name = "full"
+            self._logfile = self._logdir / f"{logfile_name}.log"
+            self._logfile.touch(exist_ok=True)
 
     def __enter__(self):
         # start live-render
@@ -134,11 +146,11 @@ class Logger:
         # make this globally visible
         self._token = _current_logger.set(self)
 
-        # Print logfile
-        if self.log_to_msg is not None:
-            msg = f"Logging to: {self._logfile}"
-            if self.log_to_msg:
-                msg = f"{self.log_to_msg} - {msg}"
+        # Print logging initialization message
+        msg = self.description
+        if self.store_logs:
+            msg += f"{' - ' if msg else ''}Logging to: {self._logfile}"
+        if msg:
             self.info(msg)
 
         return self
@@ -184,10 +196,10 @@ class Logger:
         if not self.verbose:
             # Don't log scripts if not in verbose mode
             return
-        if self.log_to_msg is None:
+        if not self.store_logs:
             # Can't log scripts if not logging to disk
             self.warning(
-                f"Cannot log modified script for task '{task_name}' because 'log_to_msg' is None."
+                f"Cannot log modified script for task '{task_name}' because logging to disk is disabled."
             )
             return
 
@@ -235,9 +247,9 @@ class Logger:
         :return: The path to the logfile, or None if task not found
         :rtype: Path | None
         """
-        if self.log_to_msg is None:
+        if not self.store_logs:
             self.warning(
-                f"Cannot generate logfile path for task ID {task_id} because 'log_to_msg' is None."
+                f"Cannot generate logfile path for task ID {task_id} because logging to disk is disabled."
             )
             return None
 
@@ -350,7 +362,7 @@ class Logger:
                         )
 
                 # Main logfile logging
-                if self.log_to_msg is not None:
+                if self.store_logs:
                     with self._logfile.open("a", encoding="utf-8") as f:
                         f.write(f"{_log_first(lines[0], enriched=False)}\n")
                         for line in lines[1:]:

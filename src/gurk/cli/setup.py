@@ -301,7 +301,10 @@ def main(argv, prog, description):
             flags[flag] = True
 
     # Execute without writing to plugins
-    with GurkContext(logger=Logger(False, False), writable=False) as ctx:
+    with GurkContext(
+        logger=Logger(verbose=False, non_interactive=False, store_logs=False),
+        writable=False,
+    ) as ctx:
         # Set up SSH keys
         ssh_keys_manager = SSHKeysManager()
         ssh_keys_exist = ssh_keys_manager.keys_exist()
