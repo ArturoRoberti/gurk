@@ -113,6 +113,14 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             else:
                 logger.debug(msg)
 
+        # Check that the path exists and is a directory
+        if not _plugin_path.exists():
+            error("Plugin path does not exist.")
+            return False
+        elif not _plugin_path.is_dir():
+            error("Plugin path is not a directory.")
+            return False
+
         # Load pyproject.toml
         pyproject_file = _plugin_path / GURK_METADATA_FILENAME
         if not pyproject_file.is_file():
@@ -139,11 +147,10 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
         ## Valid and unique plugin name
         plugin_name = project_metadata["name"]
-        if not plugin_name:
+        if not plugin_name.strip():
             error(
                 f"Plugin source '{_plugin_path}' has an invalid "
-                f"'{GURK_METADATA_FILENAME}' file: 'project.name' "
-                "is missing or empty."
+                f"'{GURK_METADATA_FILENAME}' file: 'project.name' is empty."
             )
             return False
         elif not PatternCollection.NAMING.patterns.match(plugin_name):

@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install package
-        run: pipx install -e .[dev]
+        run: pipx install .[dev]
 
       - name: Compute affected tasks, based on changed files
         run: |
@@ -45,4 +45,4 @@ jobs:
 
           # Run pytest for affected tasks
           gurk init
-          gurk pytest -v tests/tasks.py --tasks="${AFFECTED_TASKS}"
+          gurk pytest -v tests/tasks/test_tasks.py --tasks="${AFFECTED_TASKS}"

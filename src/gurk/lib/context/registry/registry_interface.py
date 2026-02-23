@@ -1,17 +1,15 @@
 from pathlib import Path
-from typing import Literal, overload
+from typing import Literal, NotRequired, TypedDict, overload
 
 from gurk.lib.shared.dicts import pprint_dict, pprint_typed_dict
 from gurk.lib.shared.plugins import (
-    LocalPluginRegistryEntry,
-    PluginRegistry,
     PluginRegistryEntry,
     PluginSpecification,
-    RemotePluginRegistryEntry,
-    ZippedRegistry,
+    ResolvedPluginRegistry,
+    ResolvedZippedRegistry,
 )
-from gurk.lib.shared.remotes import extract_url
-from gurk.lib.utils import full_isinstance, overlay_dicts, typecheck
+from gurk.lib.shared.remotes import GitQuery, extract_url
+from gurk.lib.utils import PathLike, full_isinstance, overlay_dicts, typecheck
 
 from ..logger import get_logger
 from .registry_manager import _get_registries
@@ -78,7 +76,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
     combine: Literal[False] = ...,
-) -> PluginRegistry:
+) -> ResolvedPluginRegistry:
     ...
 
 
@@ -88,7 +86,7 @@ def get_registries(
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[False] = ...,
-) -> PluginRegistry:
+) -> ResolvedPluginRegistry:
     ...
 
 
@@ -98,7 +96,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[False] = ...,
-) -> tuple[PluginRegistry, PluginRegistry]:
+) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
     ...
 
 
@@ -108,14 +106,14 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[True] = ...,
-) -> PluginRegistry:
+) -> ResolvedPluginRegistry:
     ...
 
 
 @typecheck
 def get_registries(
     *, home_registry: bool, package_registry: bool, combine: bool = False
-) -> tuple[PluginRegistry, ...] | PluginRegistry:
+) -> tuple[ResolvedPluginRegistry, ...] | ResolvedPluginRegistry:
     """
     Get the currently active registrator's plugin registries.
 
@@ -126,7 +124,7 @@ def get_registries(
     :param combine: Whether to combine the home and package plugin registries into one, with the home registry prioritized
     :type combine: bool
     :return: Tuple of plugin registries (home, package), or a single (combined) registry, depending on the input
-    :rtype: tuple[PluginRegistry, ...] | PluginRegistry
+    :rtype: tuple[ResolvedPluginRegistry, ...] | ResolvedPluginRegistry
     :raises ValueError: If neither home_registry nor package_registry is True, or if combine is True while not both home_registry and package_registry are True
     :raises RuntimeError: If no registrator is initialized
     """
@@ -159,7 +157,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
-) -> ZippedRegistry:
+) -> ResolvedZippedRegistry:
     ...
 
 
@@ -168,7 +166,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
-) -> ZippedRegistry:
+) -> ResolvedZippedRegistry:
     ...
 
 
@@ -177,14 +175,17 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
-) -> tuple[ZippedRegistry, ZippedRegistry]:
+) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]:
     ...
 
 
 @typecheck
 def _get_zipped_registries(
     *, home_registry: bool, package_registry: bool
-) -> tuple[ZippedRegistry, ZippedRegistry] | ZippedRegistry:
+) -> (
+    tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]
+    | ResolvedZippedRegistry
+):
     """
     Get a tuple of tuples of plugin registry files and their corresponding registries, with the home one first.
 
@@ -193,7 +194,7 @@ def _get_zipped_registries(
     :param package_registry: Whether to include the package plugin registry
     :type package_registry: bool
     :return: Tuple of tuples of plugin registry files and their corresponding registries (home, package), depending on the input
-    :rtype: tuple[ZippedRegistry, ZippedRegistry] | ZippedRegistry
+    :rtype: tuple[ResolvedZippedRegistry, ResolvedZippedRegistry] | ResolvedZippedRegistry
     """
     _registries = get_registries(home_registry=True, package_registry=True)
     return _filter_by_registries(
@@ -209,7 +210,20 @@ def _get_plugin_registration(
     *,
     package_registry: bool,
     require_local: bool,
-) -> PluginRegistry | None:
+) -> ResolvedPluginRegistry | None:
+    """
+    Get the registry entry of a plugin (path, remote) if it exists locally.
+
+    :param plugin: Name, PathLike, or GitQuery of the plugin
+    :type plugin: PluginSpecification
+    :param package_registry: Whether to check the package plugin registry (True) or the home plugin registry (False)
+    :type package_registry: bool
+    :param require_local: Whether to only return entries with a local path
+    :type require_local: bool
+    :return: Registry entry if the plugin exists locally, None otherwise
+    :rtype: ResolvedPluginRegistry | None
+    :raises RuntimeError: If no registrator is initialized
+    """
     # Get the plugin registry file and registry
     registry_file, registry = _get_zipped_registries(
         home_registry=not package_registry, package_registry=package_registry
@@ -279,20 +293,18 @@ def get_plugin_registration(
     home_registry: bool,
     package_registry: bool,
     require_local: bool = True,
-) -> PluginRegistry | None:
+) -> ResolvedPluginRegistry | None:
     """
     Get the registry entry of a plugin (path, remote) if it exists locally.
 
     :param plugin: Name, PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
-    :param home_registry: Whether to check the home plugin registry (takes precedence over the package registry if both are True)
-    :type home_registry: bool
-    :param package_registry: Whether to check the package plugin registry
+    :param package_registry: Whether to check the package plugin registry (True) or the home plugin registry (False)
     :type package_registry: bool
     :param require_local: Whether to only return entries with a local path
     :type require_local: bool
     :return: Registry entry if the plugin exists locally, None otherwise
-    :rtype: PluginRegistry | None
+    :rtype: ResolvedPluginRegistry | None
     :raises RuntimeError: If no registrator is initialized
     """
     # Collect registrations
@@ -353,6 +365,20 @@ def is_plugin_registered(
     return registration is not None
 
 
+class LocalPluginRegistryEntry(TypedDict):
+    # fmt: off
+    local:   None | PathLike
+    remote:  NotRequired[None | GitQuery]
+    # fmt: on
+
+
+class RemotePluginRegistryEntry(TypedDict):
+    # fmt: off
+    local:   NotRequired[None | PathLike]
+    remote:  None | GitQuery
+    # fmt: on
+
+
 @typecheck
 def update_registry(
     plugin_name: str,
@@ -394,7 +420,7 @@ def update_registry(
             or full_isinstance(entry, RemotePluginRegistryEntry)
         ):
             debug_error(
-                f"'entry' has an invalid structure. Expected (e):\n"
+                f"'entry' has an invalid structure. Expected:\n"
                 f"{pprint_typed_dict(PluginRegistryEntry, indent=2, as_str=True)}"
                 f"but got:\n{pprint_dict(entry, indent=2, as_str=True)}"
             )
@@ -445,12 +471,6 @@ def update_registry(
     else:
         if entry is None:
             # Remove registration
-            logger.error(
-                f"package_registry: {package_registry}\n"
-                f"plugin_name: {plugin_name}\n"
-                f"registries: {registries}\n"
-                f"registry_index: {registry_index}\n"
-            )
             if package_registry and plugin_name in registries[registry_index]:
                 # Can't fully remove package plugins' registration
                 if registries[registry_index][plugin_name].get("remote"):
@@ -465,9 +485,6 @@ def update_registry(
                     )
                     return False
             else:
-                logger.error(
-                    f"Removing plugin '{plugin_name}' from the {registry_str} registry 2."
-                )
                 registries[registry_index].pop(plugin_name, None)
                 return True
         else:

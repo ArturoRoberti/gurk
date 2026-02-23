@@ -1,4 +1,5 @@
-from typing import IO, Literal, overload
+from io import TextIOBase
+from typing import Literal, overload
 
 from rich.markup import escape
 
@@ -48,7 +49,7 @@ def logrichprint(
     severity: LoggerSeverity,
     message: str,
     as_str: Literal[False] = ...,
-    file: IO[str] | None = ...,
+    file: TextIOBase | None = ...,
 ) -> None:
     ...
 
@@ -58,7 +59,7 @@ def logrichprint(
     severity: LoggerSeverity,
     message: str,
     as_str: Literal[True] = ...,
-    file: IO[str] | None = ...,
+    file: TextIOBase | None = ...,
 ) -> str:
     ...
 
@@ -68,7 +69,7 @@ def logrichprint(
     severity: LoggerSeverity,
     message: str,
     as_str: bool = False,
-    file: IO[str] | None = None,
+    file: TextIOBase | None = None,
 ) -> str | None:
     """
     Print a rich-formatted log message with the specified severity.
@@ -80,7 +81,7 @@ def logrichprint(
     :param as_str: If True, return the formatted message as a string instead of printing it
     :type as_str: bool
     :param file: The output file (stdout/stderr). If None, defaults to stdout.
-    :type file: IO[str] | None
+    :type file: TextIOBase | None
     :return: The formatted message if as_str is True, otherwise None
     :rtype: str | None
     """

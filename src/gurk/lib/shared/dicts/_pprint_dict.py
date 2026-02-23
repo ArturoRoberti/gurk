@@ -5,6 +5,7 @@ from gurk.lib.utils import typecheck
 from .pprint_utils import _combine_lines
 
 
+@typecheck
 def _render_dict_value(
     value: Any,
     *,

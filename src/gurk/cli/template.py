@@ -1,13 +1,13 @@
 import shutil
 from pathlib import Path
 
-from gurk.lib.context import GurkContext, Logger
+from gurk.lib.context import GurkContext, Logger, get_plugin_directories
 from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
 from gurk.lib.shared.configs import dump_toml, dump_yaml, load_toml, load_yaml
 from gurk.lib.utils import (
     GURK_MANIFEST_FILENAME,
     GURK_METADATA_FILENAME,
-    PACKAGE_SRC_PATH,
+    PatternCollection,
 )
 
 
@@ -47,6 +47,17 @@ def main(argv, prog, description):
         ),
         writable=False,
     ) as ctx:
+        # Check plugin name validity
+        if not args.name.strip():
+            ctx.logger.fatal("Plugin name cannot be empty.")
+            return False
+        elif not PatternCollection.NAMING.patterns.match(args.name):
+            ctx.logger.fatal(
+                f"Plugin name '{args.name}' cannot have "
+                "any special characters except '_' or '-'."
+            )
+            return False
+
         # Determine destination path
         dest: Path = Path.cwd() / args.name
         if dest.exists():
@@ -64,7 +75,10 @@ def main(argv, prog, description):
 
         # Copy the template plugin to the current working directory
         shutil.copytree(
-            PACKAGE_SRC_PATH / "plugins" / "template",
+            get_plugin_directories(home_registry=False, package_registry=True)[
+                0
+            ]
+            / "template",
             dest,
         )
         ctx.logger.debug(f"Copied template plugin to '{dest.as_posix()}'")
@@ -73,7 +87,7 @@ def main(argv, prog, description):
         versioning_file = dest / GURK_METADATA_FILENAME
         metadata = load_toml(versioning_file)
         metadata["project"]["name"] = args.name
-        dump_toml(versioning_file, metadata)
+        dump_toml(metadata, versioning_file)
 
         # Rename manifest names
         ## Read data
@@ -104,3 +118,7 @@ def main(argv, prog, description):
 
         ## Write back
         dump_yaml(data, manifest_file)
+
+        ctx.logger.done(
+            f"Template plugin '{args.name}' created successfully at '{dest.as_posix()}'."
+        )

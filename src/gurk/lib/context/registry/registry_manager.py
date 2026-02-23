@@ -3,7 +3,11 @@ from contextvars import ContextVar
 from copy import deepcopy
 
 from gurk.lib.shared.configs import dump_yaml, load_yaml
-from gurk.lib.shared.plugins import PluginRegistry, PluginRegistryEntry
+from gurk.lib.shared.plugins import (
+    PluginRegistry,
+    ResolvedPluginRegistry,
+    ResolvedPluginRegistryEntry,
+)
 from gurk.lib.utils import PACKAGE_VENVS_PATH, full_isinstance, overlay_dicts
 
 from ..logger import get_logger
@@ -64,12 +68,7 @@ class RegistryManager:
         return False
 
     def _delete_invalid_registrations(self) -> None:
-        """
-        Delete invalid plugin registry entries from the given registries.
-
-        :param registries: Tuple of plugin registries (home, package)
-        :type registries: tuple[PluginRegistry, PluginRegistry]
-        """
+        """Delete invalid plugin registry entries from the given registries."""
         # Get logger
         logger = get_logger()
 
@@ -88,7 +87,7 @@ class RegistryManager:
                         logger.warning(warn_msg)
                         del registry[name]
                     elif (
-                        full_isinstance(entry, PluginRegistryEntry)
+                        full_isinstance(entry, ResolvedPluginRegistryEntry)
                         and entry.get("remote") is not None
                     ):
                         logger.warning(warn_msg)
@@ -111,9 +110,7 @@ class RegistryManager:
                 del home_registry[plugin_name]
 
     def _delete_unregistered_plugin_directories(self) -> None:
-        """
-        Remove any plugin directories that are not registered in the currently active registrator's plugin registry.
-        """
+        """Remove any plugin directories that are not registered in the currently active registrator's plugin registry."""
         local_plugin_paths = {
             _expand_registry_path(rf, v["local"])
             for rf, r in _zip_registry_files(self.registries)
@@ -168,15 +165,17 @@ class RegistryManager:
         # Delete any venv directories that don't correspond to a plugin
         self._delete_unregistered_venv_directories()
 
-    def load_registries(self) -> tuple[PluginRegistry, PluginRegistry]:
+    def load_registries(
+        self,
+    ) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
         """
         Load the plugin registries from their corresponding files, validating their structure and prepending the path to local entries.
 
         :return: Tuple of plugin registries (home, package)
-        :rtype: tuple[PluginRegistry, PluginRegistry]
+        :rtype: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
         """
         # Load registry files
-        self.registries = tuple(
+        self.registries: tuple[PluginRegistry, PluginRegistry] = tuple(
             load_yaml(p) or {} for p in _get_registry_files()
         )
         for ind, registry in enumerate(_deepcopy_tuple(self.registries)):
@@ -220,13 +219,13 @@ class RegistryManager:
             dump_yaml(registry, registry_file)
 
 
-def _get_registries() -> tuple[PluginRegistry, PluginRegistry]:
+def _get_registries() -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
     """
     Get the currently active registrator's plugin registries without deepcopying
     them (for internal use only). Also deletes invalid entries before returning.
 
     :return: Tuple of plugin registries (home, package)
-    :rtype: tuple[PluginRegistry, PluginRegistry]
+    :rtype: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
     :raises RuntimeError: If no registrator is initialized
     """
     registries = _current_registries.get()

@@ -1,6 +1,7 @@
 import os
 import shutil
 from copy import deepcopy
+from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
 from types import GenericAlias
@@ -10,7 +11,7 @@ from packaging.version import InvalidVersion, Version
 from pydantic import TypeAdapter, ValidationError
 
 from .type_check import typecheck
-from .types import ListOrTuple
+from .types import Comparison, ListOrTuple
 
 
 @typecheck
@@ -62,6 +63,31 @@ def check_version(version: str) -> bool:
         return True
     except InvalidVersion:
         return False
+
+
+@typecheck
+def compare_versions(v1: str, v2: str) -> Comparison | None:
+    """
+    Compare two version strings using packaging.version.Version.
+
+    :param v1: First version string
+    :type v1: str
+    :param v2: Second version string
+    :type v2: str
+    :returns: Comparison result (v1 wrt. v2) or None if either version is invalid
+    :rtype: Comparison | None
+    """
+    if not (check_version(v1) and check_version(v2)):
+        return None
+
+    if Version(v1) < Version(v2):
+        return Comparison.SMALLER
+    elif Version(v1) == Version(v2):
+        return Comparison.EQUAL
+    elif Version(v1) > Version(v2):
+        return Comparison.BIGGER
+    else:
+        return None
 
 
 T = TypeVar("T")
@@ -180,3 +206,34 @@ def overlay_dicts(dicts: ListOrTuple[dict]) -> dict:
 def identity(x: T) -> T:
     """Return the input value unchanged."""
     return x
+
+
+@typecheck
+def get_timestamp(unique: bool = False) -> str:
+    """
+    Get a consistent, unique timestamp string, incrementing by a second
+    if called multiple times within the same second and `unique` is True.
+
+    :param unique: Whether to ensure uniqueness by incrementing if called multiple times within the same second
+    :type unique: bool
+    :return: Timestamp string in format YYYYMMDD_HHMMSS
+    :rtype: str
+    """
+    curr_timestamp = datetime.now()
+    last_timestamp = getattr(get_timestamp, "_last_timestamp", None)
+
+    if unique and last_timestamp is not None:
+        # Compare the formatted strings
+        last_str = last_timestamp.strftime("%Y%m%d_%H%M%S")
+        curr_str = curr_timestamp.strftime("%Y%m%d_%H%M%S")
+        if curr_str <= last_str:
+            # Increment by 1 second to ensure uniqueness
+            curr_timestamp = last_timestamp + timedelta(seconds=1)
+
+    # Save the current timestamp for next call
+    setattr(get_timestamp, "_last_timestamp", curr_timestamp)
+
+    return curr_timestamp.strftime("%Y%m%d_%H%M%S")
+
+
+BASE_TIMESTAMP = get_timestamp()

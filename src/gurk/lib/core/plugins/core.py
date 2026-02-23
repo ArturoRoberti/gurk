@@ -3,13 +3,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from packaging.version import Version
-
 from gurk.lib.context import get_logger
 from gurk.lib.context.registry import (
     get_plugin_directories,
     get_plugin_registration,
-    get_registries,
     is_plugin_registered,
     update_registry,
 )
@@ -19,7 +16,6 @@ from gurk.lib.core.plugins.virtual_environments import (
     venv_exists,
 )
 from gurk.lib.shared.configs import load_toml, load_yaml
-from gurk.lib.shared.dicts import pprint_dict
 from gurk.lib.shared.plugins import (
     PluginManifest,
     PluginSource,
@@ -28,7 +24,6 @@ from gurk.lib.shared.plugins import (
 )
 from gurk.lib.shared.remotes import (
     GitQuery,
-    commit2version,
     determine_ref,
     edit_url,
     extract_url,
@@ -41,19 +36,21 @@ from gurk.lib.utils import (
     GIT_QUERY_VERSIONING_FIELDS,
     GURK_MANIFEST_FILENAME,
     GURK_METADATA_FILENAME,
+    Comparison,
     PathLike,
     check_version,
+    compare_versions,
     generate_random_path,
     typecheck,
 )
 
 from .check import check_local_plugin
 from .getters import get_plugin_data, get_relevant_plugin_files
-from .versioning import get_plugin_commit, get_plugin_version
-
-#########################################################################################
-#################################### Minor utilities ####################################
-#########################################################################################
+from .versioning import (
+    get_local_plugin_version,
+    get_plugin_commit,
+    get_plugin_version,
+)
 
 
 @typecheck
@@ -118,11 +115,6 @@ def is_plugin_installed(
         return False
 
     return True
-
-
-#########################################################################################
-################################### Command utilities ###################################
-#########################################################################################
 
 
 @typecheck
@@ -405,7 +397,7 @@ def _install_remote_plugin(plugin: GitQuery) -> bool:
         {
             "remote": edit_url(
                 extract_url(plugin),
-                commit=determine_ref(plugin, to_commit=True),
+                commit=commit,
             )
         },
     ):
@@ -468,12 +460,60 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
                 f"Nothing to remove for (package) plugin '{plugin_name}'"
             )
 
-    logger.error(
-        pprint_dict(
-            get_registries(home_registry=False, package_registry=True),
-            as_str=True,
-        )
-    )
+
+# def compare_plugin_version(plugin_source: PluginSource, plugin_spec: PluginSpecification, require_local: bool = True) -> Comparison | None:
+#     """
+#     Compare the version of a plugin source to the one of a registered plugin_spec.
+
+#     :param plugin_source: The plugin source to compare, either a local path or a Git URL
+#     :type plugin_source: PluginSource
+#     :param plugin_spec: The plugin specification to compare against, either a plugin name, a local path, or a Git URL. If a Git URL is provided, the plugin with the same remote URL and version/commit (if specified) will be compared.
+#     :type plugin_spec: PluginSpecification
+#     :param require_local: Whether to only compare against a registered plugin if it has a local path. Default is True.
+#     :type require_local: bool
+#     """
+#     # Get logger
+#     logger = get_logger()
+
+#     # Check source type
+#     if Path(plugin_source).is_dir():
+#         source_type = PluginSpecificationEnum.LOCAL_PATH
+#     elif is_git_repo(plugin_source):
+#         source_type = PluginSpecificationEnum.GIT_REMOTE
+#     else:
+#         logger.error(
+#             f"Invalid plugin source '{plugin_source}': Must be either a local "
+#             "path or a Git Query whose URL points to an existing repository."
+#         )
+#         return None
+
+#     # Check that the plugin is registered
+#     if not is_plugin_registered(plugin_spec, home_registry=True, package_registry=True, require_local=require_local):
+#         logger.debug(
+#             f"Plugin '{plugin_spec}' is not registered. Skipping..."
+#         )
+#         return None
+
+#     # Get the source's version
+#     if source_type == PluginSpecificationEnum.LOCAL_PATH:
+#         source_version = get_local_plugin_version(plugin_source)
+#         if source_version is None:
+#             logger.error(
+#                 f"Plugin source '{plugin_source}' has an invalid or no version. Skipping..."
+#             )
+#             return None
+#     else:
+#         source_version = get_remote_plugin_version(plugin_source)
+#         if source_version is None:
+#             logger.error(
+#                 f"Plugin source '{plugin_source}' has an invalid or no version. Skipping..."
+#             )
+#             return None
+
+#     # Get the registered version
+#     current_version = get_plugin_version(plugin_spec, require_local=require_local)
+
+#     return compare_versions(source_version, current_version)
 
 
 @typecheck
@@ -533,6 +573,29 @@ def install_plugin(
                 f"Failed to load plugin name from '{plugin_path}': {str(e)}"
             )
             return False
+
+        # Check that there is no plugin with the same name registered with a remote
+        if is_plugin_registered(
+            plugin_spec,
+            home_registry=True,
+            package_registry=True,
+            require_local=False,
+        ):
+            registration = get_plugin_registration(
+                plugin_spec,
+                home_registry=True,
+                package_registry=True,
+                require_local=False,
+            )
+            entry = next(iter(registration.values()))
+            if entry.get("remote") is not None:
+                logger.error(
+                    "A plugin with the same name as the specified local plugin already "
+                    f"exists with a remote URL registered ({entry['remote']}), so the "
+                    "two plugins are considered different. Please change the specification "
+                    f"or remove the existing plugin first using 'gurk remove {plugin_spec}'."
+                )
+                return False
     elif source_type == PluginSpecificationEnum.GIT_REMOTE:
         # Check that max one of version/commit is specified in the remote URL (if any)
         parsed = parse_git_query(plugin_source)
@@ -604,9 +667,7 @@ def install_plugin(
                     return False
 
         # Install plugin
-        logger.info(
-            f"Plugin '{plugin_spec}' is not currently installed - installing it."
-        )
+        logger.info(f"Plugin '{plugin_spec}' is not currently installed.")
         if not _install_plugin():
             return False
     else:
@@ -619,10 +680,27 @@ def install_plugin(
             if reinstall:
                 reinstall_required = True
             else:
-                logger.debug(
-                    f"ERROR: Plugin '{plugin_spec}' is already installed. Pass 'reinstall=True' to reinstall it."
+                source_version = get_local_plugin_version(plugin_source)
+                installed_version = get_plugin_version(
+                    plugin_spec, require_local=True
                 )
-                return False
+                if (
+                    compare_versions(source_version, installed_version)
+                    == Comparison.EQUAL
+                ):
+                    logger.info(
+                        f"Plugin '{plugin_spec}' is already installed and "
+                        "matches the specified local source version "
+                        f"({source_version}). Skipping installation..."
+                    )
+                    return True
+                else:
+                    logger.error(
+                        f"Plugin '{plugin_spec}' is already installed (v: {installed_version})"
+                        ", but does not match the specified local source version "
+                        f"(v: {source_version}). Please explictly specify to reinstall it."
+                    )
+                    return False
         elif source_type == PluginSpecificationEnum.GIT_REMOTE:
             # Check version/commit against existing one if specified
             if not plugin_data["registration"]["remote"]:
@@ -694,76 +772,65 @@ def upgrade_plugin(
     # Get logger
     logger = get_logger()
 
-    # Handle based on if the plugin is installed
-    if not is_plugin_installed(extract_url(plugin_spec), require_venv=False):
-        # Check if the plugin is registered
-        plugin_registration = get_plugin_registration(
-            plugin_spec,
-            home_registry=True,
-            package_registry=True,
-            require_local=require_local,
+    # Check that the plugin is registered
+    if not is_plugin_registered(
+        plugin_spec,
+        home_registry=True,
+        package_registry=True,
+        require_local=require_local,
+    ):
+        logger.debug(f"Plugin '{plugin_spec}' is not registered. Skipping...")
+        return False
+
+    # Check that the plugin has a registered remote URL
+    plugin_remote = next(
+        iter(
+            get_plugin_registration(
+                plugin_spec,
+                home_registry=True,
+                package_registry=True,
+                require_local=require_local,
+            ).values()
         )
-        if not plugin_registration:
-            logger.debug(
-                f"Plugin '{plugin_spec}' is not installed or registered. Skipping..."
-            )
-            return False
-        plugin_registration_entry = next(iter(plugin_registration.values()))
-
-        # Check that the plugin has a registered remote URL
-        if not plugin_registration_entry["remote"]:
-            logger.debug(
-                f"Plugin '{plugin_spec}' has no registered remote URL. Skipping..."
-            )
-            return False
-
-        # Get the current registered version
-        plugin_remote = plugin_registration_entry["remote"]
-        current_commit = parse_git_query(plugin_remote)["commit"]
-        current_version = commit2version(plugin_remote, current_commit)
-        if not current_version or not check_version(current_version):
-            logger.debug(
-                f"Plugin '{plugin_spec}' version cannot be determined. Skipping..."
-            )
-            return False
-
-    else:
-        # Get plugin data
-        plugin_data = get_plugin_data(plugin_spec)
-
-        # Check that the plugin has a registered remote URL
-        plugin_remote = plugin_data["registration"]["remote"]
-        if not plugin_remote:
-            logger.debug(
-                f"Plugin '{plugin_spec}' has no registered remote URL. Skipping..."
-            )
-            return False
-
-        # Get the current installed version
-        current_version = get_plugin_version(plugin_spec)
-        if not current_version or not check_version(current_version):
-            logger.debug(
-                f"Plugin '{plugin_spec}' version cannot be determined. Skipping..."
-            )
-            return False
+    )["remote"]
+    if plugin_remote is None:
+        logger.error(f"Plugin '{plugin_spec}' is local-only. Skipping...")
+        return False
 
     # Get the latest version available at the registered remote URL
     latest_version = get_latest_version(plugin_remote)
-    if not latest_version or not check_version(latest_version):
-        logger.debug(
-            f"Latest version for plugin '{plugin_spec}' cannot be determined. Skipping..."
+    if latest_version is None:
+        logger.error(
+            f"Failed to get the latest version for plugin '{plugin_spec}' from its registered remote URL. Skipping..."
         )
         return False
 
-    # Check if the installed version is already the latest version
-    if Version(current_version) == Version(latest_version):
+    # Get the current registered version (if any)
+    current_version = get_plugin_version(
+        plugin_spec, require_local=require_local
+    )
+    if current_version is None:
+        logger.error(
+            f"Failed to get the registered version for plugin '{plugin_spec}'. Skipping..."
+        )
+        return False
+
+    # # Check if the registered version is already the latest version
+    version_comparison = compare_versions(latest_version, current_version)
+    if version_comparison is None:
+        logger.error(
+            f"Failed to compare versions for plugin '{plugin_spec}'. Skipping..."
+        )
+        return False
+    elif version_comparison == Comparison.EQUAL:
         logger.info(
             f"Plugin '{plugin_spec}' is already at the latest version ({current_version})."
         )
         return True
-    elif Version(current_version) > Version(latest_version):
-        logger.debug(
-            f"Plugin '{plugin_spec}' version ({current_version}) is newer than latest ({latest_version})."
+    elif version_comparison == Comparison.SMALLER:
+        logger.warning(
+            f"Unexpected: Plugin '{plugin_spec}' version ({current_version}) "
+            f"is newer than latest ({latest_version}). Skipping..."
         )
         return False
     else:

@@ -19,7 +19,11 @@ from .gurk_argparser import (
     GurkArgumentParser,
     TaskParserNamespace,
 )
-from .versioning import get_plugin_version
+from .versioning import (
+    get_local_plugin_version,
+    get_plugin_version,
+    get_remote_plugin_version,
+)
 from .virtual_environments import (
     get_venv_dir,
     get_venv_gurk_version,
@@ -34,9 +38,11 @@ __all__ = [
     "check_local_plugin",
     "create_plugin_venv",
     "get_available_plugin_tasks",
+    "get_local_plugin_version",
     "get_plugin_data",
     "get_plugin_version",
     "get_raw_plugin_manifest",
+    "get_remote_plugin_version",
     "get_resolved_plugin_manifest",
     "get_venv_dir",
     "get_venv_gurk_version",

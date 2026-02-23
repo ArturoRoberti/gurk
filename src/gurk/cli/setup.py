@@ -6,7 +6,7 @@ from textwrap import dedent
 
 from gurk.lib.context import GurkContext, Logger, get_logger
 from gurk.lib.core.plugins import DefaultNamespace, GurkArgumentParser
-from gurk.lib.shared.printers import padded_print, richprint
+from gurk.lib.shared.printers import newline, padded_print, richprint
 from gurk.lib.shared.system_info import get_manufacturer
 from gurk.lib.utils import SETUP_DONE_FILE
 
@@ -118,7 +118,6 @@ class SSHKeysManager:
                 "Would you like to create another SSH key?"
             ):
                 break
-        logger.info("SSH key setup complete!")
 
 
 @dataclass
@@ -203,9 +202,6 @@ class GitCredentialsManager:
         subprocess.run(
             ["git", "config", "--global", "user.email", self.user_email]
         )
-        logger.info(
-            f"Git user name and email set to '{self.user_name}' resp. '{self.user_email}'."
-        )
 
 
 def print_secure_boot_steps() -> None:
@@ -251,7 +247,7 @@ def print_secure_boot_steps() -> None:
         dedent(
             f"""\
             1. Reboot your computer. During the initial boot screen, repeatedly press one of the following keys to enter the UEFI/BIOS setup: {all_keys_str}
-            2. Navigate to the 'Security' or 'Boot' tab using the arrow keys, locate the 'Secure Boot' option disable it.
+            2. Navigate to the 'Security' or 'Boot' tab using the arrow keys, locate the 'Secure Boot' option and disable it.
             3. Save your changes and exit the UEFI/BIOS setup - Your computer will reboot with Secure Boot disabled.
         """
         )
@@ -321,7 +317,7 @@ def main(argv, prog, description):
                 )
             ):
                 ssh_keys_manager.setup_keys()
-            ctx.logger.newline()
+            newline()
 
         # Set up Git Credentials
         git_credentials_manager = GitCredentialsManager()
@@ -339,7 +335,7 @@ def main(argv, prog, description):
                 )
             ):
                 git_credentials_manager.setup_credentials()
-            ctx.logger.newline()
+            newline()
 
         # Print Secure Boot disabling steps
         if args.disable_secure_boot and ctx.logger.prompt_bool(

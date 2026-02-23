@@ -1,9 +1,15 @@
 from pathlib import Path
 
-from gurk.lib.context.registry import get_plugin_registration
+from gurk.lib.context import get_logger, get_plugin_registration
 from gurk.lib.shared.configs import load_toml
 from gurk.lib.shared.plugins import PluginSpecification
-from gurk.lib.shared.remotes import get_commit, parse_git_query
+from gurk.lib.shared.remotes import (
+    GitQuery,
+    commit2version,
+    determine_ref,
+    get_commit,
+    parse_git_query,
+)
 from gurk.lib.utils import (
     GURK_METADATA_FILENAME,
     PathLike,
@@ -35,28 +41,91 @@ def get_local_plugin_version(plugin_path: PathLike) -> str | None:
 
 
 @typecheck
-def get_plugin_version(plugin: PluginSpecification) -> str | None:
+def get_remote_plugin_version(remote: GitQuery) -> str | None:
     """
-    Return the version string of a local plugin, or None if not found.
+    Return the version string of a repository remote, or None if not found.
 
-    :param plugin: Name, PathLike, or GitQuery of the plugin
-    :type plugin: PluginSpecification
+    :param remote: GitQuery of the remote
+    :type remote: GitQuery
     :return: Version string, or None if not found
     :rtype: str | None
     """
+    parsed = parse_git_query(remote)
+    commit = determine_ref(remote, to_commit=True)
+    if not commit:
+        return None
+
+    version = commit2version(parsed["url"], commit)
+    if not check_version(version):
+        return None
+
+    return version
+
+
+@typecheck
+def get_plugin_version(
+    plugin_spec: PluginSpecification, require_local: bool = False
+) -> str | None:
+    """
+    Return the version of a registered plugin, or None if not found.
+
+    :param plugin_spec: Name, PathLike, or GitQuery of the plugin
+    :type plugin_spec: PluginSpecification
+    :param require_local: If True, only return version if plugin has a local path. Otherwise, also check remote URL. Default is False.
+    :type require_local: bool
+    :return: Version string, or None if not found
+    :rtype: str | None
+    """
+    # Get logger
+    logger = get_logger()
+
+    def warning(msg: str) -> None:
+        logger.warning(
+            f"Registration of plugin '{plugin_spec}' has a {msg}. Please reinstall this plugin."
+        )
+
+    # Get registration
     plugin_registration = get_plugin_registration(
-        plugin, home_registry=True, package_registry=True
+        plugin_spec,
+        home_registry=True,
+        package_registry=True,
+        require_local=require_local,
     )
     if not plugin_registration:
         return None
     plugin_registration_entry = next(iter(plugin_registration.values()))
 
-    local_path = plugin_registration_entry["local"]
-    return (
-        get_local_plugin_version(local_path)
-        if local_path is not None
-        else None
-    )
+    # Determine local and remote versions
+    local = plugin_registration_entry["local"]
+    local_version = None
+    remote = plugin_registration_entry["remote"]
+    remote_version = None
+    if local is not None:
+        local_version = get_local_plugin_version(local)
+        if local_version is None:
+            warning("local path with an invalid or no version")
+    elif plugin_registration_entry["remote"] is not None:
+        remote_version = get_remote_plugin_version(remote)
+        if remote_version is None:
+            warning("remote URL with an invalid or no version")
+    else:
+        raise ValueError(
+            f"Unexpected: Plugin '{plugin_spec}' is registered "
+            "but has no local path or remote URL. "
+        )
+
+    if (
+        local_version is not None
+        and remote_version is not None
+        and local_version != remote_version
+    ):
+        warning(
+            f"local version '{local_version}' that does not "
+            f"match its remote version '{remote_version}'"
+        )
+        return None
+
+    return local_version or remote_version
 
 
 @typecheck

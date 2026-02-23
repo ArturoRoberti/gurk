@@ -1,4 +1,5 @@
-from typing import IO, Literal, overload
+from io import TextIOBase
+from typing import Literal, overload
 
 from rich import print as _richprint
 
@@ -6,12 +7,12 @@ from gurk.lib.utils import typecheck
 
 
 @typecheck
-def newline(*, file: IO[str] | None = None) -> None:
+def newline(*, file: TextIOBase | None = None) -> None:
     """
     Print a newline to the console output.
 
     :param file: The output file (stdout/stderr). If None, defaults to stdout.
-    :type file: IO[str] | None
+    :type file: TextIOBase | None
     """
     print("", file=file)
 
@@ -21,7 +22,7 @@ def richprint(
     message: str,
     color: str | None = ...,
     as_str: Literal[False] = ...,
-    file: IO[str] | None = ...,
+    file: TextIOBase | None = ...,
 ) -> None:
     ...
 
@@ -31,7 +32,7 @@ def richprint(
     message: str,
     color: str | None = ...,
     as_str: Literal[True] = ...,
-    file: IO[str] | None = ...,
+    file: TextIOBase | None = ...,
 ) -> str:
     ...
 
@@ -41,7 +42,7 @@ def richprint(
     message: str,
     color: str | None = None,
     as_str: bool = False,
-    file: IO[str] | None = None,
+    file: TextIOBase | None = None,
 ) -> str | None:
     """
     Print a rich-formatted message with optional color.
@@ -53,7 +54,7 @@ def richprint(
     :param as_str: If True, return the formatted message as a string instead of printing it
     :type as_str: bool
     :param file: The output file (stdout/stderr). If None, defaults to stdout.
-    :type file: IO[str] | None
+    :type file: TextIOBase | None
     :return: The formatted message if as_str is True, otherwise None
     :rtype: str | None
     """
@@ -76,7 +77,7 @@ def padded_print(
     top: bool = ...,
     bottom: bool = ...,
     as_str: Literal[False] = ...,
-    file: IO[str] | None = ...,
+    file: TextIOBase | None = ...,
 ) -> None:
     ...
 
@@ -89,7 +90,7 @@ def padded_print(
     top: bool = ...,
     bottom: bool = ...,
     as_str: Literal[True] = ...,
-    file: IO[str] | None = ...,
+    file: TextIOBase | None = ...,
 ) -> str:
     ...
 
@@ -102,7 +103,7 @@ def padded_print(
     top: bool = True,
     bottom: bool = True,
     as_str: bool = False,
-    file: IO[str] | None = None,
+    file: TextIOBase | None = None,
 ) -> str | None:
     """
     Print text padded with "=" signs to center it within a specified total length.
@@ -120,7 +121,7 @@ def padded_print(
     :param as_str: If True, return the formatted message as a string instead of printing it
     :type as_str: bool
     :param file: The output file (stdout/stderr). If None, defaults to stdout.
-    :type file: IO[str] | None
+    :type file: TextIOBase | None
     :return: The formatted message if as_str is True, otherwise None
     :rtype: str | None
     """
@@ -137,24 +138,20 @@ def padded_print(
     #   Subtract 2 for extra spaces
     remaining_length = total_length - len(text) - 2
     if remaining_length < 0:
-        msg += richprint(f"{text}", color=color, file=file, as_str=True) + "\n"
+        msg += richprint(f"{text}", color=color, file=file, as_str=True)
     else:
         left_pad = remaining_length // 2
         right_pad = remaining_length - left_pad
-        msg += (
-            richprint(
-                f"{'=' * left_pad} {text} {'=' * right_pad}",
-                color=color,
-                file=file,
-                as_str=True,
-            )
-            + "\n"
+        msg += richprint(
+            f"{'=' * left_pad} {text} {'=' * right_pad}",
+            color=color,
+            file=file,
+            as_str=True,
         )
     # Bottom bar
     if bottom:
-        msg += (
-            richprint("=" * total_length, color=color, file=file, as_str=True)
-            + "\n"
+        msg += "\n" + richprint(
+            "=" * total_length, color=color, file=file, as_str=True
         )
 
     if as_str:

@@ -2,7 +2,12 @@ from argparse import Namespace
 from collections import defaultdict
 from copy import deepcopy
 
-from gurk.lib.context import GurkContext, Logger, get_registries
+from gurk.lib.context import (
+    GurkContext,
+    Logger,
+    get_registries,
+    is_plugin_registered,
+)
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     get_available_plugin_tasks,
@@ -106,9 +111,15 @@ def main(argv, prog, description):
             for plugin_name in args.plugins:
                 # Check that the plugin is installed
                 if not is_plugin_installed(plugin_name):
-                    ctx.logger.error(
-                        f"Plugin '{plugin_name}' is not installed."
-                    )
+                    msg = f"Plugin '{plugin_name}' is not installed."
+                    if is_plugin_registered(
+                        plugin_name,
+                        home_registry=False,
+                        package_registry=True,
+                        require_local=False,
+                    ):
+                        msg += " It is registered however - please initialize it via 'gurk init'."
+                    ctx.logger.error(msg)
                     continue
 
                 # Re-get plugin name from metadata if available, in case another PluginSpecification was used

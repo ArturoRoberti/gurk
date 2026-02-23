@@ -1,7 +1,7 @@
 # Overview
 Apart from the user commands, this package currently also provides the `pytest` command for running tests. You can test the validity of package configs and scripts via
 ```bash
-gurk pytest tests/tasks.py --tasks TASK1[,TASK2,TASK3,...]
+gurk pytest tests/tasks/test_tasks.py --tasks TASK1[,TASK2,TASK3,...]
 ```
 > **NOTE:** For now, when not used on a GitHub Actions runner, this command only checks task configs and scripts for syntax errors and importability, but does not actually run the tasks.
 

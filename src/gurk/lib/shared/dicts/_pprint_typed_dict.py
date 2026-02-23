@@ -98,6 +98,7 @@ def _contains_typeddict(tp: Any) -> bool:
     return False
 
 
+@typecheck
 def _render_generic_type(
     origin: Any,
     args: tuple[Any, ...],
@@ -158,6 +159,7 @@ def _render_generic_type(
     return lines
 
 
+@typecheck
 def _prepare_typeddict_items(hints: dict[str, Any]) -> list[tuple[str, Any]]:
     """
     Prepare TypedDict items for rendering with display names.
@@ -187,6 +189,7 @@ def _prepare_typeddict_items(hints: dict[str, Any]) -> list[tuple[str, Any]]:
     return items
 
 
+@typecheck
 def _render_nested_typeddict(
     tag: str,
     ann: Any,
@@ -226,6 +229,7 @@ def _render_nested_typeddict(
     return lines
 
 
+@typecheck
 def _render_dict_annotation(
     tag: str,
     ktype: Any,
@@ -281,6 +285,7 @@ def _render_dict_annotation(
     return lines
 
 
+@typecheck
 def _render_sequence_annotation(
     tag: str,
     origin: Any,
@@ -334,6 +339,7 @@ def _render_sequence_annotation(
     return lines
 
 
+@typecheck
 def _render_union_annotation(tag: str, args: tuple[Any, ...]) -> list[str]:
     """
     Render Union type annotation for a TypedDict field.
@@ -355,6 +361,7 @@ def _render_union_annotation(tag: str, args: tuple[Any, ...]) -> list[str]:
     return [f"{tag} " + " | ".join(parts)]
 
 
+@typecheck
 def _render_annotation(
     tag: str,
     ann: Any,

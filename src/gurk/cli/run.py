@@ -198,6 +198,7 @@ def main(argv, prog, description):
             verbose=args.verbose,
             non_interactive=args.non_interactive,
             description="Processing plugin specification",
+            vary_timestamp=False,
         ),
         writable=True,
     ) as ctx:
@@ -297,6 +298,7 @@ def main(argv, prog, description):
             verbose=args.verbose,
             non_interactive=args.non_interactive,
             description="Running specification",
+            vary_timestamp=False,
         ),
         writable=False,
     ) as ctx:

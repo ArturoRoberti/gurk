@@ -7,10 +7,11 @@ from .metadata import (
     PluginMetadataDependencies,
 )
 from .registry import (
-    LocalPluginRegistryEntry,
     PluginRegistry,
     PluginRegistryEntry,
-    RemotePluginRegistryEntry,
+    ResolvedPluginRegistry,
+    ResolvedPluginRegistryEntry,
+    ResolvedZippedRegistry,
     ZippedRegistry,
 )
 from .specification import (

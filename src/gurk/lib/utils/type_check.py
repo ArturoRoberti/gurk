@@ -43,6 +43,8 @@ def typecheck(func):
     """
     Decorator to perform runtime type checking on function inputs using Pydantic's validate_call.
     It also formats validation errors to include the offending input type and value for easier debugging.
+
+    :raises InputValidationError: If the input validation fails, with details on the offending inputs.
     """
     if not _is_typecheck_active():
         return func

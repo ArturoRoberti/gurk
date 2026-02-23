@@ -4,9 +4,10 @@ from pathlib import Path
 
 from gurk.lib.utils import generate_random_path, typecheck
 
+from .mirror import GitRepositoryMirror
 from .types import GitQuery, GitQueryDict
 from .url import parse_git_query
-from .utils import _get_mirror, _git_run, _repo_lock, is_git_repo
+from .utils import _git_run, is_git_repo
 from .versioning import determine_ref
 
 
@@ -69,10 +70,10 @@ def git_clone(
 
     # Determine ref to clone (commit > version > branch or default branch)
     ref = determine_ref(repo)
+    if not ref:
+        raise ValueError(f"Could not determine the given ref from '{repo}'")
 
-    # Fetch updates
-    mirror = _get_mirror(parsed["url"])
-    with _repo_lock(mirror):
+    with GitRepositoryMirror(parsed["url"]) as mirror:
         # Pull file(s)
         _git_run(
             ["git", "archive", ref, parsed["path"] or "."],

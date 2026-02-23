@@ -1,14 +1,4 @@
-# Helper to define gurk task defaults. Not required, but inserted here for documentation's sake.
-_defaults: &defaults
-  config_file: null
-  depends_on: []
-  privileged: false
-  supercedes: []
-  args:
-    allowed: []
-    default: []
-
-# (Optional) Define external plugins to import first. Same functionality as `gurk plugin pull`
+# (Optional) Define external plugins to import first. Same functionality as `gurk pull`
 imports: [gurk]
 
 # (Optional) Define new tasks here, with at least mandatory fields ('description', 'script' and 'function')
@@ -26,11 +16,9 @@ tasks:
 
 # Define how to run this plugin
 # - This can either use existing tasks (in other plugins) or use your defined tasks.
-# - The 'default' option will be used when running `gurk plugin run <plugin-name>`.
-# - Other options can be used by running `gurk plugin run <plugin-name>=<option-name>`
-# - The first command prefix (before the first '-') of the tasks in the selected option
-#     will be used as the gurk core command to run (e.g., 'install' for 'install-some-task').
-#     Multiple commands can be indirectly run by enabling dependencies, but in no other way (by design).
+# - The 'default' option will be used when running `gurk run <plugin>` without specifying an option.
+# - Other options can be used by running `gurk run <plugin>:<option-name>`
+# - Dependencies of enabled tasks will also be enabled.
 options:
   some-option: &some_option
     template/install-some-task: {}

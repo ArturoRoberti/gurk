@@ -20,7 +20,13 @@ from rich.progress import (
 )
 from rich.prompt import Confirm, Prompt
 
-from gurk.lib.utils import NO_ANSWERS, TIMESTAMP, YES_ANSWERS, typecheck
+from gurk.lib.utils import (
+    BASE_TIMESTAMP,
+    NO_ANSWERS,
+    YES_ANSWERS,
+    get_timestamp,
+    typecheck,
+)
 from gurk.lib.utils.miscellaneous import identity
 
 from .logger_types import LoggerSeverity, TaskTerminationType
@@ -95,6 +101,7 @@ class Logger:
     non_interactive: bool = field()
     description:     str  = field(default="")  # Optional description of the logger's purpose, shown in logs.
     store_logs:      bool = field(default=True)  # Whether to store logs to disk.
+    vary_timestamp:  bool = field(default=True)  # Whether to use the initial timestamp or a new one
 
     _logdir:         Path = field(init=False)
     _logfile:        Path = field(init=False)
@@ -125,7 +132,12 @@ class Logger:
 
         if self.store_logs:
             # Logging directory
-            self._logdir = Path.home() / ".gurk" / "logs" / TIMESTAMP
+            timestamp = (
+                get_timestamp(unique=True)
+                if self.vary_timestamp
+                else BASE_TIMESTAMP
+            )
+            self._logdir = Path.home() / ".gurk" / "logs" / timestamp
             self._logdir.mkdir(parents=True, exist_ok=True)
             if self.verbose:
                 script_logdir = self._logdir / "modified_scripts"
@@ -178,7 +190,7 @@ class Logger:
                 "".join(traceback.format_exception(exc_type, exc, tb))
             )
             msg = f"An Exception occurred ({exc_type.__name__}):\n\n{traceback_str}"
-        logrichprint(LoggerSeverity.FATAL, msg)
+        logrichprint(LoggerSeverity.FATAL, msg, file=sys.stderr)
         raise SystemExit(1)
 
     @typecheck
@@ -328,7 +340,7 @@ class Logger:
         :param syntax_highlight: Whether to apply syntax highlighting
         :type syntax_highlight: bool
         """
-        if severity in (LoggerSeverity.ERROR, LoggerSeverity.FATAL):
+        if severity in {LoggerSeverity.ERROR, LoggerSeverity.FATAL}:
             console = self._console_err
         else:
             console = self._console_out

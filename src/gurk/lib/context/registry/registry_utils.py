@@ -4,7 +4,9 @@ from typing import Literal, TypeVar, get_type_hints, overload
 
 from gurk.lib.shared.plugins import (
     PluginRegistry,
-    PluginRegistryEntry,
+    ResolvedPluginRegistry,
+    ResolvedPluginRegistryEntry,
+    ResolvedZippedRegistry,
     ZippedRegistry,
 )
 from gurk.lib.shared.remotes import GitQueryDict, is_git_repo, parse_git_query
@@ -32,6 +34,7 @@ def _deepcopy_tuple(tup: tuple) -> tuple:
     return tuple(deepcopy(item) for item in tup)
 
 
+# TODO: Refactor with overloads
 @typecheck
 def get_plugin_directories(
     home_registry: bool = True, package_registry: bool = True
@@ -81,16 +84,36 @@ def _get_registry_files() -> tuple[Path, Path]:
     return tuple(plugin_registry_files)
 
 
+@overload
 def _zip_registry_files(
     registries: tuple[PluginRegistry, PluginRegistry]
-) -> tuple[ZippedRegistry, ...]:
+) -> tuple[ZippedRegistry, ZippedRegistry]:
+    ...
+
+
+@overload
+def _zip_registry_files(
+    registries: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
+) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]:
+    ...
+
+
+def _zip_registry_files(
+    registries: tuple[
+        PluginRegistry | ResolvedPluginRegistry,
+        PluginRegistry | ResolvedPluginRegistry,
+    ]
+) -> tuple[
+    ZippedRegistry | ResolvedZippedRegistry,
+    ZippedRegistry | ResolvedZippedRegistry,
+]:
     """
     Zip the plugin registries with their corresponding registry files, with the home one first.
 
     :param registries: Tuple of plugin registries (home, package)
-    :type registries: tuple[PluginRegistry, PluginRegistry]
+    :type registries: tuple[PluginRegistry | ResolvedPluginRegistry, PluginRegistry | ResolvedPluginRegistry]
     :return: Tuple of tuples of plugin registry files and their corresponding registries (home, package)
-    :rtype: tuple[ZippedRegistry, ...]
+    :rtype: tuple[ZippedRegistry | ResolvedZippedRegistry, ZippedRegistry | ResolvedZippedRegistry]
     """
     return tuple(zip(_get_registry_files(), registries))
 
@@ -121,7 +144,7 @@ def _expand_registry_path(
 @typecheck
 def _is_entry_valid(
     name: str,
-    entry: PluginRegistryEntry,
+    entry: ResolvedPluginRegistryEntry,
     registry_file: Path,
     check_local: bool = True,
 ) -> bool:
@@ -135,14 +158,14 @@ def _is_entry_valid(
     :return: Whether the entry is valid
     """
     checks: dict[str, bool] = {
-        "Plugin name must be a string": isinstance(name, str),
-        "Entry must conform to PluginRegistryEntry schema": full_isinstance(
-            entry, PluginRegistryEntry
+        f"Plugin name '{name}' must be a string": isinstance(name, str),
+        "Entry must conform to ResolvedPluginRegistryEntry schema": full_isinstance(
+            entry, ResolvedPluginRegistryEntry
         ),
         "Entry must define at least one of 'local' or 'remote'": any(
             (entry.get("local") is not None, entry.get("remote") is not None)
         ),
-        "Local path must exist if specified": (
+        f"Local path {entry.get('local')} must exist if specified": (
             entry.get("local") is None
             or (
                 not check_local
@@ -151,10 +174,10 @@ def _is_entry_valid(
                 ).is_dir()
             )
         ),
-        "Remote must be a valid git repository if specified": (
+        f"Remote {entry.get('remote')} must be a valid git repository if specified": (
             entry.get("remote") is None or is_git_repo(entry["remote"])
         ),
-        "Remote must define a commit (and nothing else) if specified": (
+        f"Remote {entry.get('remote')} must define a commit (and nothing else) if specified": (
             entry.get("remote") is None
             or (
                 parse_git_query(entry["remote"])["commit"] is not None

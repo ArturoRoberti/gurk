@@ -30,7 +30,7 @@ def main(argv, prog, description):
         "plugins",
         type=str,
         nargs="*",
-        help="Names of the plugins to remove",
+        help="Names of the registered plugins to remove",
     )
     args = parser.parse_args(argv)
 
@@ -46,7 +46,7 @@ def main(argv, prog, description):
         for plugin_name in args.plugins:
             # Only allow plugin names
             if Path(plugin_name).exists() or is_git_repo(plugin_name):
-                ctx.logger.fatal(
+                ctx.logger.error(
                     f"Invalid plugin specification '{plugin_name}' given "
                     f"for removal. Only plugin names are allowed."
                 )
@@ -60,9 +60,8 @@ def main(argv, prog, description):
                 registry_file = get_registry_files(
                     home_registry=False, package_registry=True
                 )
-                ctx.logger.info(
-                    f"Skipping removal of package plugin '{plugin_name}', "
-                    "which cannot be removed, as it is a package plugin. If "
+                ctx.logger.error(
+                    f"Cannot remove '{plugin_name}', as it is a package plugin. If "
                     "you really want to remove this plugin, you can manually set "
                     f"its local path to 'null' in {registry_file.as_posix()}."
                 )

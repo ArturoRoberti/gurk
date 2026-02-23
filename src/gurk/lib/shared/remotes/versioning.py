@@ -6,9 +6,10 @@ from typing import Literal, overload
 from gurk.lib.utils import GURK_METADATA_FILENAME, check_version, typecheck
 
 from ..configs import load_toml
+from .mirror import GitRepositoryMirror
 from .types import GitQuery, GitQueryDict
 from .url import edit_url, extract_url, parse_git_query
-from .utils import _get_mirror, _git_run, _repo_lock, is_git_repo
+from .utils import _git_run, is_git_repo
 
 
 @cache
@@ -30,19 +31,17 @@ def _version2commit(
     :raises ValueError: If the repository does not exist or if the version string is invalid
     :raises CalledProcessError: If git commands fail for various reasons
     """
-    # Check that version is valid
-    if not check_version(version):
-        raise ValueError(f"Invalid version string: '{version}'")
-
     # Check that the repo exists
     if not is_git_repo(url):
         raise ValueError(
             f"Repository {url} does not exist or is not accessible."
         )
 
-    # Fetch updates
-    mirror = _get_mirror(url)
-    with _repo_lock(mirror):
+    # Check that version is valid
+    if not check_version(version):
+        return None
+
+    with GitRepositoryMirror(url) as mirror:
         # Get commits that touched the versioning file, newest first
         result = _git_run(
             ["git", "rev-list", "HEAD", "--", GURK_METADATA_FILENAME],
@@ -112,9 +111,7 @@ def get_default_branch(
     :raises CalledProcessError: If git commands fail for various reasons
     :raises RuntimeError: If the default branch cannot be determined
     """
-    # Fetch updates
-    mirror = _get_mirror(url)
-    with _repo_lock(mirror):
+    with GitRepositoryMirror(url) as mirror:
         # Get default branch from remote info
         result = _git_run(
             ["git", "remote", "show", "origin"],
@@ -161,9 +158,7 @@ def _get_commit(url: str | GitQuery, commit: str | None) -> str:
     if commit is None:
         commit = "HEAD"
 
-    # Fetch updates
-    mirror = _get_mirror(url)
-    with _repo_lock(mirror):
+    with GitRepositoryMirror(url) as mirror:
         # Get commit hash
         result = _git_run(
             ["git", "rev-parse", commit],
@@ -207,7 +202,7 @@ def determine_ref(
     :type to_commit: bool
     :return: Git ref to use (branch name, version string, or commit hash)
     :rtype: str
-    :raises ValueError: If the repository does not exist or if version cannot be resolved to a commit
+    :raises ValueError: If the repository does not exist
     :raises CalledProcessError: If git commands fail for various reasons
     """
     parsed = parse_git_query(repo)
@@ -216,12 +211,7 @@ def determine_ref(
         ref = parsed["commit"]
     elif parsed["version"]:
         # Find commit for version
-        commit = version2commit(parsed["url"], parsed["version"])
-        if not commit:
-            raise ValueError(
-                f"Version '{parsed['version']}' not found in repository '{parsed['url']}'"
-            )
-        ref = commit
+        ref = version2commit(parsed["url"], parsed["version"])
     elif parsed["branch"]:
         ref = parsed["branch"]
     else:
@@ -261,9 +251,7 @@ def _get_commit_timestamp(
             f"Repository {url} does not exist or is not accessible."
         )
 
-    # Fetch updates
-    mirror = _get_mirror(url)
-    with _repo_lock(mirror):
+    with GitRepositoryMirror(url) as mirror:
         # Get commit timestamp
         format_str = "%cI" if human_readable else "%ct"
         result = _git_run(
@@ -375,11 +363,11 @@ def _commit2version(
             f"Repository {url} does not exist or is not accessible."
         )
 
-    # Fetch updates
-    mirror = _get_mirror(url)
-    with _repo_lock(mirror):
+    # Get the full commit
+    ref = determine_ref(edit_url(url, commit=commit), to_commit=True)
+
+    with GitRepositoryMirror(url) as mirror:
         # Get the versioning file
-        ref = determine_ref(edit_url(url, commit=commit))
         versioning_file = _git_run(
             ["git", "show", f"{ref}:{GURK_METADATA_FILENAME}"],
             cwd=mirror,

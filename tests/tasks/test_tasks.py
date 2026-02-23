@@ -1,8 +1,8 @@
 import os
 import subprocess
 import sys
+from io import TextIOBase
 from pathlib import Path
-from typing import IO
 
 import commentjson
 import pytest
@@ -113,7 +113,8 @@ def test_task(task: str) -> None:
             failed_tasks = [task for task in captured if not task[2]]
 
             def print_task_outputs(
-                tasks: list[tuple[str, str, bool]], file: IO[str] | None = None
+                tasks: list[tuple[str, str, bool]],
+                file: TextIOBase | None = None,
             ) -> None:
                 """
                 Print the contents of task output files.
@@ -121,7 +122,7 @@ def test_task(task: str) -> None:
                 :param tasks: List of tuples containing task name, output file path, and success status
                 :type tasks: list[tuple[str, str, bool]]
                 :param file: The output file (stdout/stderr). If None, defaults to stdout.
-                :type file: IO[str] | None
+                :type file: TextIOBase | None
                 """
                 for task in tasks:
                     # Print task name

@@ -363,10 +363,12 @@ def get_relevant_plugin_files(
     :rtype: set[Path] | None
     :raises ValueError: If the plugin source is invalid
     """
-    if plugin_source.exists():
+    if Path(plugin_source).exists():
         return _get_relevant_files_local(plugin_source, relative=relative)
-    elif is_git_repo(plugin_source):
-        return _get_relevant_files_remote(plugin_source, relative=relative)
+    elif is_git_repo(str(plugin_source)):
+        return _get_relevant_files_remote(
+            str(plugin_source), relative=relative
+        )
     else:
         raise ValueError(
             f"Invalid plugin source '{plugin_source}' - must be a git remote or a local plugin path"

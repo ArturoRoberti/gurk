@@ -8,11 +8,11 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from gurk.lib.utils import PathLike, PatternCollection, typecheck
 
-from .types import YAML
+from .types import YAML, CommentedDict
 
 
 @typecheck
-def resolve_package_path(raw_script: PathLike) -> PathLike | None:
+def resolve_package_path(raw_script: PathLike, /) -> PathLike | None:
     """
     Resolve paths that may refer to package resources. Package paths are in the format:
     ```
@@ -62,10 +62,11 @@ def resolve_package_path(raw_script: PathLike) -> PathLike | None:
 @typecheck
 def load_yaml(
     yaml_file_or_str: PathLike,
+    /,
     *,
     from_str: bool = False,
     remove_list_duplicates: bool = True,
-) -> dict[str, Any] | None:
+) -> Any | None:
     """
     Load a YAML content and normalize it.
 
@@ -76,7 +77,7 @@ def load_yaml(
     :param remove_list_duplicates: Whether to remove duplicates in lists
     :type remove_list_duplicates: bool
     :return: Normalized content of the YAML file, or None if loading fails
-    :rtype: dict[str, Any] | None
+    :rtype: Any | None
     """
 
     def normalize_yaml(obj: Any) -> Any:
@@ -156,12 +157,12 @@ def load_yaml(
 
 
 @typecheck
-def dump_yaml(content: dict[str, Any], yaml_file: PathLike) -> None:
+def dump_yaml(content: CommentedDict[str, Any], yaml_file: PathLike) -> None:
     """
     Dump content to a YAML file.
 
     :param content: Content to dump
-    :type content: dict[str, Any]
+    :type content: CommentedDict[str, Any]
     :param yaml_file: Path to the YAML file to dump to
     :type yaml_file: PathLike
     """

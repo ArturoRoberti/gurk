@@ -31,6 +31,10 @@ def main(argv, prog, description):
             home_registry=True, package_registry=True, combine=True
         )
         for plugin_name, plugin_entry in combined_registry.items():
+            # Skip gurk core plugin
+            if plugin_name == "gurk":
+                continue
+
             # Remove plugin venv (if any) with different gurk version
             if (
                 venv_exists(plugin_name)
@@ -63,20 +67,29 @@ def main(argv, prog, description):
                         f"Local plugin '{plugin_name}' is not validly installed. Please remove it manually."
                     )
                     continue
+            else:
+                ctx.logger.debug(
+                    f"Plugin '{plugin_name}' is already installed - skipping installation."
+                )
 
             # CHECK: Plugin should now be installed
             if not is_plugin_installed(plugin_name, require_venv=False):
                 ctx.logger.error(
-                    f"Unexpected: Plugin '{plugin_name}' is still not installed."
+                    f"Unexpected: Plugin '{plugin_name}' is "
+                    "still not installed. Skipping venv creation."
                 )
                 continue
 
             # Create plugin venv
-            if plugin_name != "gurk" and not venv_exists(plugin_name):
+            if not venv_exists(plugin_name):
                 if not create_plugin_venv(plugin_name):
                     ctx.logger.error(
                         f"Failed to create virtual environment for plugin '{plugin_name}'",
                     )
                     continue
+            else:
+                ctx.logger.debug(
+                    f"Plugin '{plugin_name}' virtual environment already exists - skipping creation."
+                )
 
         ctx.logger.done("Initialization complete.")

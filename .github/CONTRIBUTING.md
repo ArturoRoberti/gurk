@@ -43,7 +43,7 @@ gurk pytest tests/scripts.py
 
 You can also test individual tasks via either using the gurk core commands as any user would or using
 ```bash
-gurk pytest tests/tasks.py --tasks TASK1[,TASK2,TASK3,...]
+gurk pytest tests/tasks/test_tasks.py --tasks TASK1[,TASK2,TASK3,...]
 ```
 
 Please ensure clear and concise descriptions in your commit messages.

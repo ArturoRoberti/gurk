@@ -1,14 +1,17 @@
 from pathlib import Path
 
 from gurk.lib.context import GurkContext, Logger, get_registries
+from gurk.lib.context.registry import (
+    get_plugin_registration,
+    is_plugin_registered,
+)
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
-    get_plugin_data,
     is_plugin_installed,
     upgrade_plugin,
 )
-from gurk.lib.shared.remotes import extract_url, is_git_installed
+from gurk.lib.shared.remotes import extract_url, is_git_installed, is_git_repo
 
 
 class UpgradeNamespace(DefaultNamespace):
@@ -25,7 +28,7 @@ def main(argv, prog, description):
         "plugins",
         type=str,
         nargs="*",
-        help="PluginSpecifications (name or remote) of the installed plugins to upgrade. If empty, upgrade all local plugins",
+        help="Names of the registered plugins to upgrade. If empty, upgrade all local plugins",
     )
     parser.add_argument(
         "-e",
@@ -55,12 +58,12 @@ def main(argv, prog, description):
         # Parse plugin specifications to upgrade
         if args.plugins:
             plugins = args.plugins
-            # Don't allow local paths
             for plugin in plugins:
-                if Path(plugin).exists():
+                # Only allow plugin names
+                if Path(plugin).exists() or is_git_repo(plugin):
                     ctx.logger.error(
-                        f"Invalid plugin specification '{plugin}' given for upgrade. "
-                        f"Only plugin names or remotes are allowed. Skipping..."
+                        f"Invalid plugin specification '{plugin}' given "
+                        f"for upgrade. Only plugin names are allowed."
                     )
                     plugins.remove(plugin)
         else:
@@ -91,30 +94,36 @@ def main(argv, prog, description):
                 normalized_exclude.add(extract_url(exclude))
 
         for plugin in plugins:
-            # Logging helper
-            if args.plugins:
-                logfunc = ctx.logger.info
-            else:
-                logfunc = ctx.logger.debug
-
-            # Check if plugin is installed
-            if not is_plugin_installed(
-                extract_url(plugin), require_venv=False
+            # Check if plugin is registered
+            if not is_plugin_registered(
+                plugin,
+                home_registry=True,
+                package_registry=True,
+                require_local=False,
             ):
-                logfunc(
-                    f"Plugin '{plugin}' is not validly installed. Skipping upgrade..."
+                ctx.logger.error(
+                    f"Plugin '{plugin}' is not registered. Skipping upgrade..."
                 )
                 continue
 
-            # Get plugin data
-            plugin_data = get_plugin_data(plugin)
-            plugin_name = plugin_data["metadata"]["name"]
-            plugin_local = plugin_data["registration"]["local"]
-            plugin_remote = plugin_data["registration"]["remote"]
+            # Get available plugin data from registration
+            plugin_registration = get_plugin_registration(
+                plugin,
+                home_registry=True,
+                package_registry=True,
+                require_local=False,
+            )
+            plugin_name, plugin_entry = next(iter(plugin_registration.items()))
+            plugin_local = (
+                plugin_entry["local"].as_posix()
+                if isinstance(plugin_entry["local"], Path)
+                else plugin_entry["local"],
+            )
+            plugin_remote = plugin_entry["remote"]
 
             # Skip local-only plugins
             if not plugin_remote:
-                logfunc(
+                ctx.logger.error(
                     f"Plugin '{plugin}' is local-only and has no remote. Skipping upgrade..."
                 )
                 continue
@@ -122,16 +131,13 @@ def main(argv, prog, description):
             # Exclude specified plugins
             if normalized_exclude & {
                 plugin_name,
-                str(plugin_local),
+                plugin_local,
                 extract_url(plugin_remote),
             }:
-                logfunc(f"Excluding plugin '{plugin}' from upgrade.")
+                ctx.logger.debug(f"Excluding plugin '{plugin}' from upgrade.")
                 continue
 
             # Upgrade plugin from remotes
-            if not upgrade_plugin(plugin):
-                ctx.logger.error(
-                    f"Failed to upgrade plugin '{plugin}' from remote."
-                )
+            upgrade_plugin(plugin)
 
         ctx.logger.done("Plugin upgrades complete.")

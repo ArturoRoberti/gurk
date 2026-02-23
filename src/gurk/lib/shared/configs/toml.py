@@ -37,14 +37,14 @@ def load_toml(
 
 
 @typecheck
-def dump_toml(toml_file: PathLike, content: dict[str, Any]) -> None:
+def dump_toml(content: dict[str, Any], toml_file: PathLike) -> None:
     """
     Dump content to a TOML file.
 
-    :param toml_file: Path to the TOML file to dump to
-    :type toml_file: PathLike
     :param content: Content to dump
     :type content: dict[str, Any]
+    :param toml_file: Path to the TOML file to dump to
+    :type toml_file: PathLike
     """
     with open(toml_file, "wb") as f:
         tomli_w.dump(content, f)
