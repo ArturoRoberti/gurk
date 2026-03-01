@@ -1,0 +1,6 @@
+[project]
+name = "fzf"
+version = "1.0.0"
+description = "A gurk plugin to install fzf and loki-shell for fuzzy finding"
+
+# No pip requirements

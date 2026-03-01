@@ -1,34 +1,103 @@
-import os
-import re
-import sys
-from pathlib import Path
-
-import networkx as nx
-
 try:
-    from gurk.utils.common import (
-        DEFAULT_CONFIG_FILE,
-        PACKAGE_SRC_PATH,
-        get_script_path,
-    )
-    from gurk.utils.scripts import (
-        ScriptBlockTypes,
-        get_block_spans,
+    from gurk.lib.context import GurkContext
+    from gurk.lib.core.plugins import (
+        get_available_plugin_tasks,
+        install_plugin,
         iter_configs,
         iter_scripts,
     )
-    from gurk.utils.tasks import RUNNER_SPECIFIC_TASKS
-    from gurk.utils.yaml import load_yaml
+    from gurk.lib.shared.configs import load_yaml
+    from gurk.lib.shared.remotes import get_commit_timestamp
+    from gurk.lib.shared.scripts import ScriptBlockTypes, get_block_spans
+    from gurk.lib.utils import RUNNER_SPECIFIC_TASKS
 except ImportError:
     raise ImportError(
         "The gurk package needs to be installed to run this script."
     )
 
+import os
+import re
+import subprocess
+from pathlib import Path
+from typing import TypeAlias
+from urllib.parse import parse_qs, urlparse
+
+import networkx as nx
+from utils import PLUGIN_FOLDER_PREFIX, REPO_ROOT, get_git_diff
+
+
+def _get_changed_remote_plugin_sources() -> set[str]:
+    """
+    Get the set of changed or new remote plugin sources under PLUGIN_FOLDER_PREFIX.
+
+    :return: Set of changed or new remote plugin sources
+    :rtype: set[str]
+    """
+    RegistryData: TypeAlias = dict[str, dict[str, str]]
+
+    def filter_remote_plugins(registry_data: RegistryData) -> RegistryData:
+        return {
+            k: v
+            for k, v in registry_data.items()
+            if v.get("local") is None and v.get("remote") is not None
+        }
+
+    # Load current registry.yaml
+    registry_path = REPO_ROOT / PLUGIN_FOLDER_PREFIX / "registry.yaml"
+    curr_registry_data = load_yaml(registry_path)
+    curr_registry_data = filter_remote_plugins(curr_registry_data)
+
+    # # Load default branch registry.yaml
+    # default_registry = subprocess.check_output(
+    #     ["git", "show", f"{DEFAULT_BRANCH}:{registry_path}"],
+    #     text=True,
+    # )
+    # default_registry_data = load_yaml(default_registry)
+    # default_registry_data = filter_remote_plugins(default_registry_data)
+
+    # TODO: Only temporary until the default registry exists on main. Replace with above ASAP
+    default_registry_data: RegistryData = {}
+
+    # Get new remote plugins
+    new_plugins = {
+        v["remote"]
+        for k, v in curr_registry_data.items()
+        if k not in default_registry_data
+    }
+
+    # Get changed remote plugins
+    changed_plugins = set()
+    for k, v in curr_registry_data.items():
+        if k not in default_registry_data:
+            continue  # New plugin, already handled
+
+        # Get current commit
+        parts = urlparse(v["remote"])
+        query = parse_qs(parts.query)
+        t_commit = get_commit_timestamp(query["url"], query["commit"])
+
+        # Get default branch commit
+        parts_def = urlparse(default_registry_data[k]["remote"])
+        query_def = parse_qs(parts_def.query)
+        t_commit_def = get_commit_timestamp(
+            query_def["url"], query_def["commit"]
+        )
+
+        # Compare commit timestamps
+        if t_commit > t_commit_def:
+            changed_plugins.add(v["remote"])
+        elif t_commit < t_commit_def:
+            raise RuntimeError(
+                f"Plugin '{k}' has an older commit timestamp ({t_commit}) than in the default branch ({t_commit_def})."
+            )
+
+    return new_plugins.union(changed_plugins)
+
 
 def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
     """
     Parse a unified diff text and return a mapping of file paths to changed line numbers.
-        NOTE: This currently also counts changed comments and blank lines.
+        :NOTE: This currently also counts changed comments and blank lines.
 
     :param diff_text: The unified diff text
     :type diff_text: str
@@ -54,16 +123,14 @@ def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
                 for line_number in range(start, start + count):
                     changed[current_file].add(line_number)
 
-    # Prepend package path to file paths
-    return {
-        str(PACKAGE_SRC_PATH.parents[1] / k): v for k, v in changed.items()
-    }
+    # Prepend repo root to file paths
+    return {str(REPO_ROOT / k): v for k, v in changed.items()}
 
 
 def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
     """
     Determine which top-level blocks (functions/entrypoint) are affected by the changed lines.
-        NOTE: Assumes scripts are valid, i.e. only contain functions and an entrypoint (and imports for Python)
+        :NOTE: Assumes scripts are valid, i.e. only contain functions and an entrypoint (and imports for Python)
 
     :param path: Path to the script file
     :type path: Path
@@ -87,16 +154,15 @@ def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
     return affected_blocks
 
 
-def compute_affected_tasks(diff_text: str) -> list[str]:
+def compute_affected_tasks() -> list[str]:
     """
-    Compute the set of affected tasks based on the given diff text.
+    Compute the set of affected tasks based on the git diff.
 
-    :param diff_text: The unified diff text
-    :type diff_text: str
     :return: Set of affected task names
     :rtype: set[str]
     """
     # Parse diff to get changed line numbers per file
+    diff_text = get_git_diff(PLUGIN_FOLDER_PREFIX, staged=True)
     changed_lines_map = _parse_diff_changed_lines(diff_text)
 
     # Find affected script blocks (functions/entrypoints)
@@ -113,13 +179,11 @@ def compute_affected_tasks(diff_text: str) -> list[str]:
             affected_config_files.add(file_path.name)
 
     # Determine affected tasks
-    default_config = load_yaml(DEFAULT_CONFIG_FILE)
-    tasks = {k: v for k, v in default_config.items() if not k.startswith("_")}
+    tasks = get_available_plugin_tasks()
     affected_tasks: set[str] = set()
     for task_name, task in tasks.items():
         # Affected script block
-        command = task_name.split("-", 1)[0]
-        script = get_script_path(task["script"], command)
+        script = task["script"]
         if script in affected_script_blocks:
             affected_blocks = affected_script_blocks[script]
             if task["function"] in affected_blocks:
@@ -156,9 +220,25 @@ def compute_affected_tasks(diff_text: str) -> list[str]:
     return sorted(uninstall_tasks) + sorted(affected_tasks - uninstall_tasks)
 
 
-def main():
-    # Compute affected tasks from git diff read from stdin
-    affected_tasks = compute_affected_tasks(sys.stdin.read())
+if __name__ == "__main__":
+    # Pull changed remote plugins and stage for diff analysis
+    changed_remote_plugins = _get_changed_remote_plugin_sources()
+    for plugin_source in changed_remote_plugins:
+        if not install_plugin(plugin_source):
+            raise RuntimeError(
+                f"Failed to pull changed/new remote plugin from source '{plugin_source}'."
+            )
+    if changed_remote_plugins:
+        subprocess.run(
+            ["git", "add", PLUGIN_FOLDER_PREFIX],
+            check=True,
+            cwd=REPO_ROOT,
+            capture_output=True,
+        )
+
+    # Compute affected tasks from git diff
+    with GurkContext(logger=None, writable=False):
+        affected_tasks = compute_affected_tasks()
 
     # Write to GitHub Actions env
     github_env = os.environ.get("GITHUB_ENV")
@@ -174,7 +254,3 @@ def main():
             f"Affected tasks ({len(affected_tasks)}):\n"
             f"{', '.join(affected_tasks)}"
         )
-
-
-if __name__ == "__main__":
-    main()

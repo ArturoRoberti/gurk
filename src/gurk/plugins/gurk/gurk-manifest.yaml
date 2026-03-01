@@ -1,0 +1,75 @@
+# No plugin imports
+
+tasks:
+################################################################################################
+############################################ Install ###########################################
+################################################################################################
+  gurk/install-apt-packages:
+    description: Install a list of apt packages
+    script: scripts/package_managers.py
+    function: install_apt_packages
+    config_file: config/install_apt_packages.txt
+  gurk/install-flatpak-packages:
+    description: Install a list of flatpak packages
+    script: scripts/package_managers.py
+    function: install_flatpak_packages
+    config_file: config/install_flatpak_packages.txt
+    args:
+      --gurk-flatpak-create-aliases:
+        default: False
+        help: Create desktop file aliases for flatpak packages
+  gurk/install-js-repositories:
+    description: Clone and install a list of packages using JavaScript
+    script: scripts/js_repositories.py
+    function: install_js_repositories
+    config_file: config/install_js_repositories.txt
+    args:
+      --gurk-js-create-aliases:
+        default: False
+        help: Create desktop file aliases for JS repositories
+  gurk/install-npm-packages:
+    description: Install a list of npm packages
+    script: scripts/package_managers.py
+    function: install_npm_packages
+    config_file: config/install_npm_packages.txt
+  gurk/install-snap-packages:
+    description: Install a list of snap packages
+    script: scripts/package_managers.py
+    function: install_snap_packages
+    config_file: config/install_snap_packages.txt
+################################################################################################
+########################################### Configure ##########################################
+################################################################################################
+  gurk/configure-bashrc:
+    description: Copy lines from a template bashrc file to the user's .bashrc
+    script: scripts/configurations.bash
+    function: configure_bashrc
+    config_file: config/configure_bashrc.bash
+  gurk/configure-filestructure:
+    description: Create a predefined filestructure in on the user's system
+    script: scripts/configurations.py
+    function: configure_filestructure
+    config_file: config/configure_filestructure.yaml
+    privileged: true
+    args:
+      --gurk-configure-root-filestructure:
+        default: False
+        help: Allow creating filestructure in root-owned directories
+  gurk/configure-pinned-apps:
+    description: Configure pinned applications on the user's desktop
+    script: scripts/configurations.py
+    function: configure_pinned_apps
+    config_file: config/configure_pinned_apps.txt
+
+options:
+  install: &install_option
+    gurk/install-apt-packages: {}
+    gurk/install-flatpak-packages: {}
+    gurk/install-js-repositories: {}
+    gurk/install-npm-packages: {}
+    gurk/install-snap-packages: {}
+  configure:
+    gurk/configure-bashrc: {}
+    gurk/configure-filestructure: {}
+    gurk/configure-pinned-apps: {}
+  default: *install_option

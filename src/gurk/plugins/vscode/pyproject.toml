@@ -1,0 +1,7 @@
+[project]
+name = "vscode"
+version = "1.0.0"
+description = "A gurk plugin to install Visual Studio Code"
+
+[project.optional-dependencies]
+gurk = [ "commentjson",]

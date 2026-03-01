@@ -43,7 +43,7 @@ jobs:
         fi
 
     - name: Set up Python
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
@@ -56,12 +56,12 @@ jobs:
         restore-keys: pre-commit-${{ runner.os }}-
 
     - name: Install pre-commit
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       run: pip install pre-commit
 
       # Set git user for committing changes and ensure we are on the PR branch
     - name: Configure git
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       run: |
         # Set git user for committing changes and ensure we are on the PR branch
         git config user.name "github-actions[bot]"
@@ -70,14 +70,14 @@ jobs:
 
       # Allow fixes to be applied (continue on failure)
     - name: Run pre-commit (auto-fix pass)
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       run: |
         # Allow fixes to be applied (continue on failure)
         pre-commit run --all-files --show-diff-on-failure || true
 
       # Commit any changes made by pre-commit (if any)
     - name: Commit auto-fixes (if any)
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       run: |
         # Commit any changes made by pre-commit (if any)
         if [ -n "$(git status --porcelain)" ]; then
@@ -91,14 +91,14 @@ jobs:
 
       # This is strict — if this fails the job fails and we will NOT push
     - name: Run pre-commit (final check pass)
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       run: |
         # This is strict — if this fails the job fails and we will NOT push
         pre-commit run --all-files --show-diff-on-failure
 
       # Push auto-fixes back to the branch (if final check passed)
     - name: Push auto-fixes (if any)
-      if: ${{ env.SKIP_WORKFLOW != 'true' }}
+      if: steps.set-env.outputs.SKIP_WORKFLOW != 'true'
       id: possible-push
       run: |
         # Push auto-fixes back to the branch (if final check passed)

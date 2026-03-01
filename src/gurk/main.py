@@ -1,59 +1,57 @@
 import click
 
-from gurk.cli import core, info, setup
-from gurk.cli.utils import (
-    CORE_COMMANDS,
+from . import __version__ as GURK_VERSION
+from .cli import (
+    check,
+    help,
+    init,
+    pull,
+    pytest,
+    remove,
+    run,
+    setup,
+    template,
+    upgrade,
+)
+from .utils import (
     GROUP_CONTEXT_SETTINGS,
     SUBCOMMAND_CONTEXT_SETTINGS,
-    VERSION,
     OrderedGroup,
     get_prog,
 )
 
 
 @click.group(cls=OrderedGroup, context_settings=GROUP_CONTEXT_SETTINGS)
-@click.version_option(version=VERSION, prog_name="gurk")
+@click.version_option(version=GURK_VERSION, prog_name="gurk")
 def main():
-    """gurk - Package manager easily allowing multiple simple and complex installations."""
+    """gurk - Package manager making computer setup easy"""
     pass
 
 
-def _add_core_cmd(cmd_name: str) -> None:
-    """
-    Dynamically add a core command to the main CLI group.
+################################################################################################
+######################################### Core Commands ########################################
+################################################################################################
 
-    :param cmd_name: Name of the command to add.
-    :type cmd_name: str
-    """
-    help_text = f"Run any of the gurk '{cmd_name}' tasks (see 'gurk info --available-tasks')"
 
-    @main.command(
-        name=cmd_name,
-        context_settings=SUBCOMMAND_CONTEXT_SETTINGS,
-        help=help_text,
+@main.command(name="run", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def run_cmd(ctx: click.Context):
+    """Run a gurk plugin task or option"""
+    run.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
     )
-    @click.pass_context
-    def cmd(ctx: click.Context):
-        core.main(
-            argv=ctx.args,
-            prog=get_prog(ctx.info_name),
-            description=ctx.command.help,
-            cmd=ctx.info_name,
-        )
-
-    cmd.__name__ = f"{cmd_name}_cmd"
-    main.commands[cmd_name].category = "Core Commands"
-
-
-# Add all 'core' commands dynamically
-for cmd_name in CORE_COMMANDS:
-    _add_core_cmd(cmd_name)
 
 
 @main.command(name="setup", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def setup_cmd(ctx: click.Context):
-    """(Recommended before any main commands) Run the user through some manual setups"""
+    """
+    \b
+    Run through some manual setups
+      !!! Highly recommended before running any plugins/tasks !!!
+    """
     setup.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
@@ -61,33 +59,116 @@ def setup_cmd(ctx: click.Context):
     )
 
 
-@main.command(name="info", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@main.command(name="upgrade", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
-def info_cmd(ctx: click.Context):
-    """Print information about tasks, configuration files and the host system"""
-    info.main(
+def upgrade_cmd(ctx: click.Context):
+    """Upgrade one or all installed gurk plugins to their newest version"""
+    upgrade.main(
         argv=ctx.args,
         prog=get_prog(ctx.info_name),
         description=ctx.command.help,
     )
 
 
+@main.command(name="init", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def init_cmd(ctx: click.Context):
+    """Initialize gurk"""
+    init.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="pull", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def pull_cmd(ctx: click.Context):
+    """Install gurk plugins from git repositories or local paths"""
+    pull.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="remove", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def remove_cmd(ctx: click.Context):
+    """Uninstall one or more gurk plugins (that are not officially supported)"""
+    remove.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="help", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def help_cmd(ctx: click.Context):
+    """Show help about gurk. Use no arguments to see links to documentation."""
+    help.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+for cmd in ["run", "setup", "upgrade", "init", "pull", "remove", "help"]:
+    main.commands[cmd].category = "Core Commands"
+
+
+#################################################################################################################
+########################################## Plugin Development Commands ##########################################
+#################################################################################################################
+
+
+@main.command(name="check", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def check_cmd(ctx: click.Context):
+    """Check local gurk plugins for errors"""
+    check.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+@main.command(name="template", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def template_cmd(ctx: click.Context):
+    """Create a gurk plugin template in the current directory"""
+    template.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
+for cmd in ["check", "template"]:
+    main.commands[cmd].category = "Plugin Development Commands"
+
+
+##################################################################################################
+#################################### Gurk Development Commands ###################################
+##################################################################################################
+
+
 @main.command(name="pytest", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def pytest_cmd(ctx: click.Context):
-    """Run pytest (able to import this package). Use as you would the normal 'pytest' command."""
-    try:
-        import pytest
-    except ImportError:
-        raise RuntimeError(
-            "'pytest' is not installed. Please install this package with the "
-            "'dev' extras to use this command via: 'pipx install -e .[dev]'"
-        )
-    raise SystemExit(pytest.main(ctx.args))
+    """
+    \b
+    Run pytest (able to import this package). Use as you would the normal 'pytest' command.
+      NOTE: Set the 'SUDO_ASKPASS' environment variable to include task-running tests
+    """
+    pytest.main(argv=ctx.args)
 
 
-main.commands["pytest"].category = "Developer Commands"
+for cmd in ["pytest"]:
+    main.commands[cmd].category = "Gurk Development Commands"
 
 
+# Entry point
 if __name__ == "__main__":
     main()

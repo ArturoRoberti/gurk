@@ -1,0 +1,7 @@
+[project]
+name = "docker"
+version = "1.0.0"
+description = "A gurk plugin to install anything related to Docker"
+
+[project.optional-dependencies]
+gurk = [ "commentjson",]

@@ -78,8 +78,11 @@ repos:
 - repo: local
   hooks:
   - id: bump-version
-    name: Bump version in pyproject.toml
-    entry: python3 .github/scripts/bump_version.py
+    name: Bump pyproject.toml versions
+    entry: python3 .github/scripts/bump_versions.py
     language: python
-    additional_dependencies: [packaging, requests, toml]
     require_serial: true
+    additional_dependencies:
+      - tomli; python_version < "3.11"
+      - tomli-w
+      - packaging

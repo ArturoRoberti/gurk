@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gurk"
-version = "1.1.0"
+version = "2.0.0"
 description = "Contains anything related to setting up a new computer (desktop) system"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [ "click", "rich", "distro", "ruamel.yaml", "commentjson", "networkx", "GitPython", "requests", "packaging",]
+requires-python = ">=3.12"
+dependencies = [ "gurk-template-plugin", "click", "distro", "filelock", "networkx", "packaging", "pydantic", "requests", "rich", "ruamel.yaml", "tomli_w",]
 classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: POSIX :: Linux", "Environment :: Console", "Topic :: System :: Installation/Setup", "Intended Audience :: End Users/Desktop",]
 [[project.authors]]
 name = "Arturo J. Roberti"
@@ -24,13 +24,14 @@ Issues = "https://github.com/ArturoRoberti/gurk/issues"
 Documentation = "https://github.com/ArturoRoberti/gurk#readme"
 
 [project.optional-dependencies]
-dev = [ "pytest",]
+dev = [ "commentjson", "pytest",]
+gurk = [ "packaging", "requests",]
 
 [project.scripts]
 gurk = "gurk.main:main"
 
 [tool.setuptools.package-data]
-gurk = [ "config/**", "scripts/**",]
+gurk = [ "plugins/**", "scripts/**",]
 
 [tool.pytest.ini_options]
 pythonpath = [ "src",]

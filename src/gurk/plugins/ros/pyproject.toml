@@ -1,0 +1,6 @@
+[project]
+name = "ros"
+version = "1.0.0"
+description = "A gurk plugin to install ROS (Robot Operating System)"
+
+# No pip requirements

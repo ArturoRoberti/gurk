@@ -12,7 +12,8 @@ Before executing a task, the scheduler preprocesses its script to:
 - Inject progress-tracking `STEP` statements at the task's function or entrypoint
 - Remove any other `STEP` statements to avoid counting issues
 - Handle `sudo` prompts via a `sudo -A` (askpass) wrapper
-- Source the pipx virtual environment and any helper scripts (Bash only)
+- Source each task plugin's virtual environment
+- Source any helper scripts (Bash only)
 
 # Progress tracking via PTY
 The scheduler uses PTY (pseudo-TTY) to spawn subprocesses, allowing it to capture task output at runtime to detect progress statements and update the progress bar accordingly.

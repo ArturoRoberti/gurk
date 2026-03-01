@@ -1,0 +1,93 @@
+from io import TextIOBase
+from typing import Literal, overload
+
+from rich.markup import escape
+
+from gurk.lib.shared.printers import richprint
+from gurk.lib.utils import typecheck
+
+from .logger_types import LoggerSeverity
+
+
+@typecheck
+def _filter_pydantic_wrapper(traceback_str: str) -> str:
+    """
+    Filter out Pydantic's internal wrapper from error messages to improve readability.
+
+    :param traceback_str: The original traceback string
+    :type traceback_str: str
+    :return: The filtered traceback string
+    :rtype: str
+    """
+    lines = traceback_str.splitlines()
+    cleaned = []
+
+    i = 0
+    while i < len(lines):
+        # look ahead for a line containing _typecheck
+        if i + 1 < len(lines) and "_typecheck(" in lines[i + 1]:
+            # skip until we see validate_python
+            while (
+                i < len(lines)
+                and "self.__pydantic_validator__.validate_python("
+                not in lines[i]
+            ):
+                i += 1
+
+            # skip the validate_python line and the line after it (if any)
+            i += 2
+            continue
+
+        cleaned.append(lines[i])
+        i += 1
+
+    return "\n".join(cleaned)
+
+
+@overload
+def logrichprint(
+    severity: LoggerSeverity,
+    message: str,
+    as_str: Literal[False] = ...,
+    file: TextIOBase | None = ...,
+) -> None:
+    ...
+
+
+@overload
+def logrichprint(
+    severity: LoggerSeverity,
+    message: str,
+    as_str: Literal[True] = ...,
+    file: TextIOBase | None = ...,
+) -> str:
+    ...
+
+
+@typecheck
+def logrichprint(
+    severity: LoggerSeverity,
+    message: str,
+    as_str: bool = False,
+    file: TextIOBase | None = None,
+) -> str | None:
+    """
+    Print a rich-formatted log message with the specified severity.
+
+    :param severity: Severity level
+    :type severity: LoggerSeverity
+    :param message: The message to print
+    :type message: str
+    :param as_str: If True, return the formatted message as a string instead of printing it
+    :type as_str: bool
+    :param file: The output file (stdout/stderr). If None, defaults to stdout.
+    :type file: TextIOBase | None
+    :return: The formatted message if as_str is True, otherwise None
+    :rtype: str | None
+    """
+    color = f"{'bold 'if severity.bold else ''}{'bright_'if severity.bright else ''}{severity.color}"
+    msg = f"{richprint(escape(f'[{severity.label}]'), color=color, as_str=True)} {message}"
+    if as_str:
+        return msg
+    else:
+        richprint(msg, file=file)

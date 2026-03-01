@@ -1,0 +1,32 @@
+# No plugin imports
+
+tasks:
+  ros/install-ros:
+    description: Install ROS (Robot Operating System)
+    script: scripts/ros.bash
+    function: null
+    args:
+      --ros-version:
+        default: latest
+        help: Specify the ROS version to install
+        choices:
+          - latest
+          - ardent
+          - bouncy
+          - crystal
+          - dashing
+          - eloquent
+          - foxy
+          - galactic
+          - humble
+          - iron
+          - jazzy
+          - kilted
+          - lyrical
+      --ros-include-future:
+        default: false
+        help: Include future ROS distributions in the installation options
+
+options:
+  default:
+    ros/install-ros: {}

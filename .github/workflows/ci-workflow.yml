@@ -29,11 +29,13 @@ jobs:
     if: ${{ always() && needs.ci-wf-branch-name.result != 'failure' }}
     uses: ./.github/workflows/reusable-labels.yml
     with:
-      required-labels: "bug,enhancement"
+      required-labels: "developer,bug,enhancement,automated"
       auto-assign-labels: |
         {
+          "dev/": "developer",
           "feature/": "enhancement",
-          "fix/": "bug"
+          "fix/": "bug",
+          "automated/": "automated"
         }
 
   # Final job to report overall CI status

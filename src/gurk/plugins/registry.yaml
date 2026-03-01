@@ -1,0 +1,28 @@
+# Package basics plugin
+gurk:
+  local: gurk
+  remote: null
+
+# Package remote plugins - Gladly add any of your plugins here via a Pull Request!
+#   TODO: any remaining local ones should be moved to their own repositories)
+conda:
+  local: conda
+  remote: null
+docker:
+  local: docker
+  remote: null
+fzf:
+  local: fzf
+  remote: null
+nvidia:
+  local: nvidia
+  remote: null
+pip:
+  local: pip
+  remote: null
+ros:
+  local: ros
+  remote: null
+vscode:
+  local: vscode
+  remote: null

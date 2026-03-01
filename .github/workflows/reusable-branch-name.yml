@@ -49,20 +49,28 @@ jobs:
           console.log("Extracted codeowners:", codeowners);
 
           // ------------------------------------------------------------
-          // Build allowed dev/ patterns
-          // dev/<owner>*
+          // Build allowed patterns
+          // dev/<codeowner>*
+          // feature/<description>
+          // fix/<description>
+          // automated/<description>
           // ------------------------------------------------------------
+
+          // dev/<codeowner>*
           const devPatterns = codeowners.map(o => new RegExp(`^dev/${o}.*$`));
 
-          let valid = true;
-
-          // Check basic pattern: (feature|fix)/<description>
+          // (feature|fix)/<description>
           const featureFixPattern = /^(feature|fix)\/[^/]+$/;
 
-          const matchesFeatureFix = featureFixPattern.test(branch);
-          const matchesDevPattern = devPatterns.some(p => p.test(branch));
+          // automated/<description>
+          const automatedPattern = /^automated\/[^/]+$/;
 
-          if (!matchesFeatureFix && !matchesDevPattern) {
+          const matchesDev = devPatterns.some(p => p.test(branch));
+          const matchesFeatureFix = featureFixPattern.test(branch);
+          const matchesAutomated = automatedPattern.test(branch);
+
+          let valid = true;
+          if (!matchesFeatureFix && !matchesDev && !matchesAutomated) {
             console.log("Branch name does not match allowed patterns.");
             valid = false;
           }

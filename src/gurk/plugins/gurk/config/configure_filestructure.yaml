@@ -1,0 +1,29 @@
+# The structure under HOME will be placed into the user's home directory, and the
+#     structure under ROOT will be placed into the root directory ("/") (requires '--root' arg to enable).
+# The final values may be
+# - null (indicating an empty directory/file to create)
+#     (type (folder/file) is inferred from if a suffix is present (e.g. '.txt'))
+# - (str) a github repository reference (indicating a repo to clone from)
+#           (see see '_parse_git_query' function in this repo for expected format)
+# - (str) a URL (indicating a file to download from), starting with "http(s)://"
+# - (str) a local path (indicating a file/directory to copy from)
+#         - You may add the "symlink://" prefix to create a symlink instead of copying.
+#         - To specify a path relative to the its folder (in this structure), use "./<relative_path>".
+#         - To specify a path relative to this config file, simply use "<relative_path>".
+#         - Also, the user's home (~) will be expanded.
+# Recommended: Add custom executable scripts and aliases in $HOME/.cmds, then add it to PATH
+HOME:
+  .cmds:
+    argparse.bash:
+      https://github.com/nhoffman/argparse-bash.git?path=argparse.bash
+  git: null
+  Documents:
+    Personal:
+      CVs: null
+      IDs: null
+    General: null
+    Work: null
+ROOT:
+  usr:
+    bin:
+      python: symlink:///usr/bin/python3
