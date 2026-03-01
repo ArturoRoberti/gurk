@@ -3,7 +3,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
 PLUGIN_FOLDER_PREFIX = "src/gurk/plugins/"
-DEFAULT_BRANCH = "main"
+DEFAULT_BRANCH = "origin/main"
 
 
 def get_git_diff(
