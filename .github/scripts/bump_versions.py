@@ -126,7 +126,7 @@ def _get_changed_plugin_folder_names() -> set[str]:
         remainder = path[len(PLUGIN_FOLDER_PREFIX) :]
         parts = remainder.split("/", 1)
 
-        if len(parts) > 1 and parts[0] not in ("gurk", "template"):
+        if len(parts) > 1 and parts[0] != "gurk":
             plugins.add(parts[0])
 
     # Return prefixed with PLUGIN_FOLDER_PREFIX

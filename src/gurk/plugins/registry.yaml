@@ -11,9 +11,6 @@ conda:
 docker:
   local: docker
   remote: null
-example-gurk-plugin:
-  local: null
-  remote: git@github.com:ArturoRoberti/example_gurk_plugin.git?commit=b71fc86e1840ecfed1f7716db4a1c27d20df201e
 fzf:
   local: fzf
   remote: null

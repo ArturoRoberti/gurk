@@ -262,7 +262,11 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
             f"Destination path '{dest}' for plugin '{plugin_name}' already exists. Overwriting it..."
         )
         shutil.rmtree(dest)
-    shutil.copytree(plugin_path, dest)
+    relevant_files = get_relevant_plugin_files(plugin_path)
+    for rfile in relevant_files:
+        dest_file = dest / rfile
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(plugin_path / rfile, dest_file)
 
     # Install plugin dependencies in the plugin venv
     if not create_plugin_venv(plugin_name):

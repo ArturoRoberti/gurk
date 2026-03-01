@@ -1,2 +1,0 @@
-# Mock configuration file
-sl

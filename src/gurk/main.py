@@ -2,11 +2,11 @@ import click
 
 from . import __version__ as GURK_VERSION
 from .cli import (
-    _pytest,
     check,
     help,
     init,
     pull,
+    pytest,
     remove,
     run,
     setup,
@@ -162,7 +162,7 @@ def pytest_cmd(ctx: click.Context):
     Run pytest (able to import this package). Use as you would the normal 'pytest' command.
       NOTE: Set the 'SUDO_ASKPASS' environment variable to include task-running tests
     """
-    _pytest.main(argv=ctx.args)
+    pytest.main(argv=ctx.args)
 
 
 for cmd in ["pytest"]:

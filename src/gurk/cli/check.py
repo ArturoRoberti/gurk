@@ -34,8 +34,8 @@ def main(argv, prog, description):
     ) as ctx:
         for source in args.paths:
             if not check_local_plugin(source, True):
-                ctx.logger.fatal(f"Plugin source '{source}' is invalid.")
+                ctx.logger.fatal(f"Plugin at '{source}' is invalid.")
             else:
-                ctx.logger.info(f"Plugin source '{source}' is valid.")
+                ctx.logger.info(f"Plugin at '{source}' is valid.")
 
         ctx.logger.done("Plugin checks complete.")

@@ -123,7 +123,6 @@ class RegistryManager:
             for possible_plugin_dir in base_dir.iterdir():
                 if (
                     possible_plugin_dir != registry_file
-                    and possible_plugin_dir.name != "template"
                     and possible_plugin_dir not in local_plugin_paths
                 ):
                     _type = (

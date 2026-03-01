@@ -1,6 +1,7 @@
 import getpass
 import os
 import subprocess
+import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -71,10 +72,10 @@ def get_sudo_askpass() -> Path:
                 break
             else:
                 if attempts != 1:
-                    print("Sorry, try again.")
+                    print("Sorry, try again.", file=sys.stderr)
                 attempts -= 1
         else:
-            print("gurk: 3 incorrect password attempts")
+            print("gurk: 3 incorrect password attempts", file=sys.stderr)
             raise SystemExit(1)
 
         askpass_file.write("#!/bin/sh\n" f"echo '{response}'\n")
@@ -135,31 +136,32 @@ def main(
     # Get logger
     logger = get_logger()
 
-    # Set default values in case of early exception
-    askpass_path = None
+    # Prompt to run the 'setup' command upon first usage
+    if not logger.non_interactive:
+        prompt_setup()
+
+    # Check system information
+    system_info = get_system_info()  # Raises exception if incompatible system
+    logger.debug(f"System information: {system_info}")
+
+    # Load option and process tasks
+    processor = Processor(option, cli_args, parser_base)
+
+    # Check if a prompt is needed to get sudo access
+    if not (askpass or check_askpass() or "pytest" in sys.modules):
+        if logger.non_interactive:
+            logger.fatal(
+                "sudo access is required to run tasks. Please set the "
+                "'SUDO_ASKPASS' environment variable or run in interactive mode."
+            )
+        askpass_prompted = True
+    else:
+        askpass_prompted = False
 
     try:
-        # Prompt to run the 'setup' command upon first usage
-        if not logger.non_interactive:
-            prompt_setup()
-
-        # Check system information
-        try:
-            system_info = get_system_info()
-            logger.debug(f"System information: {system_info}")
-        except RuntimeError as e:
-            logger.fatal(str(e))
-
-        # Load option and process tasks
-        processor = Processor(option, cli_args, parser_base)
-
         # Get sudo password
-        if not (askpass or check_askpass()):
-            if logger.non_interactive:
-                logger.fatal(
-                    "sudo access is required to run tasks. Please set the "
-                    "'SUDO_ASKPASS' environment variable or run in interactive mode."
-                )
+        askpass_path = None  # Set default value in case of early exception
+        if askpass_prompted:
             # Prompt for sudo password
             askpass_path = get_sudo_askpass()
         else:
@@ -178,6 +180,10 @@ def main(
         raise e
 
     finally:
-        # Remove temporary sudo askpass file
-        if askpass_path is not None and Path(askpass_path).is_file():
+        # Remove temporary sudo askpass file, if it was created via gurk
+        if (
+            askpass_prompted
+            and askpass_path is not None
+            and Path(askpass_path).is_file()
+        ):
             os.remove(askpass_path)

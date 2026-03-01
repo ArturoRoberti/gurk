@@ -79,10 +79,6 @@ def main(argv, prog, description):
             unregistered_paths: set[Path] = set()
             for dir, is_home in zip(get_plugin_directories(), [True, False]):
                 for item in dir.iterdir():
-                    if item.name == "template":
-                        # Skip template directory, which is not registered
-                        continue
-
                     if item.is_dir() and not is_plugin_registered(
                         item,
                         home_registry=is_home,

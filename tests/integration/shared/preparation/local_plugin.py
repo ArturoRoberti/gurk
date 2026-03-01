@@ -3,15 +3,13 @@ from dataclasses import dataclass, field
 
 from packaging.version import InvalidVersion, Version
 
-from gurk.lib.context import get_plugin_directories
-from gurk.lib.core.plugins import check_local_plugin
 from gurk.lib.shared.configs import dump_toml, load_toml
 from gurk.lib.utils import GURK_METADATA_FILENAME
 
 from ...utils import (
-    EXAMPLE_PLUGIN_VERSIONING,
     PYTEST_PLUGIN_NAME,
     PYTEST_PLUGIN_PATH,
+    TEMPLATE_PLUGIN_VERSIONING,
     PytestInputException,
     PytestUnexpectedException,
 )
@@ -27,9 +25,9 @@ class PreparedLocalPlugin:
     :type version: str
     """
 
-    version: str = field(
-        default=EXAMPLE_PLUGIN_VERSIONING["version"]["exists"]
-    )
+    # fmt: off
+    version:   str  = field(default=TEMPLATE_PLUGIN_VERSIONING["version"]["exists"])
+    # fmt: on
 
     def __post_init__(self):
         # Validate version string
@@ -40,25 +38,14 @@ class PreparedLocalPlugin:
                 f"Invalid version string '{self.version}' provided for the template plugin context."
             )
 
-        # Assert that the template plugin is valid, just to be safe
-        template_path = (
-            get_plugin_directories(home_registry=False, package_registry=True)[
-                0
-            ]
-            / "template"
-        )
-        if not template_path.is_dir():
-            raise PytestUnexpectedException(
-                f"Expected the template plugin directory to exist at {template_path}, but it was not found."
-            )
-        elif not check_local_plugin(template_path):
-            raise PytestUnexpectedException(
-                "Expected the template plugin to be valid, but it was not."
-            )
-
     def __enter__(self) -> str:
         # Create a local plugin to pull from
-        gurk_template(["-n", PYTEST_PLUGIN_NAME, "--force"])
+        gurk_template(
+            [
+                f"--name={PYTEST_PLUGIN_NAME}",
+                f"--directory={PYTEST_PLUGIN_PATH.parent.as_posix()}",
+            ]
+        )
         if not PYTEST_PLUGIN_PATH.is_dir():
             raise PytestUnexpectedException(
                 f"Expected a directory for the plugin, but it was not found at {PYTEST_PLUGIN_PATH}"

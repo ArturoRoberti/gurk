@@ -5,13 +5,12 @@ from .miscellaneous import (
     BASE_TIMESTAMP,
     check_version,
     compare_versions,
-    full_isinstance,
     generate_random_path,
     get_timestamp,
     identity,
     overlay_dicts,
 )
-from .type_check import InputValidationError, typecheck
+from .type_check import InputValidationError, full_isinstance, typecheck
 from .types import *
 from .types import __all__ as types__all__
 

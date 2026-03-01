@@ -2,9 +2,10 @@
 from .data import PluginData
 from .manifest import PluginManifest, PluginOptions, ResolvedPluginManifest
 from .metadata import (
-    FilteredPluginMetadata,
     PluginMetadata,
     PluginMetadataDependencies,
+    PluginMetadataProject,
+    ResolvedPluginMetadata,
 )
 from .registry import (
     PluginRegistry,

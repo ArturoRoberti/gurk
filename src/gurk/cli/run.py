@@ -1,4 +1,5 @@
 import os
+import sys
 from argparse import ArgumentTypeError
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from gurk.lib.core.plugins import (
 )
 from gurk.lib.shared.configs import load_toml
 from gurk.lib.shared.plugins import PluginSpecificationEnum
-from gurk.lib.shared.remotes import is_git_installed, is_git_repo
+from gurk.lib.shared.remotes import extract_url, is_git_installed, is_git_repo
 from gurk.lib.shared.tasks import (
     ResolvedCustomTaskDict,
     ResolvedDefaultTaskDict,
@@ -64,7 +65,7 @@ def parse_specification(specification: str) -> ParsedSpecification:
     ) -> ParsedSpecification | None:
         if transform is None:
             transform = identity
-
+        # No subspecification
         if check_function(transform(specification)):
             return ParsedSpecification(
                 specification=specification,
@@ -73,8 +74,11 @@ def parse_specification(specification: str) -> ParsedSpecification:
                 subtask=None,
                 option="default",
             )
-        elif possible_option and check_function(
-            transform(possible_option_plugin)
+        # Option specified
+        elif (
+            possible_option
+            and extract_url(possible_option) == possible_option
+            and check_function(transform(possible_option_plugin))
         ):
             return ParsedSpecification(
                 specification=specification,
@@ -83,8 +87,11 @@ def parse_specification(specification: str) -> ParsedSpecification:
                 subtask=None,
                 option=possible_option,
             )
-        elif possible_subtask and check_function(
-            transform(possible_subtask_plugin)
+        # Subtask specified
+        elif (
+            possible_subtask
+            and extract_url(possible_subtask) == possible_subtask
+            and check_function(transform(possible_subtask_plugin))
         ):
             return ParsedSpecification(
                 specification=specification,
@@ -198,7 +205,7 @@ def main(argv, prog, description):
             verbose=args.verbose,
             non_interactive=args.non_interactive,
             description="Processing plugin specification",
-            vary_timestamp=False,
+            vary_timestamp="pytest" in sys.modules,
         ),
         writable=True,
     ) as ctx:
@@ -298,7 +305,7 @@ def main(argv, prog, description):
             verbose=args.verbose,
             non_interactive=args.non_interactive,
             description="Running specification",
-            vary_timestamp=False,
+            vary_timestamp="pytest" in sys.modules,
         ),
         writable=False,
     ) as ctx:

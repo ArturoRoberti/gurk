@@ -9,14 +9,15 @@ from gurk.lib.context.registry import (
     get_plugin_registration,
 )
 from gurk.lib.shared.configs import load_toml, load_yaml
-from gurk.lib.shared.dicts import fill_typed_dict
+from gurk.lib.shared.dicts import fill_typed_dict, filter_typed_dict
 from gurk.lib.shared.plugins import (
-    FilteredPluginMetadata,
     PluginData,
     PluginManifest,
+    PluginMetadata,
     PluginSource,
     PluginSpecification,
     ResolvedPluginManifest,
+    ResolvedPluginMetadata,
 )
 from gurk.lib.shared.remotes import GitQuery, edit_url, git_clone, is_git_repo
 from gurk.lib.shared.tasks import (
@@ -32,7 +33,7 @@ from gurk.lib.utils import (
     typecheck,
 )
 
-from .check import check_local_plugin, filter_metadata
+from .check import check_local_plugin
 
 
 @typecheck
@@ -119,14 +120,14 @@ def get_resolved_plugin_manifest(
 @typecheck
 def _get_plugin_metadata(
     plugin: PluginSpecification,
-) -> FilteredPluginMetadata | None:
+) -> ResolvedPluginMetadata | None:
     """
     Get the pyproject.toml metadata of a local plugin.
 
     :param plugin: Name, utils.PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
     :return: Plugin metadata if the plugin exists locally, None otherwise
-    :rtype: FilteredPluginMetadata | None
+    :rtype: ResolvedPluginMetadata | None
     """
     plugin_registration = get_plugin_registration(
         plugin, home_registry=True, package_registry=True
@@ -144,7 +145,11 @@ def _get_plugin_metadata(
     if not toml_data:
         return None
 
-    return filter_metadata(toml_data)
+    metadata = filter_typed_dict(toml_data, PluginMetadata)["project"]
+    dependencies = metadata.pop("optional-dependencies", {})
+    metadata["dependencies"] = dependencies.get("gurk", [])
+
+    return metadata
 
 
 @typecheck
@@ -371,5 +376,6 @@ def get_relevant_plugin_files(
         )
     else:
         raise ValueError(
-            f"Invalid plugin source '{plugin_source}' - must be a git remote or a local plugin path"
+            f"Invalid plugin source '{plugin_source}' - must be a git remote or a "
+            f"local plugin path, not {plugin_source} (type '{type(plugin_source)}')"
         )

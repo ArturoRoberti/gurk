@@ -16,7 +16,7 @@ from gurk.lib.core.plugins import (
 )
 from gurk.lib.shared.configs import load_toml
 from gurk.lib.shared.dicts import pprint_dict, pprint_typed_dict
-from gurk.lib.shared.plugins import PluginManifest, PluginMetadata
+from gurk.lib.shared.plugins import PluginManifest, PluginMetadataProject
 from gurk.lib.shared.printers import padded_print, richprint
 from gurk.lib.shared.system_info import get_system_info
 from gurk.lib.utils import (
@@ -110,7 +110,7 @@ def main(argv, prog, description):
         elif args.plugins:
             for plugin_name in args.plugins:
                 # Check that the plugin is installed
-                if not is_plugin_installed(plugin_name):
+                if not is_plugin_installed(plugin_name, require_venv=False):
                     msg = f"Plugin '{plugin_name}' is not installed."
                     if is_plugin_registered(
                         plugin_name,
@@ -229,10 +229,10 @@ def main(argv, prog, description):
             pprint_typed_dict(PluginManifest)
 
             padded_print(
-                f"Structure of 'project' section in '{GURK_METADATA_FILENAME}'",
+                f"Minimum structure of 'project' section in '{GURK_METADATA_FILENAME}'",
                 "cyan",
             )
-            pprint_typed_dict(PluginMetadata)
+            pprint_typed_dict(PluginMetadataProject)
 
         # Print system information
         elif args.system_info:

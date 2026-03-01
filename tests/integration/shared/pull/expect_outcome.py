@@ -5,7 +5,7 @@ from gurk.lib.shared.remotes import determine_ref, parse_git_query
 from gurk.lib.utils import GIT_QUERY_VERSIONING_FIELDS, typecheck
 
 from ...utils import (
-    EXAMPLE_PLUGIN_VERSIONING,
+    TEMPLATE_PLUGIN_VERSIONING,
     ExpectedOutcome,
     PytestUnexpectedException,
 )
@@ -55,7 +55,7 @@ def expected_outcome_pull_remote_specification(
         return ExpectedOutcome.SUCCESS
     elif (
         determine_ref(registration.entry["remote"], to_commit=True)
-        == EXAMPLE_PLUGIN_VERSIONING["commit"]["exists"]
+        == TEMPLATE_PLUGIN_VERSIONING["commit"]["exists"]
     ):
         # The registered plugin matches the specified plugin version
         return ExpectedOutcome.SUCCESS

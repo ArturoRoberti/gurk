@@ -9,7 +9,6 @@ import pytest
 import tomllib
 from ruamel.yaml import YAML
 
-from gurk.cli._pytest import check_askpass
 from gurk.lib.context import GurkContext, Logger
 from gurk.lib.core import runner
 from gurk.lib.core.plugins import (
@@ -80,7 +79,7 @@ def test_task(task: str) -> None:
                 )
 
     # Run task and capture task results
-    if check_askpass():
+    if runner.check_askpass():
         # For now, only run in GitHub Actions runner to avoid askpass prompts
         captured = []
         with GurkContext(

@@ -1,23 +1,25 @@
 from typing import NotRequired, TypedDict
 
 
-class FilteredPluginMetadata(TypedDict):
-    # fmt: off
-    name:         str
-    version:      str
-    description:  str
+class _PluginMetadataBase(TypedDict):
+    name: str
+    version: str
+    description: str
+
+
+class ResolvedPluginMetadata(_PluginMetadataBase):
     dependencies: list[str]
-    # fmt: on
 
 
 class PluginMetadataDependencies(TypedDict):
     gurk: NotRequired[list[str]]
 
 
+class PluginMetadataProject(_PluginMetadataBase):
+    __annotations__ = {  # Syntax necessary for hyphen in dependencies
+        "optional-dependencies": NotRequired[PluginMetadataDependencies],
+    }
+
+
 class PluginMetadata(TypedDict):
-    # fmt: off
-    name:                  str
-    version:               str
-    description:           str
-    optional_dependencies: NotRequired[PluginMetadataDependencies]
-    # fmt: on
+    project: PluginMetadataProject

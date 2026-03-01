@@ -5,16 +5,17 @@ from gurk.lib.shared.plugins import PluginRegistryEntry
 from gurk.lib.shared.remotes import edit_url
 
 from ...utils import (
-    EXAMPLE_PLUGIN_REMOTE,
-    EXAMPLE_PLUGIN_VERSIONING,
     PYTEST_PLUGIN_NAME,
+    TEMPLATE_PLUGIN_REMOTE,
+    TEMPLATE_PLUGIN_VERSIONING,
     RegistryKind,
     bump_patch,
 )
 
 # 'registration'
 remote = edit_url(
-    EXAMPLE_PLUGIN_REMOTE, commit=EXAMPLE_PLUGIN_VERSIONING["commit"]["exists"]
+    TEMPLATE_PLUGIN_REMOTE,
+    commit=TEMPLATE_PLUGIN_VERSIONING["commit"]["exists"],
 )
 REGISTRY_ENTRY_OPTIONS: list[PluginRegistryEntry | None] = [
     None,
@@ -62,7 +63,7 @@ for entry, kind, venv_exists in deepcopy(PREPARED_PLUGIN_REGISTRATION_PARAMS):
             )
 
 # Local plugin versions
-existing_version = EXAMPLE_PLUGIN_VERSIONING["version"]["exists"]
+existing_version = TEMPLATE_PLUGIN_VERSIONING["version"]["exists"]
 LOCAL_PLUGIN_VERSIONS = {
     existing_version,  # Existing version
     bump_patch(existing_version),  # New version

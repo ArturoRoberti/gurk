@@ -77,13 +77,30 @@ class PreparedPluginRegistration:
         return self.is_registered and self.entry["local"] is not None
 
     def __enter__(self):
+        self.prepare()
+
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # Remove any installation
+        self.entry = None
+        self.venv_exists = False
+        self.prepare()
+
+        # Propagate exceptions
+        return False
+
+    def prepare(self):
+        """
+        Prepare the test environment for plugin registration and installation.
+        """
         # Clean up plugin directories to ensure a clean slate for tests
         for plugin_dir in get_plugin_directories(
             home_registry=True, package_registry=True
         ):
             for child in plugin_dir.iterdir():
-                # Remove all plugins except for the 'template' and package plugin
                 if child.is_dir() and child.name == PYTEST_PLUGIN_NAME:
+                    # Remove any existing pytest plugin (should not be necessary)
                     shutil.rmtree(child)
                 elif child.name == "registry.yaml":
                     # Change the registry as requested
@@ -126,12 +143,6 @@ class PreparedPluginRegistration:
             shutil.rmtree(venv_dir)
         if self.venv_exists:
             EnvBuilder().create(venv_dir)
-
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        # Propagate exceptions
-        return False
 
 
 def prepared_plugin_registration_id(

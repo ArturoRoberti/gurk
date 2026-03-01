@@ -13,7 +13,7 @@ from .shared import (
     gurk_pull,
 )
 from .utils import (
-    EXAMPLE_PLUGIN_REMOTE,
+    TEMPLATE_PLUGIN_REMOTE,
     ExpectedOutcome,
     PytestUnexpectedException,
 )
@@ -108,7 +108,7 @@ def test_pull_invalid_remote_plugin(
     """Test pulling a remote plugin that is invalid."""
     # Use a known invalid branch specification
     invalid_remote = edit_url(
-        EXAMPLE_PLUGIN_REMOTE, branch="dev/invalid_branch"
+        TEMPLATE_PLUGIN_REMOTE, branch="pytest/invalid_manifest"
     )
 
     # Attempt to pull the remote plugin

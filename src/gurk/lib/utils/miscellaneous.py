@@ -4,11 +4,9 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
-from types import GenericAlias
-from typing import Any, TypeGuard, TypeVar, overload
+from typing import TypeVar
 
 from packaging.version import InvalidVersion, Version
-from pydantic import TypeAdapter, ValidationError
 
 from .type_check import typecheck
 from .types import Comparison, ListOrTuple
@@ -90,65 +88,6 @@ def compare_versions(v1: str, v2: str) -> Comparison | None:
         return None
 
 
-T = TypeVar("T")
-K = TypeVar("K")
-V = TypeVar("V")
-
-
-@overload
-def full_isinstance(value: Any, expected_type: type[T], /) -> TypeGuard[T]:
-    ...
-
-
-@overload
-def full_isinstance(
-    value: Any, expected_type: type[set[T]], /
-) -> TypeGuard[set[T]]:
-    ...
-
-
-@overload
-def full_isinstance(
-    value: Any, expected_type: type[list[T]], /
-) -> TypeGuard[list[T]]:
-    ...
-
-
-@overload
-def full_isinstance(
-    value: Any, expected_type: type[dict[K, V]], /
-) -> TypeGuard[dict[K, V]]:
-    ...
-
-
-@overload
-def full_isinstance(
-    value: Any, expected_type: type[tuple[T, ...]], /
-) -> TypeGuard[tuple[T, ...]]:
-    ...
-
-
-@typecheck
-def full_isinstance(value: Any, expected_type: type | GenericAlias, /) -> bool:
-    """
-    Check if a value is an instance of the expected type.
-
-    :param value: The value to check.
-    :type value: Any
-    :param expected_type: The expected type (can be a plain type, Union, TypedDict, etc.).
-    :type expected_type: type | GenericAlias
-    :return: True if the value matches the expected type, False otherwise.
-    :rtype: bool
-    """
-    adapter = TypeAdapter(expected_type)
-    try:
-        adapter.validate_python(value, strict=True, extra="forbid")
-    except ValidationError:
-        return False
-    else:
-        return True
-
-
 @typecheck
 def overlay_dicts(dicts: ListOrTuple[dict]) -> dict:
     """
@@ -201,6 +140,9 @@ def overlay_dicts(dicts: ListOrTuple[dict]) -> dict:
         overlayed_dict = _overlay_two_dicts(overlayed_dict, current_dict)
 
     return overlayed_dict
+
+
+T = TypeVar("T")
 
 
 def identity(x: T) -> T:

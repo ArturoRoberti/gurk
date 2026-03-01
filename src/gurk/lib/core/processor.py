@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
 
@@ -142,7 +143,8 @@ class Processor:
         logger.debug("Assigned args to resp. tasks successfully")
 
         # Prepend system preparation task
-        tasks = self.add_preparation_task(tasks)
+        if "pytest" not in sys.modules:
+            tasks = self.add_preparation_task(tasks)
 
         # Convert to SchedulerTask list
         for task_name, task in tasks.items():

@@ -12,6 +12,7 @@ class ExpectedOutcome(Enum):
     SUCCESS = (0, False)
     PARTIAL = (0, True)
     FAILURE = (1, True)
+    ARGPARSE = (2, True)  # argparse error
 
     @property
     def exit_code(self) -> int:

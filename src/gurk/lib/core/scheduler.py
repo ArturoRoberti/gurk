@@ -3,6 +3,7 @@ import json
 import os
 import pty
 import subprocess
+import sys
 import termios
 from dataclasses import dataclass, field
 from io import TextIOWrapper
@@ -35,7 +36,7 @@ class Scheduler:
 
     # fmt: off
     tasks:        list[SchedulerTask] = field(repr=False)
-    askpass_file: Path                = field(repr=False)
+    askpass_file: Path | None         = field(repr=False)
     logger:       Logger              = field(init=False, repr=False)
 
     results:   dict[SchedulerTask, TaskTerminationType] = field(init=False, repr=False, default_factory=dict)
@@ -43,7 +44,15 @@ class Scheduler:
 
     lock:      Lock  = field(init=False, repr=False, default_factory=Lock)
     queue:     Queue = field(init=False, repr=False, default_factory=Queue)
-    # fmt: on
+    # fmt:
+
+    def __post_init__(self):
+        # Validate that if the askpass_file is not provided, pytests are being run
+        if self.askpass_file is None and "pytest" not in sys.modules:
+            raise ValueError(
+                "UNEXPECTED: Scheduler initialized without "
+                "'askpass_file', but pytests don't seem to be running."
+            )
 
     @staticmethod
     @typecheck
@@ -320,8 +329,9 @@ class Scheduler:
             return wrapper_dir.as_posix()
 
         env = os.environ.copy()
-        env["SUDO_ASKPASS"] = str(self.askpass_file)
-        env["PATH"] = f"{create_sudo_wrapper()}:{env.get('PATH', '')}"
+        if self.askpass_file is not None:
+            env["SUDO_ASKPASS"] = str(self.askpass_file)
+            env["PATH"] = f"{create_sudo_wrapper()}:{env.get('PATH', '')}"
 
         # 6. Set non-interactive environment variables
         env["DEBIAN_FRONTEND"] = "noninteractive"

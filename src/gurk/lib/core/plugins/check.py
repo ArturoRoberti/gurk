@@ -1,7 +1,6 @@
 from argparse import ArgumentTypeError
 from copy import deepcopy
 from pathlib import Path
-from typing import get_type_hints
 
 import networkx as nx
 
@@ -10,10 +9,9 @@ from gurk.lib.context.registry import get_plugin_registration
 from gurk.lib.shared.configs import load_toml, load_yaml
 from gurk.lib.shared.dicts import pprint_typed_dict
 from gurk.lib.shared.plugins import (
-    FilteredPluginMetadata,
     PluginManifest,
     PluginMetadata,
-    PluginMetadataDependencies,
+    PluginMetadataProject,
     PluginOptions,
 )
 from gurk.lib.shared.remotes import is_git_repo
@@ -34,51 +32,6 @@ from gurk.lib.utils import (
 )
 
 from .gurk_argparser import GurkArgumentParser, check_args_dict
-
-
-@typecheck
-def filter_metadata(metadata: dict) -> FilteredPluginMetadata | None:
-    """
-    Return a filtered version of the PluginMetadata containing only relevant fields.
-
-    :param metadata: Raw pyproject.toml metadata dictionary (top-level `pyproject.toml` content)
-    :type metadata: dict
-    :return: Filtered PluginMetadata
-    :rtype: FilteredPluginMetadata
-    """
-    if not isinstance(metadata, dict):
-        return None
-
-    # 'Project' section
-    project_data = metadata.get("project")
-    if not project_data or not isinstance(project_data, dict):
-        return None
-
-    # Allow other fields, thus filter them out before validating
-    filtered_metadata = {
-        k.replace("-", "_"): v
-        for k, v in project_data.items()
-        if k.replace("-", "_") in get_type_hints(PluginMetadata)
-    }
-    filtered_metadata["optional_dependencies"] = {
-        k: v
-        for k, v in project_data.get("optional-dependencies", {}).items()
-        if k in get_type_hints(PluginMetadataDependencies)
-    }
-
-    # Validate structure
-    if not full_isinstance(filtered_metadata, PluginMetadata):
-        return None
-
-    # Version
-    if not check_version(filtered_metadata["version"]):
-        return None
-
-    # Dependencies
-    optional_deps = filtered_metadata.pop("optional_dependencies", {})
-    filtered_metadata["dependencies"] = optional_deps.get("gurk", [])
-
-    return filtered_metadata
 
 
 @typecheck
@@ -136,17 +89,26 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             return False
 
         # Validate pyproject.toml
-        project_metadata = filter_metadata(pyproject_data)
-        if not project_metadata:
+        if not full_isinstance(pyproject_data, PluginMetadata, extra="ignore"):
             error(
                 f"Plugin source '{_plugin_path}' has an invalid '{GURK_METADATA_FILENAME}' "
-                "file: invalid 'project' section structure. Expected:\n"
-                f"{pprint_typed_dict(PluginMetadata, indent=2, as_str=True)}"
+                "file: invalid 'project' section structure. Expected (minimum):\n"
+                f"{pprint_typed_dict(PluginMetadataProject, indent=2, as_str=True)}"
+            )
+            return False
+
+        ## Validate version validity
+        version = pyproject_data["project"]["version"]
+        if not check_version(version):
+            error(
+                f"Plugin source '{_plugin_path}' has an invalid version "
+                f"'{version}' in its '{GURK_METADATA_FILENAME}' file. Version "
+                "should be in the format 'X.Y.Z' where X, Y, and Z are integers."
             )
             return False
 
         ## Valid and unique plugin name
-        plugin_name = project_metadata["name"]
+        plugin_name = pyproject_data["project"]["name"]
         if not plugin_name.strip():
             error(
                 f"Plugin source '{_plugin_path}' has an invalid "
@@ -154,10 +116,19 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
             )
             return False
         elif not PatternCollection.NAMING.patterns.match(plugin_name):
-            error(
-                f"Plugin name '{plugin_name}' is invalid: No "
-                "special characters except '_' or '-' are allowed."
-            )
+            special_chars = ("-", "_")
+            if plugin_name.startswith(special_chars) or plugin_name.endswith(
+                special_chars
+            ):
+                error(
+                    f"Plugin name '{plugin_name}' must "
+                    "start and end with a lowercase letter."
+                )
+            else:
+                error(
+                    f"Plugin name '{plugin_name}' is invalid: It cannot have any "
+                    "special characters except '_' or '-' and must be lowercase"
+                )
             return False
 
         existing_plugin_registration = get_plugin_registration(
@@ -221,10 +192,19 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
                 )
                 return False
             elif not PatternCollection.NAMING.patterns.match(remaining):
-                error(
-                    f"Task '{task_name}' has an invalid name: No "
-                    "special characters except '_' or '-' are allowed."
-                )
+                special_chars = ("-", "_")
+                if remaining.startswith(special_chars) or remaining.endswith(
+                    special_chars
+                ):
+                    error(
+                        f"Task '{task_name}' has an invalid subname: It "
+                        "must start and end with a lowercase letter."
+                    )
+                else:
+                    error(
+                        f"Task '{task_name}' has an invalid subname: It cannot have any "
+                        "special characters except '_' or '-' and must be lowercase"
+                    )
                 return False
 
             # Check task description

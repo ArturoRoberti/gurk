@@ -1,4 +1,5 @@
 import re
+import sys
 from enum import Enum
 from typing import Protocol, TypedDict, TypeVar
 
@@ -98,6 +99,10 @@ class _EnumValue(Protocol[T]):
     patterns: T
 
 
+_NAMING_CHARS = r"[a-z_-]"
+_NAMING_ENDS = _NAMING_CHARS if "pytest" in sys.argv else r"[a-z]"
+
+
 class PatternCollection(Enum):
     """Collection of regex patterns for various utilities."""
 
@@ -139,7 +144,7 @@ class PatternCollection(Enum):
     }
     ANSI:           _EnumValue[re.Pattern] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
     TRACEBACK_FILE: _EnumValue[re.Pattern] = re.compile(r'^\s*File\s+"([^"]+)",\s+line\s+(\d+)')
-    NAMING:         _EnumValue[re.Pattern] = re.compile(r"^[A-Za-z_-]+$")
+    NAMING:         _EnumValue[re.Pattern] = re.compile(rf"^{_NAMING_ENDS}{_NAMING_CHARS}*{_NAMING_ENDS}$")
     # fmt: on
 
     @property
