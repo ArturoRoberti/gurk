@@ -3,7 +3,7 @@ from gurk.lib.shared.remotes import edit_url
 from ...utils import PYTEST_PLUGIN_PATH, TEMPLATE_PLUGIN_VERSIONING, bump_patch
 
 existing_version = TEMPLATE_PLUGIN_VERSIONING["version"]["exists"]
-LOCAL_PLUGIN_VERSIONS = {  # TODO: Move to preparation
+LOCAL_PLUGIN_VERSIONS = {
     existing_version,  # Existing version
     bump_patch(existing_version),  # New version
 }

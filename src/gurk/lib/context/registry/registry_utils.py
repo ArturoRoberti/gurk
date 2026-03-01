@@ -34,11 +34,37 @@ def _deepcopy_tuple(tup: tuple) -> tuple:
     return tuple(deepcopy(item) for item in tup)
 
 
-# TODO: Refactor with overloads
+@overload
+def get_plugin_directories(
+    *,
+    home_registry: Literal[True] = ...,
+    package_registry: Literal[True] = ...,
+) -> tuple[Path, Path]:
+    ...
+
+
+@overload
+def get_plugin_directories(
+    *,
+    home_registry: Literal[True] = ...,
+    package_registry: Literal[False] = ...,
+) -> Path:
+    ...
+
+
+@overload
+def get_plugin_directories(
+    *,
+    home_registry: Literal[False] = ...,
+    package_registry: Literal[True] = ...,
+) -> Path:
+    ...
+
+
 @typecheck
 def get_plugin_directories(
-    home_registry: bool = True, package_registry: bool = True
-) -> tuple[Path, ...]:
+    *, home_registry: bool = True, package_registry: bool = True
+) -> tuple[Path, Path] | Path:
     """
     Get a tuple of plugin directories, with the home one first.
 
@@ -47,14 +73,10 @@ def get_plugin_directories(
     :param package_registry: Whether to include the package plugin directory
     :type package_registry: bool
     :return: Tuple of plugin directories (home, package), depending on the input
-    :rtype: tuple[Path, ...]
+    :rtype: tuple[Path, Path] | Path
     :raises TypeError: If an expected plugin directory path exists but is not a directory
     """
-    parent_paths: list[Path] = []
-    if home_registry:
-        parent_paths.append(PACKAGE_HOME_PATH)
-    if package_registry:
-        parent_paths.append(PACKAGE_SRC_PATH)
+    parent_paths = (PACKAGE_HOME_PATH, PACKAGE_SRC_PATH)
 
     possible_plugin_paths = [p / "plugins" for p in parent_paths]
     for p in possible_plugin_paths:
@@ -65,7 +87,11 @@ def get_plugin_directories(
             )
         p.mkdir(parents=True, exist_ok=True)
 
-    return tuple(possible_plugin_paths)
+    return _filter_by_registries(
+        tuple(possible_plugin_paths),
+        home_registry=home_registry,
+        package_registry=package_registry,
+    )
 
 
 def _get_registry_files() -> tuple[Path, Path]:

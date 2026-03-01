@@ -5,6 +5,7 @@ Look for TODOs in code. Otherwise, look at:
     - Handle/Fix `RUNNER_SPECIFIC_TASKS` (see `utils/tasks.py`). These should make use of the `simulate_hardware` flag.
     - (Where possible) Add pytest for non-core gurk commands
 - Expand uninstallation scripts. These can then also be used to lessen the size of installations on CI runners.
+- Allow versioning via tags
 
 # Minor
 ## Features

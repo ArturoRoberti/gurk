@@ -12,9 +12,7 @@ class SafeFileHandler:
 
     def __enter__(self):
         # Store original registry states for cleanup
-        for plugin_dir in get_plugin_directories(
-            home_registry=True, package_registry=True
-        ):
+        for plugin_dir in get_plugin_directories():
             with TemporaryDirectory() as tmp:
                 tmp_dir = Path(tmp)
             shutil.copytree(plugin_dir, tmp_dir, symlinks=True)

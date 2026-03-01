@@ -21,12 +21,26 @@ jobs:
       - name: Install package
         run: pipx install .[dev]
 
+      - name: Check if only plugin library files changed
+        id: check-changes
+        run: |
+          changed_files=$(git diff --name-only origin/main...HEAD)
+          only_plugins_changed=true
+          while IFS= read -r file; do
+            if [[ -n "$file" && "$file" != src/gurk/lib/plugins/* ]]; then
+              only_plugins_changed=false
+              break
+            fi
+          done <<< "$changed_files"
+          echo "ONLY_PLUGINS_CHANGED=$only_plugins_changed" >> "$GITHUB_OUTPUT"
+
       - name: Compute affected tasks, based on changed files
         run: |
           VENV_PYTHON=$(pipx environment --value PIPX_HOME)/venvs/gurk/bin/python
           $VENV_PYTHON .github/scripts/gurk_find_affected_tasks.py
 
       - name: Run pytest for affected tasks
+        id: run-task-pytests
         run: |
           # Check affected tasks
           if [ -z "${AFFECTED_TASKS}" ]; then
@@ -45,4 +59,10 @@ jobs:
 
           # Run pytest for affected tasks
           gurk init
-          gurk pytest -v tests/tasks/test_tasks.py --tasks="${AFFECTED_TASKS}"
+          gurk pytest -v tests/tasks/test_tasks.py --maxfail=3 --tasks="${AFFECTED_TASKS}"
+
+      - name: Run integration pytests
+        if: steps.check-changes.outputs.ONLY_PLUGINS_CHANGED != 'true' && steps.run-task-pytests.result == 'success'
+        run: |
+          gurk init
+          gurk pytest -v tests/integration --maxfail=3

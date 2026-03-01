@@ -6,7 +6,7 @@ from venv import EnvBuilder
 from gurk.lib.context import get_plugin_directories
 from gurk.lib.core.plugins import get_remote_plugin_version, get_venv_dir
 from gurk.lib.shared.configs import dump_yaml, load_yaml
-from gurk.lib.shared.plugins import PluginRegistryEntry
+from gurk.lib.shared.plugins import PluginRegistry, PluginRegistryEntry
 from gurk.lib.utils import PACKAGE_SRC_PATH, InputValidationError, typecheck
 
 from ...utils import PYTEST_PLUGIN_NAME, PytestInputException, RegistryKind
@@ -60,7 +60,7 @@ class PreparedPluginRegistration:
 
         # Resolve the local path (if any)
         if self.entry is not None and self.entry["local"] is not None:
-            plugin_directory = get_plugin_directories(
+            plugin_directory: Path = get_plugin_directories(
                 home_registry=self.kind == RegistryKind.HOME,
                 package_registry=self.kind == RegistryKind.PACKAGE,
             )[0]
@@ -95,16 +95,14 @@ class PreparedPluginRegistration:
         Prepare the test environment for plugin registration and installation.
         """
         # Clean up plugin directories to ensure a clean slate for tests
-        for plugin_dir in get_plugin_directories(
-            home_registry=True, package_registry=True
-        ):
+        for plugin_dir in get_plugin_directories():
             for child in plugin_dir.iterdir():
                 if child.is_dir() and child.name == PYTEST_PLUGIN_NAME:
                     # Remove any existing pytest plugin (should not be necessary)
                     shutil.rmtree(child)
                 elif child.name == "registry.yaml":
                     # Change the registry as requested
-                    registry = load_yaml(child)
+                    registry: PluginRegistry = load_yaml(child)
                     if self.is_registered and (
                         child.is_relative_to(PACKAGE_SRC_PATH)
                         == (self.kind == RegistryKind.PACKAGE)
