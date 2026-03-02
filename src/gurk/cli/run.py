@@ -20,7 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import get_type_hints
 
-from gurk.lib.context import GurkContext, Logger
+from gurk.lib.context import (
+    GurkContext,
+    Logger,
+    get_plugin_registration,
+    is_plugin_registered,
+)
 from gurk.lib.core import runner
 from gurk.lib.core.plugins import (
     DefaultNamespace,
@@ -141,7 +146,12 @@ def parse_specification(specification: str) -> ParsedSpecification:
     # Installed plugin name
     def check_installed_plugin_name(plugin_name: str) -> bool:
         with GurkContext(logger=None, writable=False):
-            return is_plugin_installed(plugin_name, require_venv=True)
+            return is_plugin_registered(
+                plugin_name,
+                home_registry=True,
+                package_registry=True,
+                require_local=False,
+            )
 
     installed_plugin_specification = check_specification_type(
         PluginSpecificationEnum.PLUGIN_NAME, check_installed_plugin_name
@@ -252,13 +262,23 @@ def main(argv, prog, description):
             else:
                 plugin_spec = args.specification.plugin
         else:
-            # See if plugin is installed
+            # Install plugin if registered as remote-only
             if not is_plugin_installed(
-                args.specification.plugin, require_venv=True
+                args.specification.plugin, require_venv=False
             ):
-                ctx.logger.fatal(
-                    f"Plugin '{args.specification.plugin}' is not installed. Please install it first or change its specification."
+                remote = get_plugin_registration(
+                    args.specification.plugin,
+                    home_registry=True,
+                    package_registry=True,
+                    require_local=False,
+                )["remote"]
+                ctx.logger.debug(
+                    f"Plugin '{args.specification.plugin}' is not installed. Pulling from remote '{remote}'..."
                 )
+                if not install_plugin(remote, reinstall=True):
+                    ctx.logger.fatal(
+                        f"Failed to pull plugin '{args.specification.plugin}' from '{remote}'."
+                    )
 
             # Get plugin specification
             plugin_spec = args.specification.plugin
@@ -323,6 +343,20 @@ def main(argv, prog, description):
         ),
         writable=False,
     ) as ctx:
+        if not ctx.logger.can_prompt:
+            if not ctx.logger.non_interactive:
+                ctx.logger.fatal(
+                    "Cannot run tasks in interactive mode without a prompt-capable logger."
+                )
+            else:
+                ctx.logger.fatal(
+                    "Cannot run tasks in non-interactive mode without a prompt-capable logger."
+                )
+        else:
+            ctx.logger.info(
+                "Running tasks for specification "
+                f"'{args.specification.specification}'..."
+            )
         # Generate task argparser base
         task_parser_base = GurkArgumentParser(
             prog=f"{prog} {args.specification.specification}",

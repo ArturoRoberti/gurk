@@ -18,10 +18,16 @@ from textwrap import dedent
 
 import networkx as nx
 
-from gurk.lib.context import get_logger
+from gurk.lib.context import get_logger, get_plugin_registration
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
+    create_plugin_venv,
     get_available_plugin_tasks,
+    get_venv_gurk_version,
+    install_plugin,
+    is_plugin_installed,
+    remove_venv,
+    venv_exists,
 )
 from gurk.lib.shared.dicts import fill_typed_dict
 from gurk.lib.shared.scripts import Command, SchedulerTask
@@ -32,7 +38,8 @@ from gurk.lib.shared.tasks import (
     ResolvedTaskDictCollection,
 )
 from gurk.lib.utils import (
-    PACKAGE_VENVS_PATH,
+    GURK_VERSION,
+    PACKAGE_NAME,
     generate_random_path,
     overlay_dicts,
     typecheck,
@@ -70,20 +77,6 @@ class Processor:
 
         # Enable dependencies of enabled tasks
         tasks = self.enable_dependencies(tasks)
-
-        # Disable tasks whose venvs do not exist
-        for task_name, task in tasks.items():
-            plugin = task_name.split("/")[0]
-            if (
-                plugin != "gurk"
-                and task_name in self.option
-                and not (PACKAGE_VENVS_PATH / plugin).exists()
-            ):
-                del self.option[task_name]
-                logger.warning(
-                    f"Disabling task '{task_name}' as its plugin venv "
-                    "does not exist. Did you forget to run 'gurk init'?"
-                )
 
         # Filter only enabled tasks
         tasks = {
@@ -156,6 +149,9 @@ class Processor:
 
         logger.debug("Assigned args to resp. tasks successfully")
 
+        # Ensure valid plugin states
+        self.ensure_plugins(tasks)
+
         # Prepend system preparation task
         if "pytest" not in sys.modules:
             tasks = self.add_preparation_task(tasks)
@@ -208,6 +204,63 @@ class Processor:
                         logger.debug(f"Enabling dependency '{dep}'")
 
         return tasks
+
+    @typecheck
+    def ensure_plugins(self, tasks: ResolvedTaskDictCollection) -> None:
+        """
+        Ensure all plugins used and their virtual environments exist validly.
+
+        :param tasks: Tasks to process
+        :type tasks: ResolvedTaskDictCollection
+        """
+        # Get logger
+        logger = get_logger()
+
+        # Get plugins used in tasks
+        plugin_names = set(
+            task_name.split("/")[0] for task_name in tasks.keys()
+        ) - {PACKAGE_NAME}
+
+        for plugin in plugin_names:
+            # Install plugin if registered as remote-only
+            if not is_plugin_installed(plugin, require_venv=False):
+                remote = get_plugin_registration(
+                    plugin,
+                    home_registry=True,
+                    package_registry=True,
+                    require_local=False,
+                )["remote"]
+                logger.debug(
+                    f"Plugin '{plugin}' is not installed. Pulling from remote '{remote}'..."
+                )
+                if not install_plugin(remote, reinstall=True):
+                    logger.fatal(
+                        f"Failed to pull plugin '{plugin}' from '{remote}'."
+                    )
+
+            # Remove plugin venv (if any) with different gurk version
+            if (
+                venv_exists(plugin)
+                and get_venv_gurk_version(plugin) != GURK_VERSION
+            ):
+                logger.debug(
+                    f"Removing existing virtual environment for plugin '{plugin}' "
+                    "to ensure it is re-created with the current gurk version."
+                )
+                if not remove_venv(plugin):
+                    logger.fatal(
+                        f"Failed to remove existing virtual environment for plugin '{plugin}'."
+                    )
+            # Create plugin venv
+            if not venv_exists(plugin):
+                if not create_plugin_venv(plugin):
+                    logger.fatal(
+                        f"Failed to create virtual environment for plugin '{plugin}'",
+                    )
+                else:
+                    logger.debug(
+                        f"Created virtual environment for plugin '{plugin}' successfully."
+                    )
 
     @typecheck
     def add_preparation_task(

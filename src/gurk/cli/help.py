@@ -145,7 +145,7 @@ def main(argv, prog, description):
                         package_registry=True,
                         require_local=False,
                     ):
-                        msg += " It is registered however - please initialize it via 'gurk init'."
+                        msg += " Unexpectedly, It is registered however."
                     ctx.logger.error(msg)
                     continue
 

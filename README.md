@@ -17,10 +17,9 @@ sudo apt update
 sudo apt install git pipx
 ```
 
-Then, install and initialize `gurk`:
+Then, install `gurk` via:
 ```bash
 pipx install gurk
-gurk init
 ```
 
 ## MacOS, Windows and other Linux distributions

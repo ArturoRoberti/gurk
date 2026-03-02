@@ -480,7 +480,7 @@ class Logger:
         self._progress.update(task_id, completed=total, description=desc)
 
     @property
-    def _can_prompt(self) -> bool:
+    def can_prompt(self) -> bool:
         """
         Check if the logger can prompt the user for input.
 
@@ -517,7 +517,7 @@ class Logger:
         :raises ValueError: If the predefined answer is invalid.
         """
         # Non-interactive mode
-        if not self._can_prompt and answer is None:
+        if not self.can_prompt and answer is None:
             raise RuntimeError(
                 "Cannot prompt for input in non-interactive mode without a predefined answer."
             )
@@ -540,7 +540,7 @@ class Logger:
                 raise ValueError(
                     f"Invalid predefined answer type '{type(answer)}'"
                 )
-        elif not self._can_prompt:
+        elif not self.can_prompt:
             # Non-interactive mode without predefined answer defaults to 'no'
             return False
 
@@ -562,7 +562,7 @@ class Logger:
         :raises RuntimeError: If in non-interactive mode.
         """
         # Non-interactive mode
-        if not self._can_prompt:
+        if not self.can_prompt:
             raise RuntimeError(
                 "Cannot prompt for input in non-interactive mode."
             )

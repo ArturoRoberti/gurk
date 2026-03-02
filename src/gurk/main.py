@@ -18,7 +18,6 @@ from . import __version__ as GURK_VERSION
 from .cli import (
     check,
     help,
-    init,
     pull,
     pytest,
     remove,
@@ -84,17 +83,6 @@ def upgrade_cmd(ctx: click.Context):
     )
 
 
-@main.command(name="init", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
-@click.pass_context
-def init_cmd(ctx: click.Context):
-    """Initialize gurk"""
-    init.main(
-        argv=ctx.args,
-        prog=get_prog(ctx.info_name),
-        description=ctx.command.help,
-    )
-
-
 @main.command(name="pull", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def pull_cmd(ctx: click.Context):
@@ -128,7 +116,7 @@ def help_cmd(ctx: click.Context):
     )
 
 
-for cmd in ["run", "setup", "upgrade", "init", "pull", "remove", "help"]:
+for cmd in ["run", "setup", "upgrade", "pull", "remove", "help"]:
     main.commands[cmd].category = "Core Commands"
 
 

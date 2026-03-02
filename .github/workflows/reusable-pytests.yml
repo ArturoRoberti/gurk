@@ -87,7 +87,6 @@ jobs:
           export SUDO_ASKPASS="$askpass_path"
 
           # Run pytest for affected tasks
-          gurk init
           gurk pytest -v tests/tasks/test_tasks.py --maxfail=3 --tasks="${AFFECTED_TASKS}"
 
       - name: Run integration pytests
@@ -96,5 +95,4 @@ jobs:
           echo "pip: $(pip --version)"
           echo "python: $(python --version)"
           echo "pip3: $(pip3 --version)"
-          gurk init
           gurk pytest -v tests/integration --maxfail=3

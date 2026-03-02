@@ -151,7 +151,7 @@ def main(
     logger = get_logger()
 
     # Prompt to run the 'setup' command upon first usage
-    if not logger.non_interactive:
+    if logger.can_prompt:
         prompt_setup()
 
     # Check system information
@@ -163,7 +163,7 @@ def main(
 
     # Check if a prompt is needed to get sudo access
     if not (askpass or check_askpass() or "pytest" in sys.modules):
-        if logger.non_interactive:
+        if not logger.can_prompt:
             logger.fatal(
                 "sudo access is required to run tasks. Please set the "
                 "'SUDO_ASKPASS' environment variable or run in interactive mode."

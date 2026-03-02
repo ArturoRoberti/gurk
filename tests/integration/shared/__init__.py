@@ -17,8 +17,6 @@ from .check import *
 from .check import __all__ as check__all__
 from .help import *
 from .help import __all__ as help__all__
-from .init import *
-from .init import __all__ as init__all__
 from .miscellaneous import assert_outcome
 from .preparation import *
 from .preparation import __all__ as preparation__all__
@@ -36,7 +34,6 @@ from .upgrade import __all__ as upgrade__all__
 __all__ = [
     *check__all__,
     *help__all__,
-    *init__all__,
     *pull__all__,
     *preparation__all__,
     *remove__all__,
