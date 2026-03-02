@@ -129,9 +129,11 @@ def main(argv, prog, description):
             )
             plugin_name, plugin_entry = next(iter(plugin_registration.items()))
             plugin_local = (
-                plugin_entry["local"].as_posix()
-                if isinstance(plugin_entry["local"], Path)
-                else plugin_entry["local"],
+                (
+                    plugin_entry["local"].as_posix()
+                    if isinstance(plugin_entry["local"], Path)
+                    else plugin_entry["local"]
+                ),
             )
             plugin_remote = plugin_entry["remote"]
 

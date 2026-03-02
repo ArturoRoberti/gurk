@@ -58,9 +58,12 @@ def main(argv):
             )
 
     # Run pytests with a safe file handler to prevent any modifications to plugin registries during testing
-    with SafeFileHandler(), GurkContext(
-        logger=None,
-        writable=False,
-    ) as ctx:
+    with (
+        SafeFileHandler(),
+        GurkContext(
+            logger=None,
+            writable=False,
+        ) as ctx,
+    ):
         # Run pytests
         raise SystemExit(pytest.main(argv))

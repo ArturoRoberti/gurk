@@ -595,7 +595,7 @@ class Scheduler:
 
         all_tasks = []
         for task, result in self.results.items():
-            for _, task_info in logger.task_infos.items():
+            for _, task_info in logger._task_infos.items():
                 if task_info["name"] == task.name:
                     all_tasks.append(
                         (

@@ -37,8 +37,7 @@ def richprint(
     color: str | None = ...,
     as_str: Literal[False] = ...,
     file: TextIOBase | None = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -47,8 +46,7 @@ def richprint(
     color: str | None = ...,
     as_str: Literal[True] = ...,
     file: TextIOBase | None = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck
@@ -92,8 +90,7 @@ def padded_print(
     bottom: bool = ...,
     as_str: Literal[False] = ...,
     file: TextIOBase | None = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -105,8 +102,7 @@ def padded_print(
     bottom: bool = ...,
     as_str: Literal[True] = ...,
     file: TextIOBase | None = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck

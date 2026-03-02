@@ -14,11 +14,11 @@
 
 from .answers import NO_ANSWERS, YES_ANSWERS
 from .common import (
+    EDITABLE_INSTALL,
     GURK_VERSION,
     PACKAGE_CACHE_PATH,
     PACKAGE_NAME,
     PACKAGE_SRC_PATH,
-    PACKAGE_TESTS_PATH,
     PIPX_PYTHON_PATH,
 )
 from .miscellaneous import (
@@ -38,6 +38,7 @@ from .remotes import (
 from .template import TEMPLATE_PLUGIN_NAME, TEMPLATE_PLUGIN_PATH
 
 __all__ = [
+    "EDITABLE_INSTALL",
     "GIT_MIRRORS_DIR",
     "GIT_QUERY_VERSIONING_FIELDS",
     "GURK_MANIFEST_FILENAME",
@@ -50,7 +51,6 @@ __all__ = [
     "PACKAGE_HOME_PATH",
     "PACKAGE_NAME",
     "PACKAGE_SRC_PATH",
-    "PACKAGE_TESTS_PATH",
     "PACKAGE_VENVS_PATH",
     "PIPX_PYTHON_PATH",
     "RUNNER_SPECIFIC_TASKS",

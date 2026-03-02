@@ -13,7 +13,7 @@
 # limitations under the License.
 
 try:
-    from gurk.lib.context import GurkContext
+    from gurk.lib.context import GurkContext, get_plugin_directories
     from gurk.lib.core.plugins import (
         get_available_plugin_tasks,
         install_plugin,
@@ -37,7 +37,7 @@ from typing import TypeAlias
 from urllib.parse import parse_qs, urlparse
 
 import networkx as nx
-from utils import PLUGIN_FOLDER_PREFIX, REPO_ROOT, get_git_diff
+from utils import DEFAULT_BRANCH, PLUGIN_FOLDER_PREFIX, REPO_ROOT, get_git_diff
 
 
 def _get_changed_remote_plugin_sources() -> set[str]:
@@ -61,16 +61,17 @@ def _get_changed_remote_plugin_sources() -> set[str]:
     curr_registry_data = load_yaml(registry_path)
     curr_registry_data = filter_remote_plugins(curr_registry_data)
 
-    # # Load default branch registry.yaml
-    # default_registry = subprocess.check_output(
-    #     ["git", "show", f"{DEFAULT_BRANCH}:{registry_path}"],
-    #     text=True,
-    # )
-    # default_registry_data = load_yaml(default_registry)
-    # default_registry_data = filter_remote_plugins(default_registry_data)
-
-    # TODO: Only temporary until the default registry exists on main. Replace with above ASAP
-    default_registry_data: RegistryData = {}
+    # Load default branch registry.yaml
+    default_registry = subprocess.check_output(
+        [
+            "git",
+            "show",
+            f"{DEFAULT_BRANCH}:{registry_path.relative_to(REPO_ROOT)}",
+        ],
+        text=True,
+    )
+    default_registry_data = load_yaml(default_registry, from_str=True)
+    default_registry_data = filter_remote_plugins(default_registry_data)
 
     # Get new remote plugins
     new_plugins = {
@@ -138,7 +139,10 @@ def _parse_diff_changed_lines(diff_text: str) -> dict[str, set[int]]:
                     changed[current_file].add(line_number)
 
     # Prepend repo root to file paths
-    return {str(REPO_ROOT / k): v for k, v in changed.items()}
+    return {
+        Path(k).relative_to(PLUGIN_FOLDER_PREFIX).as_posix(): v
+        for k, v in changed.items()
+    }
 
 
 def _affected_blocks(path: Path, changed_lines: set[int]) -> set[str]:
@@ -180,16 +184,26 @@ def compute_affected_tasks() -> list[str]:
     changed_lines_map = _parse_diff_changed_lines(diff_text)
 
     # Find affected script blocks (functions/entrypoints)
+    pkg_plugin_dir = get_plugin_directories(
+        home_registry=False, package_registry=True
+    )
     affected_script_blocks: dict[Path, set[str]] = {}
     for file_path in iter_scripts():
         affected_script_blocks[file_path] = _affected_blocks(
-            file_path, changed_lines_map.get(str(file_path), set())
+            file_path,
+            changed_lines_map.get(
+                file_path.relative_to(pkg_plugin_dir).as_posix(),
+                set(),
+            ),
         )
 
     # Find affected config files
     affected_config_files = set()
     for file_path in iter_configs():
-        if str(file_path) in changed_lines_map:
+        if (
+            file_path.relative_to(pkg_plugin_dir).as_posix()
+            in changed_lines_map
+        ):
             affected_config_files.add(file_path.name)
 
     # Determine affected tasks

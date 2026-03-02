@@ -31,8 +31,7 @@ def pprint_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[False] = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -44,8 +43,7 @@ def pprint_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[True] = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck
@@ -103,8 +101,7 @@ def pprint_typed_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[False] = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -115,8 +112,7 @@ def pprint_typed_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[True] = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 def pprint_typed_dict(

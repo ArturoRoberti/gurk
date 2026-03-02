@@ -117,8 +117,8 @@ class Logger:
     store_logs:      bool = field(default=True)  # Whether to store logs to disk.
     vary_timestamp:  bool = field(default=True)  # Whether to use the initial timestamp or a new one
 
-    _logdir:         Path = field(init=False)
-    _logfile:        Path = field(init=False)
+    _logdir:         Path = field(init=False, default=None)
+    _logfile:        Path = field(init=False, default=None)
     _tasks_lock:     Lock = field(init=False, repr=False, default_factory=Lock)
     _task_infos:     dict[TaskID, TaskInfo] = field(init=False, repr=False, default_factory=dict)
 

@@ -122,8 +122,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[T]:
-    ...
+) -> TypeGuard[T]: ...
 
 
 @overload
@@ -134,8 +133,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[set[T]]:
-    ...
+) -> TypeGuard[set[T]]: ...
 
 
 @overload
@@ -146,8 +144,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[list[T]]:
-    ...
+) -> TypeGuard[list[T]]: ...
 
 
 @overload
@@ -158,8 +155,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[dict[K, V]]:
-    ...
+) -> TypeGuard[dict[K, V]]: ...
 
 
 @overload
@@ -170,8 +166,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[tuple[T, ...]]:
-    ...
+) -> TypeGuard[tuple[T, ...]]: ...
 
 
 @typecheck

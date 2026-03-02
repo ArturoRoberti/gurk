@@ -19,6 +19,7 @@ from copy import deepcopy
 from gurk.lib.context import (
     GurkContext,
     Logger,
+    get_plugin_directories,
     get_registries,
     is_plugin_registered,
 )
@@ -34,8 +35,10 @@ from gurk.lib.shared.plugins import PluginManifest, PluginMetadataProject
 from gurk.lib.shared.printers import padded_print, richprint
 from gurk.lib.shared.system_info import get_system_info
 from gurk.lib.utils import (
+    EDITABLE_INSTALL,
     GURK_MANIFEST_FILENAME,
     GURK_METADATA_FILENAME,
+    PACKAGE_NAME,
     PACKAGE_SRC_PATH,
 )
 
@@ -105,12 +108,22 @@ def main(argv, prog, description):
         if not any(vars(args).values()):
             # Load help from pyproject.toml
             gurk_toml = load_toml(
-                PACKAGE_SRC_PATH.parents[1] / GURK_METADATA_FILENAME
+                get_plugin_directories(
+                    home_registry=False, package_registry=True
+                )
+                / PACKAGE_NAME
+                / GURK_METADATA_FILENAME
             )
 
             # Dictionary linking to gurk help
+            docs = (
+                (PACKAGE_SRC_PATH.parents[1] / "docs").as_posix()
+                if EDITABLE_INSTALL
+                else gurk_toml["project"]["urls"]["Homepage"]
+                + "/tree/main/docs"
+            )
             gurk_help = {
-                "Documentation": PACKAGE_SRC_PATH.parents[1] / "docs",
+                "Documentation": docs,
                 "Homepage": gurk_toml["project"]["urls"]["Homepage"],
             }
 

@@ -136,7 +136,7 @@ def install_snap_packages(*args: list[str]) -> None:
             )
             return
 
-        # Try to start snapd if not running
+        # Try to start snapd if not active
         logrichprint(
             LoggerSeverity.WARNING,
             "Attempting to start snapd service...",

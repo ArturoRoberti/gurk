@@ -64,8 +64,7 @@ def logrichprint(
     message: str,
     as_str: Literal[False] = ...,
     file: TextIOBase | None = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -74,8 +73,7 @@ def logrichprint(
     message: str,
     as_str: Literal[True] = ...,
     file: TextIOBase | None = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck

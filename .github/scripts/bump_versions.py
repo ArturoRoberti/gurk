@@ -55,12 +55,11 @@ def save_toml(data: dict, path: Path) -> None:
 
 def _check_toml_version(file: Path) -> bool:
     """
-    Check if the version in the given TOML file is greater than or equal to
-    the version in the main branch.
+    Check if the version in the given TOML file is greater than the version in the main branch.
 
     :param file: Path to the TOML file
     :type file: Path
-    :return: True if the version is greater than or equal to main branch version, False otherwise
+    :return: True if the version is greater than the main branch version, False otherwise
     :rtype: bool
     """
     # Get current version
@@ -80,7 +79,7 @@ def _check_toml_version(file: Path) -> bool:
         return True  # Does not exist in main, consider it new
 
     # Compare versions
-    if current_version >= main_version:
+    if current_version > main_version:
         return True
     else:
         return False
@@ -156,7 +155,7 @@ def get_changed_plugin_folders() -> set[Path]:
     :rtype: set[Path]
     """
     return {
-        REPO_ROOT / PLUGIN_FOLDER_PREFIX / p
+        Path(PLUGIN_FOLDER_PREFIX) / p
         for p in _get_changed_plugin_folder_names()
     }
 
@@ -164,7 +163,9 @@ def get_changed_plugin_folders() -> set[Path]:
 def main():
     # Bump main pyproject.toml version, if necessary
     GURK_METADATA_FILENAME = "pyproject.toml"
-    version_file = Path(__file__).parents[2] / GURK_METADATA_FILENAME
+    version_file = (
+        Path(__file__).parents[2] / GURK_METADATA_FILENAME
+    ).relative_to(REPO_ROOT)
     bump_toml_version_if_necessary(version_file)
 
     # Bump local plugin versions, if necessary

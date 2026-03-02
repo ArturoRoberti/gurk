@@ -41,8 +41,7 @@ def get_registry_files(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
-) -> Path:
-    ...
+) -> Path: ...
 
 
 @overload
@@ -50,8 +49,7 @@ def get_registry_files(
     *,
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
-) -> Path:
-    ...
+) -> Path: ...
 
 
 @overload
@@ -59,8 +57,7 @@ def get_registry_files(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
-) -> tuple[Path, Path]:
-    ...
+) -> tuple[Path, Path]: ...
 
 
 @typecheck
@@ -90,8 +87,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
     combine: Literal[False] = ...,
-) -> ResolvedPluginRegistry:
-    ...
+) -> ResolvedPluginRegistry: ...
 
 
 @overload
@@ -100,8 +96,7 @@ def get_registries(
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[False] = ...,
-) -> ResolvedPluginRegistry:
-    ...
+) -> ResolvedPluginRegistry: ...
 
 
 @overload
@@ -110,8 +105,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[False] = ...,
-) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
-    ...
+) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]: ...
 
 
 @overload
@@ -120,8 +114,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[True] = ...,
-) -> ResolvedPluginRegistry:
-    ...
+) -> ResolvedPluginRegistry: ...
 
 
 @typecheck
@@ -171,8 +164,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
-) -> ResolvedZippedRegistry:
-    ...
+) -> ResolvedZippedRegistry: ...
 
 
 @overload
@@ -180,8 +172,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
-) -> ResolvedZippedRegistry:
-    ...
+) -> ResolvedZippedRegistry: ...
 
 
 @overload
@@ -189,8 +180,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
-) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]:
-    ...
+) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]: ...
 
 
 @typecheck

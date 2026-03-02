@@ -286,8 +286,7 @@ def get_commit_timestamp(
     commit: str,
     *,
     human_readable: Literal[False] = ...,
-) -> int:
-    ...
+) -> int: ...
 
 
 @overload
@@ -296,8 +295,7 @@ def get_commit_timestamp(
     commit: str,
     *,
     human_readable: Literal[True] = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck

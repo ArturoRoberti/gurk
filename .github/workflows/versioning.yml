@@ -40,7 +40,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install package
-        run: pipx install .[dev]
+        run: pipx install -e .[dev]
 
       - name: Update plugin versions, if possible
         run: |

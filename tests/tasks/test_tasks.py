@@ -98,7 +98,7 @@ def test_task(task: str) -> None:
         captured = []
         with GurkContext(
             logger=Logger(
-                verbose=False, non_interactive=True, store_logs=False
+                verbose=False, non_interactive=True, store_logs=True
             ),
             writable=False,
         ) as ctx:
@@ -116,6 +116,7 @@ def test_task(task: str) -> None:
                     askpass=os.getenv("SUDO_ASKPASS"),
                     _captured=captured,
                 )
+                raise SystemExit(0)
 
             if e.value.code != 0:
                 ctx.logger.fatal(

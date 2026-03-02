@@ -33,20 +33,35 @@ jobs:
           python-version: '3.11'
 
       - name: Install package
-        run: pipx install .[dev]
+        run: pipx install -e .[dev]
 
       - name: Check if only plugin library files changed
         id: check-changes
         run: |
+          # Check changed files
           changed_files=$(git diff --name-only origin/main...HEAD)
-          only_plugins_changed=true
+          source_changed=false
           while IFS= read -r file; do
             if [[ -n "$file" && "$file" != src/gurk/lib/plugins/* ]]; then
-              only_plugins_changed=false
+              source_changed=true
               break
             fi
           done <<< "$changed_files"
-          echo "ONLY_PLUGINS_CHANGED=$only_plugins_changed" >> "$GITHUB_OUTPUT"
+
+          # Output
+          n_changed_files=$(echo "$changed_files" | wc -l)
+          echo -e "Changed files ($n_changed_files):\n$changed_files" | head -n 11
+          if [ "$n_changed_files" -gt 10 ]; then
+            echo "..."
+          fi
+          if [ "$source_changed" = false ]; then
+            echo "Only plugin library files changed. Skipping integration tests."
+          else
+            echo "Changes include non-plugin files. Integration tests will run."
+          fi
+
+          # Save result
+          echo "RUN_INTEGRATION_TESTS=$source_changed" >> "$GITHUB_OUTPUT"
 
       - name: Compute affected tasks, based on changed files
         run: |
@@ -76,7 +91,10 @@ jobs:
           gurk pytest -v tests/tasks/test_tasks.py --maxfail=3 --tasks="${AFFECTED_TASKS}"
 
       - name: Run integration pytests
-        if: steps.check-changes.outputs.ONLY_PLUGINS_CHANGED != 'true' && steps.run-task-pytests.result == 'success'
+        if: ${{ steps.run-task-pytests.result != 'failure' && steps.check-changes.outputs.RUN_INTEGRATION_TESTS == 'true' }}
         run: |
+          echo "pip: $(pip --version)"
+          echo "python: $(python --version)"
+          echo "pip3: $(pip3 --version)"
           gurk init
           gurk pytest -v tests/integration --maxfail=3

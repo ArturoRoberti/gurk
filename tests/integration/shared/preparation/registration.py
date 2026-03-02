@@ -21,7 +21,7 @@ from gurk.lib.context import get_plugin_directories
 from gurk.lib.core.plugins import get_remote_plugin_version, get_venv_dir
 from gurk.lib.shared.configs import dump_yaml, load_yaml
 from gurk.lib.shared.plugins import PluginRegistry, PluginRegistryEntry
-from gurk.lib.utils import PACKAGE_SRC_PATH, InputValidationError, typecheck
+from gurk.lib.utils import InputValidationError, typecheck
 
 from ...utils import PYTEST_PLUGIN_NAME, PytestInputException, RegistryKind
 from .constants import is_registration_valid
@@ -77,7 +77,7 @@ class PreparedPluginRegistration:
             plugin_directory: Path = get_plugin_directories(
                 home_registry=self.kind == RegistryKind.HOME,
                 package_registry=self.kind == RegistryKind.PACKAGE,
-            )[0]
+            )
             self.entry["local"] = (
                 plugin_directory / self.entry["local"]
             ).as_posix()
@@ -118,7 +118,11 @@ class PreparedPluginRegistration:
                     # Change the registry as requested
                     registry: PluginRegistry = load_yaml(child)
                     if self.is_registered and (
-                        child.is_relative_to(PACKAGE_SRC_PATH)
+                        child.is_relative_to(
+                            get_plugin_directories(
+                                home_registry=False, package_registry=True
+                            )
+                        )
                         == (self.kind == RegistryKind.PACKAGE)
                     ):
                         registry[PYTEST_PLUGIN_NAME] = self.entry
@@ -158,7 +162,7 @@ class PreparedPluginRegistration:
 
 
 def prepared_plugin_registration_id(
-    param: tuple[PluginRegistryEntry | None, RegistryKind, bool]
+    param: tuple[PluginRegistryEntry | None, RegistryKind, bool],
 ) -> str:
     """
     Generate a test identification string for plugin registration scenarios.

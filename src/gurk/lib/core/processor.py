@@ -168,9 +168,9 @@ class Processor:
             resolved_task = SchedulerTask(
                 name=task_name,
                 command=Command(task["script"], task["function"]),
-                config_file=str(task["config_file"])
-                if task["config_file"]
-                else None,
+                config_file=(
+                    str(task["config_file"]) if task["config_file"] else None
+                ),
                 depends_on=tuple(task["depends_on"]),
                 privileged=task["privileged"],
                 args=tuple(task["args"]),
@@ -228,16 +228,12 @@ class Processor:
         # Create temporary bash script for preparation task
         tmp_path = generate_random_path(suffix=f"{safe_task_name}.bash")
         with open(tmp_path, "w") as f:
-            f.write(
-                dedent(
-                    """\
+            f.write(dedent("""\
                 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
                     # (STEP) Updating apt packages...
                     sudo apt-get update -y
                 fi
-                """
-                )
-            )
+                """))
 
         # Define preparation task
         prep_task = ResolvedTaskDict(

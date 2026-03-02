@@ -39,7 +39,8 @@ def install_docker_images(*args: list[str]) -> None:
     ]
     if not docker_images:
         log_step(
-            "No docker images found in the provided config file. Skipping pulling of docker images.",
+            "No docker images found in the provided config "
+            "file. Skipping pulling of docker images.",
         )
         return
 

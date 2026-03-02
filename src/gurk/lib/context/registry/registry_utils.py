@@ -53,8 +53,7 @@ def get_plugin_directories(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
-) -> tuple[Path, Path]:
-    ...
+) -> tuple[Path, Path]: ...
 
 
 @overload
@@ -62,8 +61,7 @@ def get_plugin_directories(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
-) -> Path:
-    ...
+) -> Path: ...
 
 
 @overload
@@ -71,8 +69,7 @@ def get_plugin_directories(
     *,
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
-) -> Path:
-    ...
+) -> Path: ...
 
 
 @typecheck
@@ -126,23 +123,21 @@ def _get_registry_files() -> tuple[Path, Path]:
 
 @overload
 def _zip_registry_files(
-    registries: tuple[PluginRegistry, PluginRegistry]
-) -> tuple[ZippedRegistry, ZippedRegistry]:
-    ...
+    registries: tuple[PluginRegistry, PluginRegistry],
+) -> tuple[ZippedRegistry, ZippedRegistry]: ...
 
 
 @overload
 def _zip_registry_files(
-    registries: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
-) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]:
-    ...
+    registries: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry],
+) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]: ...
 
 
 def _zip_registry_files(
     registries: tuple[
         PluginRegistry | ResolvedPluginRegistry,
         PluginRegistry | ResolvedPluginRegistry,
-    ]
+    ],
 ) -> tuple[
     ZippedRegistry | ResolvedZippedRegistry,
     ZippedRegistry | ResolvedZippedRegistry,
@@ -253,8 +248,7 @@ def _filter_by_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
     dcopy: bool = ...,
-) -> T:
-    ...
+) -> T: ...
 
 
 @overload
@@ -264,8 +258,7 @@ def _filter_by_registries(
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
     dcopy: bool = ...,
-) -> T:
-    ...
+) -> T: ...
 
 
 @overload
@@ -275,8 +268,7 @@ def _filter_by_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     dcopy: bool = ...,
-) -> tuple[T, T]:
-    ...
+) -> tuple[T, T]: ...
 
 
 @typecheck

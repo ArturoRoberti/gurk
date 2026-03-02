@@ -35,8 +35,7 @@ def run_script_function(
     run: Literal[True],
     *args: Any,
     **kwargs: Any,
-) -> subprocess.CompletedProcess[str]:
-    ...
+) -> subprocess.CompletedProcess[str]: ...
 
 
 @overload
@@ -44,8 +43,7 @@ def run_script_function(
     run: Literal[False],
     *args: Any,
     **kwargs: Any,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck
@@ -137,22 +135,18 @@ def _run_bash_script_function(
     """
     # Source pipx venv and helpers
     venv = Path(venv or PIPX_PYTHON_PATH.parents[1])
-    sourcing = dedent(
-        f"""\
+    sourcing = dedent(f"""\
         source {venv / 'bin' / 'activate'}
         source {PACKAGE_BASH_HELPERS_PATH}
-    """
-    )
+    """)
 
     # Build script body
     if function:
         # Simply source and call function
-        body = sourcing + dedent(
-            f"""\
+        body = sourcing + dedent(f"""\
             source {script}
             {function} {' '.join(repr(arg) for arg in args)}
-        """
-        )
+        """)
     else:
         # Create temporary sourcing file for usage with BASH_ENV
         sourcing_file = NamedTemporaryFile(
@@ -163,23 +157,16 @@ def _run_bash_script_function(
         sourcing_file.close()
 
         # Run the script with BASH_ENV set
-        body = dedent(
-            f"""\
+        body = dedent(f"""\
             export BASH_ENV='{sourcing_file.name}'
             {CommandKind.BASH.exe} {script} {' '.join(repr(arg) for arg in args)}
-        """
-        )
+        """)
 
     # (Run) Full bash script
-    wrapper_src = (
-        dedent(
-            """\
+    wrapper_src = dedent("""\
         #!/usr/bin/env bash
         set -euo pipefail
-    """
-        )
-        + body
-    )
+    """) + body
     if run:
         return subprocess.run(
             [CommandKind.BASH.exe, "-c", wrapper_src],
@@ -222,8 +209,7 @@ def _run_python_script_function(
     """
     if function:
         # Import the module dynamically and call the function
-        wrapper_src = dedent(
-            f"""\
+        wrapper_src = dedent(f"""\
             import importlib.util
             p = {repr(str(script))}
             spec = importlib.util.spec_from_file_location('_run_mod', p)
@@ -233,12 +219,10 @@ def _run_python_script_function(
             res = func({', '.join(repr(arg) for arg in args)})
             if isinstance(res, int):
                 raise SystemExit(res)
-        """
-        )
+        """)
     else:
         # Just execute the script directly
-        wrapper_src = dedent(
-            f"""\
+        wrapper_src = dedent(f"""\
             import sys
             from pathlib import Path
             script = Path({repr(str(script))})
@@ -247,8 +231,7 @@ def _run_python_script_function(
             with open(script, 'rb') as f:
                 code = compile(f.read(), script, 'exec')
                 exec(code, {{'__name__': '__main__'}})
-        """
-        )
+        """)
 
     if run:
         sudo_prefix = ["sudo", "-E"] if sudo else []

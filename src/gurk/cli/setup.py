@@ -257,15 +257,11 @@ def print_secure_boot_steps() -> None:
         all_keys_str = ", ".join([key for _, keys in matches for key in keys])
 
     # Print steps
-    richprint(
-        dedent(
-            f"""\
+    richprint(dedent(f"""\
             1. Reboot your computer. During the initial boot screen, repeatedly press one of the following keys to enter the UEFI/BIOS setup: {all_keys_str}
             2. Navigate to the 'Security' or 'Boot' tab using the arrow keys, locate the 'Secure Boot' option and disable it.
             3. Save your changes and exit the UEFI/BIOS setup - Your computer will reboot with Secure Boot disabled.
-        """
-        )
-    )
+        """))
 
 
 class SetupNamespace(DefaultNamespace):

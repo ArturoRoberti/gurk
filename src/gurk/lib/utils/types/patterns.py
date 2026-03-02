@@ -21,8 +21,9 @@ from typing import Protocol, TypedDict, TypeVar
 class _PatternFactory(Protocol):
     """Callable that produces a regex pattern based on progress flag."""
 
-    def __call__(self, *, progress: bool, warning: bool = False) -> re.Pattern:
-        ...
+    def __call__(
+        self, *, progress: bool, warning: bool = False
+    ) -> re.Pattern: ...
 
 
 def _pattern_factory(base_type: str) -> _PatternFactory:
