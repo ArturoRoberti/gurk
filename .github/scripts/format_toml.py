@@ -31,7 +31,7 @@ def format_file(file: str) -> None:
 
     # Write it back
     with open(file, "wb") as f:
-        tomli_w.dump(data, f)
+        tomli_w.dump(data, f, indent=2)
 
 
 if __name__ == "__main__":

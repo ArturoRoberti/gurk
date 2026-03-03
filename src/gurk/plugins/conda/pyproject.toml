@@ -1,10 +1,10 @@
 [project]
 name = "conda"
-version = "1.0.1"
+version = "1.0.2"
 description = "A gurk plugin to install Conda (Miniconda/Anaconda) and manage Conda/Mamba environments"
 
 [project.optional-dependencies]
 gurk = [
   "commentjson",
-  "ruamel.yaml"
+  "ruamel.yaml",
 ]

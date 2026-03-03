@@ -22,11 +22,14 @@ PACKAGE_NAME = "gurk"
 GURK_VERSION = version(PACKAGE_NAME)
 PACKAGE_SRC_PATH = Path(resources.files(PACKAGE_NAME)).expanduser().resolve()
 PIPX_PYTHON_PATH = Path(sys.executable)
-EDITABLE_INSTALL: bool = (
-    json.loads(distribution(PACKAGE_NAME).read_text("direct_url.json"))
-    .get("dir_info", {})
-    .get("editable", False)
-)
+try:
+    EDITABLE_INSTALL: bool = (
+        json.loads(distribution(PACKAGE_NAME).read_text("direct_url.json"))
+        .get("dir_info", {})
+        .get("editable", False)
+    )
+except Exception:
+    EDITABLE_INSTALL = False
 
 PACKAGE_CACHE_PATH = Path.home() / ".cache" / PACKAGE_NAME
 PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)

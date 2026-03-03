@@ -50,7 +50,7 @@ def save_toml(data: dict, path: Path) -> None:
     :type path: Path
     """
     with path.open("wb") as f:
-        tomli_w.dump(data, f)
+        tomli_w.dump(data, f, indent=2)
 
 
 def _check_toml_version(file: Path) -> bool:

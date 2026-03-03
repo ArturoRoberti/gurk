@@ -18,7 +18,13 @@ from subprocess import DEVNULL, CalledProcessError, check_call
 from venv import EnvBuilder
 
 from gurk.lib.context import get_logger
-from gurk.lib.utils import PACKAGE_SRC_PATH, PACKAGE_VENVS_PATH, typecheck
+from gurk.lib.utils import (
+    EDITABLE_INSTALL,
+    GURK_VERSION,
+    PACKAGE_SRC_PATH,
+    PACKAGE_VENVS_PATH,
+    typecheck,
+)
 
 
 @typecheck
@@ -82,10 +88,14 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
 
     # Install dependencies
     pip_bin = (venv_dir / "bin" / "pip").as_posix()
-    all_dependencies = dependencies + [
-        "-e",
-        PACKAGE_SRC_PATH.parents[1].as_posix(),
-    ]
+    all_dependencies = dependencies + (
+        [
+            "-e",
+            PACKAGE_SRC_PATH.parents[1].as_posix(),
+        ]
+        if EDITABLE_INSTALL
+        else [f"gurk=={GURK_VERSION}"]
+    )
     try:
         check_call([pip_bin, "install", "--upgrade", "pip"], stdout=DEVNULL)
         check_call([pip_bin, "install", *all_dependencies], stdout=DEVNULL)

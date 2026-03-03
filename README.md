@@ -10,11 +10,14 @@
 
 # Installation
 
-## Ubuntu
-Install dependencies:
+## Ubuntu (22.04+)
+Ensure you have `pipx` installed via `python3.12` (or higher) and `git`:
 ```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt update
-sudo apt install git pipx
+sudo apt install python3.12 git
+python3.12 -m pip install --user pipx
+python3.12 -m pipx ensurepath
 ```
 
 Then, install `gurk` via:

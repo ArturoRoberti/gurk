@@ -61,4 +61,4 @@ def dump_toml(content: dict[str, Any], toml_file: PathLike) -> None:
     :type toml_file: PathLike
     """
     with open(toml_file, "wb") as f:
-        tomli_w.dump(content, f)
+        tomli_w.dump(content, f, indent=2)

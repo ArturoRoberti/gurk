@@ -47,4 +47,4 @@ else:
 # Write back
 data["project"]["version"] = str(new_version)
 with open("pyproject.toml", "wb") as f:
-    tomli_w.dump(data, f)
+    tomli_w.dump(data, f, indent=2)

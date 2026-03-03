@@ -1,38 +1,38 @@
 [build-system]
 requires = [
-    "setuptools>=66.1.0",
+  "setuptools>=66.1.0",
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "gurk"
-version = "2.0.1"
+version = "2.0.5"
 description = "Contains anything related to setting up a new computer (desktop) system"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "gurk-template-plugin",
-    "click",
-    "distro",
-    "filelock",
-    "networkx",
-    "packaging",
-    "pydantic",
-    "requests",
-    "rich",
-    "ruamel.yaml",
-    "tomli_w",
+  "gurk-template-plugin",
+  "click",
+  "distro",
+  "filelock",
+  "networkx",
+  "packaging",
+  "pydantic",
+  "requests",
+  "rich",
+  "ruamel.yaml",
+  "tomli_w",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: POSIX :: Linux",
-    "Environment :: Console",
-    "Topic :: System :: Installation/Setup",
-    "Intended Audience :: End Users/Desktop",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX :: Linux",
+  "Environment :: Console",
+  "Topic :: System :: Installation/Setup",
+  "Intended Audience :: End Users/Desktop",
 ]
 authors = [
-    { name = "Arturo J. Roberti", email = "arturo.roberti@outlook.com" },
+  { name = "Arturo J. Roberti", email = "arturo.roberti@outlook.com" },
 ]
 
 [project.license]
@@ -40,12 +40,12 @@ file = "LICENSE"
 
 [project.optional-dependencies]
 dev = [
-    "commentjson",
-    "pytest",
+  "commentjson",
+  "pytest",
 ]
 gurk = [
-    "packaging",
-    "requests",
+  "packaging",
+  "requests",
 ]
 
 [project.scripts]
@@ -59,22 +59,22 @@ Documentation = "https://github.com/ArturoRoberti/gurk#readme"
 
 [tool.pytest.ini_options]
 pythonpath = [
-    "src",
+  "src",
 ]
 testpaths = [
-    "tests",
+  "tests",
 ]
 addopts = [
-    "--import-mode=importlib",
+  "--import-mode=importlib",
 ]
 
 [tool.setuptools.package-data]
 gurk = [
-    "plugins/**",
-    "scripts/**",
+  "plugins/**",
+  "plugin_helpers/**",
 ]
 
 [tool.setuptools.packages.find]
 where = [
-    "src",
+  "src",
 ]

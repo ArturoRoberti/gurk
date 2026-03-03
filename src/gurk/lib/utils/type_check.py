@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 from functools import cache, wraps
-from importlib.metadata import Distribution
 from types import GenericAlias
 from typing import Any, Literal, TypeGuard, TypeVar, overload
 
 from pydantic import ConfigDict, TypeAdapter, ValidationError, validate_call
 
-from .constants import NO_ANSWERS, PACKAGE_NAME, YES_ANSWERS
+from .constants import EDITABLE_INSTALL, NO_ANSWERS, YES_ANSWERS
 
 
 @cache
@@ -33,13 +31,7 @@ def _is_typecheck_active() -> bool:
     elif gurk_typecheck in NO_ANSWERS:
         return False
     else:
-        # See if the package is installed in editable mode
-        direct_url = Distribution.from_name(PACKAGE_NAME).read_text(
-            "direct_url.json"
-        )
-        return (
-            json.loads(direct_url).get("dir_info", {}).get("editable", False)
-        )
+        return EDITABLE_INSTALL
 
 
 class InputValidationError(Exception):
