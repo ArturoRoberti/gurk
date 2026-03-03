@@ -108,9 +108,9 @@ class RegistryManager:
                         registry[name]["local"] = None
                     else:
                         logger.error(
-                            "THIS SHOULD NOT HAPPEN: Package registry entry "
-                            f"'{name}' in {registry_file.as_posix()} is VERY "
-                            "invalid, and is thus being removed entirely."
+                            f"THIS SHOULD NOT HAPPEN: Package registry entry '{name}' "
+                            f"in {registry_file.as_posix()} is VERY invalid, and is "
+                            "thus being removed entirely. See DEBUG logs for details."
                         )
                         del registry[name]
 

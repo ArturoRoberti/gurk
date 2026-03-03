@@ -22,7 +22,7 @@ PACKAGE_NAME = "gurk"
 GURK_VERSION = version(PACKAGE_NAME)
 PACKAGE_SRC_PATH = Path(resources.files(PACKAGE_NAME)).expanduser().resolve()
 PIPX_PYTHON_PATH = Path(sys.executable)
-EDITABLE_INSTALL = (
+EDITABLE_INSTALL: bool = (
     json.loads(distribution(PACKAGE_NAME).read_text("direct_url.json"))
     .get("dir_info", {})
     .get("editable", False)

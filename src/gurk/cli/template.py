@@ -89,14 +89,6 @@ def main(argv, prog, description):
             ctx.logger.fatal("Plugin name cannot be empty.")
         elif not PatternCollection.NAMING.patterns.match(args.name):
             special_chars = ("-", "_")
-            import sys
-
-            print(PatternCollection.NAMING.patterns, file=sys.stderr)
-            print(args.name, file=sys.stderr)
-            print(
-                PatternCollection.NAMING.patterns.match(args.name),
-                file=sys.stderr,
-            )
             if args.name.startswith(special_chars) or args.name.endswith(
                 special_chars
             ):

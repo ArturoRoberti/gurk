@@ -40,8 +40,9 @@ from .versioning import (
     get_remote_plugin_version,
 )
 from .virtual_environments import (
+    create_venv,
     get_venv_dir,
-    get_venv_gurk_version,
+    get_venv_package_version,
     remove_venv,
     venv_exists,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "TaskParserNamespace",
     "check_local_plugin",
     "create_plugin_venv",
+    "create_venv",
     "get_available_plugin_tasks",
     "get_local_plugin_version",
     "get_plugin_data",
@@ -61,7 +63,7 @@ __all__ = [
     "get_remote_plugin_version",
     "get_resolved_plugin_manifest",
     "get_venv_dir",
-    "get_venv_gurk_version",
+    "get_venv_package_version",
     "install_plugin",
     "is_plugin_installed",
     "iter_configs",

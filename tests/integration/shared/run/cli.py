@@ -32,11 +32,18 @@ def gurk_run(
     :return: A tuple containing the exception info and captured output.
     :rtype: tuple[ExceptionInfo[SystemExit], CaptureResult[str]]
     """
+    # Add 'verbose' and 'non-interactive' flags to the arguments
+    if "--verbose" not in argv:
+        argv.insert(0, "--verbose")
+    if "--non-interactive" not in argv:
+        argv.insert(0, "--non-interactive")
+
+    # Execute the 'gurk run' command
     with pytest.raises(SystemExit) as e:
         run.main(
             argv,
             prog="gurk run",
-            description="Run a plugin.",
+            description="Run a plugin or task.",
         )
 
     return e, capsys.readouterr()

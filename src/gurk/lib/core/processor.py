@@ -18,14 +18,12 @@ from textwrap import dedent
 
 import networkx as nx
 
-from gurk.lib.context import get_logger, get_plugin_registration
+from gurk.lib.context import get_logger
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
     create_plugin_venv,
     get_available_plugin_tasks,
-    get_venv_gurk_version,
-    install_plugin,
-    is_plugin_installed,
+    get_venv_package_version,
     remove_venv,
     venv_exists,
 )
@@ -165,7 +163,9 @@ class Processor:
                 name=task_name,
                 command=Command(task["script"], task["function"]),
                 config_file=(
-                    str(task["config_file"]) if task["config_file"] else None
+                    task["config_file"].as_posix()
+                    if task["config_file"]
+                    else None
                 ),
                 depends_on=tuple(task["depends_on"]),
                 privileged=task["privileged"],
@@ -222,26 +222,11 @@ class Processor:
         ) - {PACKAGE_NAME}
 
         for plugin in plugin_names:
-            # Install plugin if registered as remote-only
-            if not is_plugin_installed(plugin, require_venv=False):
-                remote = get_plugin_registration(
-                    plugin,
-                    home_registry=True,
-                    package_registry=True,
-                    require_local=False,
-                )["remote"]
-                logger.debug(
-                    f"Plugin '{plugin}' is not installed. Pulling from remote '{remote}'..."
-                )
-                if not install_plugin(remote, reinstall=True):
-                    logger.fatal(
-                        f"Failed to pull plugin '{plugin}' from '{remote}'."
-                    )
-
             # Remove plugin venv (if any) with different gurk version
             if (
                 venv_exists(plugin)
-                and get_venv_gurk_version(plugin) != GURK_VERSION
+                and get_venv_package_version(plugin, PACKAGE_NAME)
+                != GURK_VERSION
             ):
                 logger.debug(
                     f"Removing existing virtual environment for plugin '{plugin}' "

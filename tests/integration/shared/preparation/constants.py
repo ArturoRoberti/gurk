@@ -50,9 +50,14 @@ def is_registration_valid(
     entry: PluginRegistryEntry | None, kind: RegistryKind, venv_exists: bool
 ) -> bool:
     """Determine if a given combination of registration entry and venv existence is valid."""
-    if entry is None and venv_exists:
-        # No registration but venv exists - invalid
-        return False
+    if venv_exists:
+        if entry is None:
+            # Venv exists but no registration - invalid
+            return False
+        elif entry["local"] is None:
+            # Remote-only registration but venv exists - invalid
+            return False
+
     return True
 
 

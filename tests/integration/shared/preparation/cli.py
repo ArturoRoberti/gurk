@@ -24,6 +24,13 @@ def gurk_template(argv: list[str]) -> None:
     :param argv: List of command-line arguments to pass to 'gurk template'.
     :type argv: list[str]
     """
+    # Add 'verbose' and 'non-interactive' flags to the arguments
+    if "--verbose" not in argv:
+        argv.insert(0, "--verbose")
+    if "--non-interactive" not in argv:
+        argv.insert(0, "--non-interactive")
+
+    # Execute the 'gurk template' command
     with pytest.raises(SystemExit) as e:
         template.main(
             argv,

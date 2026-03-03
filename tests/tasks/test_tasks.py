@@ -94,12 +94,9 @@ def test_task(task: str) -> None:
 
     # Run task and capture task results
     if runner.check_askpass():
-        # For now, only run in GitHub Actions runner to avoid askpass prompts
         captured = []
         with GurkContext(
-            logger=Logger(
-                verbose=False, non_interactive=True, store_logs=True
-            ),
+            logger=Logger(verbose=True, non_interactive=True, store_logs=True),
             writable=False,
         ) as ctx:
             with pytest.raises(SystemExit) as e:

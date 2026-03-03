@@ -18,13 +18,7 @@ from subprocess import DEVNULL, CalledProcessError, check_call
 from venv import EnvBuilder
 
 from gurk.lib.context import get_logger
-from gurk.lib.utils import (
-    EDITABLE_INSTALL,
-    GURK_VERSION,
-    PACKAGE_SRC_PATH,
-    PACKAGE_VENVS_PATH,
-    typecheck,
-)
+from gurk.lib.utils import PACKAGE_SRC_PATH, PACKAGE_VENVS_PATH, typecheck
 
 
 @typecheck
@@ -38,19 +32,6 @@ def get_venv_dir(plugin_name: str) -> Path:
     :rtype: Path
     """
     return PACKAGE_VENVS_PATH / plugin_name
-
-
-@typecheck
-def _get_venv_gurk_file(plugin_name: str) -> Path:
-    """
-    Get the path to the GURK version file for a plugin's virtual environment.
-
-    :param plugin_name: Name of the plugin
-    :type plugin_name: str
-    :return: Path to the GURK version file in the virtual environment
-    :rtype: Path
-    """
-    return get_venv_dir(plugin_name) / "GURK_VERSION"
 
 
 @typecheck
@@ -100,13 +81,10 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
     EnvBuilder(with_pip=True).create(venv_dir)
 
     # Install dependencies
-    pip_bin = str(venv_dir / "bin" / "pip")
+    pip_bin = (venv_dir / "bin" / "pip").as_posix()
     all_dependencies = dependencies + [
-        (
-            PACKAGE_SRC_PATH.parents[1].as_posix()
-            if EDITABLE_INSTALL
-            else f"gurk=={GURK_VERSION}"
-        )
+        "-e",
+        PACKAGE_SRC_PATH.parents[1].as_posix(),
     ]
     try:
         check_call([pip_bin, "install", "--upgrade", "pip"], stdout=DEVNULL)
@@ -117,9 +95,6 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
         )
         remove_venv(venv_name)
         return False
-
-    # Write the gurk version to a file in the venv directory for later reference
-    _get_venv_gurk_file(venv_name).write_text(GURK_VERSION + "\n")
 
     logger.success(
         f"Successfully created virtual environment for plugin '{venv_name}'"
@@ -149,16 +124,27 @@ def remove_venv(venv_name: str) -> bool:
 
 
 @typecheck
-def get_venv_gurk_version(venv_name: str) -> str | None:
+def get_venv_package_version(venv_name: str, package_name: str) -> str | None:
     """
-    Get the GURK version associated with a virtual environment.
+    Get the version of a specific package associated with a virtual environment.
 
     :param venv_name: Name of the virtual environment (same as the plugin name)
     :type venv_name: str
-    :return: The GURK version if available, None otherwise
+    :param package_name: Name of the package to get the version for
+    :type package_name: str
+    :return: The package version if available, None otherwise
     :rtype: str | None
     """
-    gurk_version_file = _get_venv_gurk_file(venv_name)
-    if gurk_version_file.is_file():
-        return gurk_version_file.read_text().strip()
-    return None
+    python_bin = (get_venv_dir(venv_name) / "bin" / "python").as_posix()
+    try:
+        return check_call(
+            [
+                python_bin,
+                "-c",
+                f"from importlib.metadata import version; print(version('{package_name}'))",
+            ],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except Exception:
+        return None

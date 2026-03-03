@@ -18,6 +18,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from gurk.lib.context import GurkContext, Logger, get_plugin_directories
+from gurk.lib.utils import EDITABLE_INSTALL
 
 
 @dataclass
@@ -55,6 +56,14 @@ def main(argv):
             ctx.logger.fatal(
                 "'pytest' is not installed. Please install this package with the "
                 "'dev' extras to use this command via: 'pipx install -e .[dev]'"
+            )
+
+        # Check that the package is installed in editable mode
+        if not EDITABLE_INSTALL:
+            ctx.logger.fatal(
+                "Pytests can only be run with an editable installation of "
+                "'gurk'. Please install this package with the 'dev' extras "
+                "to use this command via: 'pipx install -e .[dev]'"
             )
 
     # Run pytests with a safe file handler to prevent any modifications to plugin registries during testing

@@ -32,11 +32,18 @@ def gurk_upgrade(
     :return: A tuple containing the exception info and captured output.
     :rtype: tuple[ExceptionInfo[SystemExit], CaptureResult[str]]
     """
+    # Add 'verbose' and 'non-interactive' flags to the arguments
+    if "--verbose" not in argv:
+        argv.insert(0, "--verbose")
+    if "--non-interactive" not in argv:
+        argv.insert(0, "--non-interactive")
+
+    # Execute the 'gurk upgrade' command
     with pytest.raises(SystemExit) as e:
         upgrade.main(
             argv,
             prog="gurk upgrade",
-            description="Remove a plugin from the registry.",
+            description="Upgrade a plugin in the registry.",
         )
 
     return e, capsys.readouterr()

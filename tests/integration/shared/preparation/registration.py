@@ -15,10 +15,13 @@
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from venv import EnvBuilder
 
 from gurk.lib.context import get_plugin_directories
-from gurk.lib.core.plugins import get_remote_plugin_version, get_venv_dir
+from gurk.lib.core.plugins import (
+    create_venv,
+    get_remote_plugin_version,
+    get_venv_dir,
+)
 from gurk.lib.shared.configs import dump_yaml, load_yaml
 from gurk.lib.shared.plugins import PluginRegistry, PluginRegistryEntry
 from gurk.lib.utils import InputValidationError, typecheck
@@ -158,7 +161,7 @@ class PreparedPluginRegistration:
         if venv_dir.exists():
             shutil.rmtree(venv_dir)
         if self.venv_exists:
-            EnvBuilder().create(venv_dir)
+            create_venv(PYTEST_PLUGIN_NAME, [])
 
 
 def prepared_plugin_registration_id(

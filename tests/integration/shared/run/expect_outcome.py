@@ -40,9 +40,6 @@ def expected_outcome_run_local_specification(
     Determine the expected outcome of 'gurk run <local-path>' based on the
     current registration state and the local plugin being run.
 
-    Unlike 'gurk pull', 'gurk run' calls fatal() on install failure, so
-    conflicts result in FAILURE (exit 1) rather than FAILURE (exit 0).
-
     :param registration: The current plugin registration (if any).
     :type registration: PreparedPluginRegistration
     :param specification: The local path specification being run.
@@ -84,9 +81,6 @@ def expected_outcome_run_remote_specification(
     """
     Determine the expected outcome of 'gurk run <remote-url>' based on the
     current registration state and the remote specification being run.
-
-    Unlike 'gurk pull', 'gurk run' calls fatal() on install failure, so
-    conflicts result in FAILURE (exit 1) rather than FAILURE (exit 0).
 
     :param registration: The current plugin registration (if any).
     :type registration: PreparedPluginRegistration
@@ -134,12 +128,6 @@ def expected_outcome_run_name_specification(
     Determine the expected outcome of 'gurk run <plugin-name>' based on the
     current registration state and the name specification being run.
 
-    'gurk run' uses parse_specification() as the argparse type for the positional
-    argument. For a name spec this calls is_plugin_installed(name, require_venv=True);
-    if the check fails an ArgumentTypeError is raised and argparse exits with code 2
-    (ARGPARSE). Only when the plugin is installed with a venv does the spec
-    parse successfully, and the plugin is then executed (SUCCESS).
-
     :param registration: The current plugin registration (if any).
     :type registration: PreparedPluginRegistration
     :param specification: The plugin name specification being run.
@@ -147,9 +135,9 @@ def expected_outcome_run_name_specification(
     :return: The expected outcome of the run operation.
     :rtype: ExpectedOutcome
     """
-    if registration.is_installed and registration.venv_exists:
-        # The plugin is installed with a venv, so any valid specification should succeed
+    if registration.is_registered:
+        # The plugin is registered, so any valid specification should succeed
         return ExpectedOutcome.SUCCESS
     else:
-        # The plugin is not installed or has no venv, so even a valid specification should yield ARGPARSE
+        # The plugin is not registered, so even a valid specification should yield ARGPARSE
         return ExpectedOutcome.ARGPARSE

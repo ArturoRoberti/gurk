@@ -32,6 +32,13 @@ def gurk_check(
     :return: A tuple containing the exception info and captured output.
     :rtype: tuple[ExceptionInfo[SystemExit], CaptureResult[str]]
     """
+    # Add 'verbose' and 'non-interactive' flags to the arguments
+    if "--verbose" not in argv:
+        argv.insert(0, "--verbose")
+    if "--non-interactive" not in argv:
+        argv.insert(0, "--non-interactive")
+
+    # Execute the 'gurk check' command
     with pytest.raises(SystemExit) as e:
         check.main(
             argv,
