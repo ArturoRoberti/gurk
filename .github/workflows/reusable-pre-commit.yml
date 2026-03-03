@@ -96,7 +96,7 @@ jobs:
         # Commit any changes made by pre-commit (if any)
         if [ -n "$(git status --porcelain)" ]; then
           git add -A
-          git commit -m "$PRE_COMMIT_MSG" || echo "No commit created"
+          git commit -m "$PRE_COMMIT_MSG"
           echo "COMMITTED_CHANGES=true" >> $GITHUB_ENV
         else
           echo "No changes to commit"

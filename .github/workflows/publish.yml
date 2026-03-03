@@ -34,7 +34,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.11"
 
     - name: Install required tools
       run: |
@@ -51,7 +51,7 @@ jobs:
 
     - name: Auto-bump version if needed
       run: |
-        python .github/scripts/bump_versions.py
+        python .github/scripts/bump_pypi_version.py
         if [ -z "$(git status --porcelain)" ]; then
           echo "No version bump required"
         else

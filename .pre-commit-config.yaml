@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 repos:
 # Core pre-commit hooks (general purpose)
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -22,7 +36,7 @@ repos:
   hooks:
   - id: shellcheck
     args: ["--severity=error"]
-# Format YAML and JSON(C) files (local hooks)
+# Format YAML, JSON(C) and TOML files (local hooks)
 - repo: local
   hooks:
   - id: format-yaml
@@ -37,6 +51,14 @@ repos:
     language: python
     additional_dependencies: [commentjson]
     files: \.jsonc?$
+  - id: format-toml
+    name: Format TOML files
+    entry: python3 .github/scripts/format_toml.py
+    language: python
+    additional_dependencies:
+      - tomli; python_version < "3.11"
+      - tomli-w
+    files: \.toml$
 # Python formatting and linting
 - repo: https://github.com/pre-commit/mirrors-isort
   rev: v5.10.1
@@ -87,9 +109,3 @@ repos:
       - tomli; python_version < "3.11"
       - tomli-w
       - packaging
-# Format TOML files (! AFTER bumping versions !)
-- repo: https://github.com/pappasam/toml-sort
-  rev: v0.24.2
-  hooks:
-    - id: toml-sort
-      args: ["--in-place"]
