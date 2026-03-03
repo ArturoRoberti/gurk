@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from .check import check_local_plugin
 from .core import (
     create_plugin_venv,
@@ -26,8 +40,9 @@ from .versioning import (
     get_remote_plugin_version,
 )
 from .virtual_environments import (
+    create_venv,
     get_venv_dir,
-    get_venv_gurk_version,
+    get_venv_package_version,
     remove_venv,
     venv_exists,
 )
@@ -38,6 +53,7 @@ __all__ = [
     "TaskParserNamespace",
     "check_local_plugin",
     "create_plugin_venv",
+    "create_venv",
     "get_available_plugin_tasks",
     "get_local_plugin_version",
     "get_plugin_data",
@@ -47,7 +63,7 @@ __all__ = [
     "get_remote_plugin_version",
     "get_resolved_plugin_manifest",
     "get_venv_dir",
-    "get_venv_gurk_version",
+    "get_venv_package_version",
     "install_plugin",
     "is_plugin_installed",
     "iter_configs",

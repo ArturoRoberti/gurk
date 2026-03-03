@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Literal, TypeVar, overload
 
 from rich import print as richprint
@@ -17,8 +31,7 @@ def pprint_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[False] = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -30,8 +43,7 @@ def pprint_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[True] = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 @typecheck
@@ -89,8 +101,7 @@ def pprint_typed_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[False] = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -101,8 +112,7 @@ def pprint_typed_dict(
     indent: int = ...,
     indent_step: int = ...,
     as_str: Literal[True] = ...,
-) -> str:
-    ...
+) -> str: ...
 
 
 def pprint_typed_dict(

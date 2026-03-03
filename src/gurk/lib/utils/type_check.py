@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import os
 from functools import cache, wraps
@@ -108,8 +122,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[T]:
-    ...
+) -> TypeGuard[T]: ...
 
 
 @overload
@@ -120,8 +133,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[set[T]]:
-    ...
+) -> TypeGuard[set[T]]: ...
 
 
 @overload
@@ -132,8 +144,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[list[T]]:
-    ...
+) -> TypeGuard[list[T]]: ...
 
 
 @overload
@@ -144,8 +155,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[dict[K, V]]:
-    ...
+) -> TypeGuard[dict[K, V]]: ...
 
 
 @overload
@@ -156,8 +166,7 @@ def full_isinstance(
     *,
     strict: bool = ...,
     extra: str = ...,
-) -> TypeGuard[tuple[T, ...]]:
-    ...
+) -> TypeGuard[tuple[T, ...]]: ...
 
 
 @typecheck

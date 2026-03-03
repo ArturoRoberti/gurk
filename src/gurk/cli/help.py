@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from argparse import Namespace
 from collections import defaultdict
 from copy import deepcopy
@@ -5,6 +19,7 @@ from copy import deepcopy
 from gurk.lib.context import (
     GurkContext,
     Logger,
+    get_plugin_directories,
     get_registries,
     is_plugin_registered,
 )
@@ -20,8 +35,10 @@ from gurk.lib.shared.plugins import PluginManifest, PluginMetadataProject
 from gurk.lib.shared.printers import padded_print, richprint
 from gurk.lib.shared.system_info import get_system_info
 from gurk.lib.utils import (
+    EDITABLE_INSTALL,
     GURK_MANIFEST_FILENAME,
     GURK_METADATA_FILENAME,
+    PACKAGE_NAME,
     PACKAGE_SRC_PATH,
 )
 
@@ -91,12 +108,22 @@ def main(argv, prog, description):
         if not any(vars(args).values()):
             # Load help from pyproject.toml
             gurk_toml = load_toml(
-                PACKAGE_SRC_PATH.parents[1] / GURK_METADATA_FILENAME
+                get_plugin_directories(
+                    home_registry=False, package_registry=True
+                )
+                / PACKAGE_NAME
+                / GURK_METADATA_FILENAME
             )
 
             # Dictionary linking to gurk help
+            docs = (
+                (PACKAGE_SRC_PATH.parents[1] / "docs").as_posix()
+                if EDITABLE_INSTALL
+                else gurk_toml["project"]["urls"]["Homepage"]
+                + "/tree/main/docs"
+            )
             gurk_help = {
-                "Documentation": PACKAGE_SRC_PATH.parents[1] / "docs",
+                "Documentation": docs,
                 "Homepage": gurk_toml["project"]["urls"]["Homepage"],
             }
 
@@ -118,7 +145,7 @@ def main(argv, prog, description):
                         package_registry=True,
                         require_local=False,
                     ):
-                        msg += " It is registered however - please initialize it via 'gurk init'."
+                        msg += " Unexpectedly, It is registered however."
                     ctx.logger.error(msg)
                     continue
 

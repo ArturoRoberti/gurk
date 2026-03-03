@@ -1,10 +1,23 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import click
 
 from . import __version__ as GURK_VERSION
 from .cli import (
     check,
     help,
-    init,
     pull,
     pytest,
     remove,
@@ -70,17 +83,6 @@ def upgrade_cmd(ctx: click.Context):
     )
 
 
-@main.command(name="init", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
-@click.pass_context
-def init_cmd(ctx: click.Context):
-    """Initialize gurk"""
-    init.main(
-        argv=ctx.args,
-        prog=get_prog(ctx.info_name),
-        description=ctx.command.help,
-    )
-
-
 @main.command(name="pull", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def pull_cmd(ctx: click.Context):
@@ -114,7 +116,7 @@ def help_cmd(ctx: click.Context):
     )
 
 
-for cmd in ["run", "setup", "upgrade", "init", "pull", "remove", "help"]:
+for cmd in ["run", "setup", "upgrade", "pull", "remove", "help"]:
     main.commands[cmd].category = "Core Commands"
 
 

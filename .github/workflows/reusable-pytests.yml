@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 name: Task pytests
 
 on:
@@ -19,20 +33,35 @@ jobs:
           python-version: '3.11'
 
       - name: Install package
-        run: pipx install .[dev]
+        run: pipx install -e .[dev]
 
       - name: Check if only plugin library files changed
         id: check-changes
         run: |
+          # Check changed files
           changed_files=$(git diff --name-only origin/main...HEAD)
-          only_plugins_changed=true
+          source_changed=false
           while IFS= read -r file; do
             if [[ -n "$file" && "$file" != src/gurk/lib/plugins/* ]]; then
-              only_plugins_changed=false
+              source_changed=true
               break
             fi
           done <<< "$changed_files"
-          echo "ONLY_PLUGINS_CHANGED=$only_plugins_changed" >> "$GITHUB_OUTPUT"
+
+          # Output
+          n_changed_files=$(echo "$changed_files" | wc -l)
+          echo -e "Changed files ($n_changed_files):\n$changed_files" | head -n 11
+          if [ "$n_changed_files" -gt 10 ]; then
+            echo "..."
+          fi
+          if [ "$source_changed" = false ]; then
+            echo "Only plugin library files changed. Skipping integration tests."
+          else
+            echo "Changes include non-plugin files. Integration tests will run."
+          fi
+
+          # Save result
+          echo "RUN_INTEGRATION_TESTS=$source_changed" >> "$GITHUB_OUTPUT"
 
       - name: Compute affected tasks, based on changed files
         run: |
@@ -58,11 +87,12 @@ jobs:
           export SUDO_ASKPASS="$askpass_path"
 
           # Run pytest for affected tasks
-          gurk init
           gurk pytest -v tests/tasks/test_tasks.py --maxfail=3 --tasks="${AFFECTED_TASKS}"
 
       - name: Run integration pytests
-        if: steps.check-changes.outputs.ONLY_PLUGINS_CHANGED != 'true' && steps.run-task-pytests.result == 'success'
+        if: ${{ steps.run-task-pytests.result != 'failure' && steps.check-changes.outputs.RUN_INTEGRATION_TESTS == 'true' }}
         run: |
-          gurk init
+          echo "pip: $(pip --version)"
+          echo "python: $(python --version)"
+          echo "pip3: $(pip3 --version)"
           gurk pytest -v tests/integration --maxfail=3

@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from pathlib import Path
 from typing import Literal, NotRequired, TypedDict, overload
 
@@ -27,8 +41,7 @@ def get_registry_files(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
-) -> Path:
-    ...
+) -> Path: ...
 
 
 @overload
@@ -36,8 +49,7 @@ def get_registry_files(
     *,
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
-) -> Path:
-    ...
+) -> Path: ...
 
 
 @overload
@@ -45,8 +57,7 @@ def get_registry_files(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
-) -> tuple[Path, Path]:
-    ...
+) -> tuple[Path, Path]: ...
 
 
 @typecheck
@@ -76,8 +87,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
     combine: Literal[False] = ...,
-) -> ResolvedPluginRegistry:
-    ...
+) -> ResolvedPluginRegistry: ...
 
 
 @overload
@@ -86,8 +96,7 @@ def get_registries(
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[False] = ...,
-) -> ResolvedPluginRegistry:
-    ...
+) -> ResolvedPluginRegistry: ...
 
 
 @overload
@@ -96,8 +105,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[False] = ...,
-) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
-    ...
+) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]: ...
 
 
 @overload
@@ -106,8 +114,7 @@ def get_registries(
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
     combine: Literal[True] = ...,
-) -> ResolvedPluginRegistry:
-    ...
+) -> ResolvedPluginRegistry: ...
 
 
 @typecheck
@@ -157,8 +164,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[False] = ...,
-) -> ResolvedZippedRegistry:
-    ...
+) -> ResolvedZippedRegistry: ...
 
 
 @overload
@@ -166,8 +172,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[False] = ...,
     package_registry: Literal[True] = ...,
-) -> ResolvedZippedRegistry:
-    ...
+) -> ResolvedZippedRegistry: ...
 
 
 @overload
@@ -175,8 +180,7 @@ def _get_zipped_registries(
     *,
     home_registry: Literal[True] = ...,
     package_registry: Literal[True] = ...,
-) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]:
-    ...
+) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]: ...
 
 
 @typecheck

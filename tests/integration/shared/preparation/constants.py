@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from copy import deepcopy
 from itertools import product
 
@@ -36,9 +50,14 @@ def is_registration_valid(
     entry: PluginRegistryEntry | None, kind: RegistryKind, venv_exists: bool
 ) -> bool:
     """Determine if a given combination of registration entry and venv existence is valid."""
-    if entry is None and venv_exists:
-        # No registration but venv exists - invalid
-        return False
+    if venv_exists:
+        if entry is None:
+            # Venv exists but no registration - invalid
+            return False
+        elif entry["local"] is None:
+            # Remote-only registration but venv exists - invalid
+            return False
+
     return True
 
 

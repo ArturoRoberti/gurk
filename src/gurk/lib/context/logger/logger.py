@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import shutil
 import sys
@@ -103,8 +117,8 @@ class Logger:
     store_logs:      bool = field(default=True)  # Whether to store logs to disk.
     vary_timestamp:  bool = field(default=True)  # Whether to use the initial timestamp or a new one
 
-    _logdir:         Path = field(init=False)
-    _logfile:        Path = field(init=False)
+    _logdir:         Path = field(init=False, default=None)
+    _logfile:        Path = field(init=False, default=None)
     _tasks_lock:     Lock = field(init=False, repr=False, default_factory=Lock)
     _task_infos:     dict[TaskID, TaskInfo] = field(init=False, repr=False, default_factory=dict)
 
@@ -466,7 +480,7 @@ class Logger:
         self._progress.update(task_id, completed=total, description=desc)
 
     @property
-    def _can_prompt(self) -> bool:
+    def can_prompt(self) -> bool:
         """
         Check if the logger can prompt the user for input.
 
@@ -503,7 +517,7 @@ class Logger:
         :raises ValueError: If the predefined answer is invalid.
         """
         # Non-interactive mode
-        if not self._can_prompt and answer is None:
+        if not self.can_prompt and answer is None:
             raise RuntimeError(
                 "Cannot prompt for input in non-interactive mode without a predefined answer."
             )
@@ -526,7 +540,7 @@ class Logger:
                 raise ValueError(
                     f"Invalid predefined answer type '{type(answer)}'"
                 )
-        elif not self._can_prompt:
+        elif not self.can_prompt:
             # Non-interactive mode without predefined answer defaults to 'no'
             return False
 
@@ -548,7 +562,7 @@ class Logger:
         :raises RuntimeError: If in non-interactive mode.
         """
         # Non-interactive mode
-        if not self._can_prompt:
+        if not self.can_prompt:
             raise RuntimeError(
                 "Cannot prompt for input in non-interactive mode."
             )

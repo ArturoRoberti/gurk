@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import filecmp
 import shutil
 import subprocess
@@ -463,61 +477,6 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
             logger.info(
                 f"Nothing to remove for (package) plugin '{plugin_name}'"
             )
-
-
-# def compare_plugin_version(plugin_source: PluginSource, plugin_spec: PluginSpecification, require_local: bool = True) -> Comparison | None:
-#     """
-#     Compare the version of a plugin source to the one of a registered plugin_spec.
-
-#     :param plugin_source: The plugin source to compare, either a local path or a Git URL
-#     :type plugin_source: PluginSource
-#     :param plugin_spec: The plugin specification to compare against, either a plugin name, a local path, or a Git URL. If a Git URL is provided, the plugin with the same remote URL and version/commit (if specified) will be compared.
-#     :type plugin_spec: PluginSpecification
-#     :param require_local: Whether to only compare against a registered plugin if it has a local path. Default is True.
-#     :type require_local: bool
-#     """
-#     # Get logger
-#     logger = get_logger()
-
-#     # Check source type
-#     if Path(plugin_source).is_dir():
-#         source_type = PluginSpecificationEnum.LOCAL_PATH
-#     elif is_git_repo(plugin_source):
-#         source_type = PluginSpecificationEnum.GIT_REMOTE
-#     else:
-#         logger.error(
-#             f"Invalid plugin source '{plugin_source}': Must be either a local "
-#             "path or a Git Query whose URL points to an existing repository."
-#         )
-#         return None
-
-#     # Check that the plugin is registered
-#     if not is_plugin_registered(plugin_spec, home_registry=True, package_registry=True, require_local=require_local):
-#         logger.debug(
-#             f"Plugin '{plugin_spec}' is not registered. Skipping..."
-#         )
-#         return None
-
-#     # Get the source's version
-#     if source_type == PluginSpecificationEnum.LOCAL_PATH:
-#         source_version = get_local_plugin_version(plugin_source)
-#         if source_version is None:
-#             logger.error(
-#                 f"Plugin source '{plugin_source}' has an invalid or no version. Skipping..."
-#             )
-#             return None
-#     else:
-#         source_version = get_remote_plugin_version(plugin_source)
-#         if source_version is None:
-#             logger.error(
-#                 f"Plugin source '{plugin_source}' has an invalid or no version. Skipping..."
-#             )
-#             return None
-
-#     # Get the registered version
-#     current_version = get_plugin_version(plugin_spec, require_local=require_local)
-
-#     return compare_versions(source_version, current_version)
 
 
 @typecheck

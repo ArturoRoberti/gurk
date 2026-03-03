@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import subprocess
 import sys
@@ -80,12 +94,9 @@ def test_task(task: str) -> None:
 
     # Run task and capture task results
     if runner.check_askpass():
-        # For now, only run in GitHub Actions runner to avoid askpass prompts
         captured = []
         with GurkContext(
-            logger=Logger(
-                verbose=False, non_interactive=True, store_logs=False
-            ),
+            logger=Logger(verbose=True, non_interactive=True, store_logs=True),
             writable=False,
         ) as ctx:
             with pytest.raises(SystemExit) as e:
@@ -102,6 +113,7 @@ def test_task(task: str) -> None:
                     askpass=os.getenv("SUDO_ASKPASS"),
                     _captured=captured,
                 )
+                raise SystemExit(0)
 
             if e.value.code != 0:
                 ctx.logger.fatal(

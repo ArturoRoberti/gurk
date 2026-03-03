@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import sys
 from argparse import ArgumentTypeError
@@ -6,7 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import get_type_hints
 
-from gurk.lib.context import GurkContext, Logger
+from gurk.lib.context import (
+    GurkContext,
+    Logger,
+    get_plugin_registration,
+    is_plugin_registered,
+)
 from gurk.lib.core import runner
 from gurk.lib.core.plugins import (
     DefaultNamespace,
@@ -112,6 +131,22 @@ def parse_specification(specification: str) -> ParsedSpecification:
     if local_path_specification:
         return local_path_specification
 
+    # Registered plugin name
+    def check_registered_plugin_name(plugin_name: str) -> bool:
+        with GurkContext(logger=None, writable=False):
+            return is_plugin_registered(
+                plugin_name,
+                home_registry=True,
+                package_registry=True,
+                require_local=False,
+            )
+
+    registered_plugin_specification = check_specification_type(
+        PluginSpecificationEnum.PLUGIN_NAME, check_registered_plugin_name
+    )
+    if registered_plugin_specification:
+        return registered_plugin_specification
+
     # Git remote
     git_installed = is_git_installed()
     if git_installed:
@@ -123,17 +158,6 @@ def parse_specification(specification: str) -> ParsedSpecification:
         git_msg = ""
     else:
         git_msg = " (NOTE: Git is not installed, so it cannot be used for plugin specifications) "
-
-    # Installed plugin name
-    def check_installed_plugin_name(plugin_name: str) -> bool:
-        with GurkContext(logger=None, writable=False):
-            return is_plugin_installed(plugin_name, require_venv=True)
-
-    installed_plugin_specification = check_specification_type(
-        PluginSpecificationEnum.PLUGIN_NAME, check_installed_plugin_name
-    )
-    if installed_plugin_specification:
-        return installed_plugin_specification
 
     # If none of the above checks succeeded, raise an error
     raise ArgumentTypeError(
@@ -238,13 +262,24 @@ def main(argv, prog, description):
             else:
                 plugin_spec = args.specification.plugin
         else:
-            # See if plugin is installed
+            # Install plugin if registered as remote-only
             if not is_plugin_installed(
-                args.specification.plugin, require_venv=True
+                args.specification.plugin, require_venv=False
             ):
-                ctx.logger.fatal(
-                    f"Plugin '{args.specification.plugin}' is not installed. Please install it first or change its specification."
+                registration = get_plugin_registration(
+                    args.specification.plugin,
+                    home_registry=True,
+                    package_registry=True,
+                    require_local=False,
                 )
+                remote = next(iter(registration.values()))["remote"]
+                ctx.logger.debug(
+                    f"Plugin '{args.specification.plugin}' is not installed. Pulling from remote '{remote}'..."
+                )
+                if not install_plugin(remote, reinstall=True):
+                    ctx.logger.fatal(
+                        f"Failed to pull plugin '{args.specification.plugin}' from '{remote}'."
+                    )
 
             # Get plugin specification
             plugin_spec = args.specification.plugin
@@ -309,6 +344,11 @@ def main(argv, prog, description):
         ),
         writable=False,
     ) as ctx:
+        if not (ctx.logger.can_prompt or ctx.logger.non_interactive):
+            ctx.logger.fatal(
+                "Cannot run tasks in interactive mode without a prompt-capable logger."
+            )
+
         # Generate task argparser base
         task_parser_base = GurkArgumentParser(
             prog=f"{prog} {args.specification.specification}",

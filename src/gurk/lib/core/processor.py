@@ -1,3 +1,17 @@
+# Copyright 2026 Arturo Roberti
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
@@ -7,7 +21,11 @@ import networkx as nx
 from gurk.lib.context import get_logger
 from gurk.lib.core.plugins import (
     GurkArgumentParser,
+    create_plugin_venv,
     get_available_plugin_tasks,
+    get_venv_package_version,
+    remove_venv,
+    venv_exists,
 )
 from gurk.lib.shared.dicts import fill_typed_dict
 from gurk.lib.shared.scripts import Command, SchedulerTask
@@ -18,7 +36,8 @@ from gurk.lib.shared.tasks import (
     ResolvedTaskDictCollection,
 )
 from gurk.lib.utils import (
-    PACKAGE_VENVS_PATH,
+    GURK_VERSION,
+    PACKAGE_NAME,
     generate_random_path,
     overlay_dicts,
     typecheck,
@@ -56,20 +75,6 @@ class Processor:
 
         # Enable dependencies of enabled tasks
         tasks = self.enable_dependencies(tasks)
-
-        # Disable tasks whose venvs do not exist
-        for task_name, task in tasks.items():
-            plugin = task_name.split("/")[0]
-            if (
-                plugin != "gurk"
-                and task_name in self.option
-                and not (PACKAGE_VENVS_PATH / plugin).exists()
-            ):
-                del self.option[task_name]
-                logger.warning(
-                    f"Disabling task '{task_name}' as its plugin venv "
-                    "does not exist. Did you forget to run 'gurk init'?"
-                )
 
         # Filter only enabled tasks
         tasks = {
@@ -142,6 +147,9 @@ class Processor:
 
         logger.debug("Assigned args to resp. tasks successfully")
 
+        # Ensure valid plugin states
+        self.ensure_plugins(tasks)
+
         # Prepend system preparation task
         if "pytest" not in sys.modules:
             tasks = self.add_preparation_task(tasks)
@@ -154,9 +162,11 @@ class Processor:
             resolved_task = SchedulerTask(
                 name=task_name,
                 command=Command(task["script"], task["function"]),
-                config_file=str(task["config_file"])
-                if task["config_file"]
-                else None,
+                config_file=(
+                    task["config_file"].as_posix()
+                    if task["config_file"]
+                    else None
+                ),
                 depends_on=tuple(task["depends_on"]),
                 privileged=task["privileged"],
                 args=tuple(task["args"]),
@@ -196,6 +206,48 @@ class Processor:
         return tasks
 
     @typecheck
+    def ensure_plugins(self, tasks: ResolvedTaskDictCollection) -> None:
+        """
+        Ensure all plugins used and their virtual environments exist validly.
+
+        :param tasks: Tasks to process
+        :type tasks: ResolvedTaskDictCollection
+        """
+        # Get logger
+        logger = get_logger()
+
+        # Get plugins used in tasks
+        plugin_names = set(
+            task_name.split("/")[0] for task_name in tasks.keys()
+        ) - {PACKAGE_NAME}
+
+        for plugin in plugin_names:
+            # Remove plugin venv (if any) with different gurk version
+            if (
+                venv_exists(plugin)
+                and get_venv_package_version(plugin, PACKAGE_NAME)
+                != GURK_VERSION
+            ):
+                logger.debug(
+                    f"Removing existing virtual environment for plugin '{plugin}' "
+                    "to ensure it is re-created with the current gurk version."
+                )
+                if not remove_venv(plugin):
+                    logger.fatal(
+                        f"Failed to remove existing virtual environment for plugin '{plugin}'."
+                    )
+            # Create plugin venv
+            if not venv_exists(plugin):
+                if not create_plugin_venv(plugin):
+                    logger.fatal(
+                        f"Failed to create virtual environment for plugin '{plugin}'",
+                    )
+                else:
+                    logger.debug(
+                        f"Created virtual environment for plugin '{plugin}' successfully."
+                    )
+
+    @typecheck
     def add_preparation_task(
         self,
         tasks: ResolvedTaskDictCollection,
@@ -214,16 +266,12 @@ class Processor:
         # Create temporary bash script for preparation task
         tmp_path = generate_random_path(suffix=f"{safe_task_name}.bash")
         with open(tmp_path, "w") as f:
-            f.write(
-                dedent(
-                    """\
+            f.write(dedent("""\
                 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
                     # (STEP) Updating apt packages...
                     sudo apt-get update -y
                 fi
-                """
-                )
-            )
+                """))
 
         # Define preparation task
         prep_task = ResolvedTaskDict(
