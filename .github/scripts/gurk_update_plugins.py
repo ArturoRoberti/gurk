@@ -27,8 +27,9 @@ if __name__ == "__main__":
     ):
         if not all(
             upgrade_plugin(name, require_local=False)
-            for name in get_registries(
+            for name, entry in get_registries(
                 home_registry=False, package_registry=True
-            ).keys()
+            ).items()
+            if entry["remote"]
         ):
             raise SystemExit(1)
