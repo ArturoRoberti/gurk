@@ -246,7 +246,7 @@ class GurkArgumentParser(Generic[T], ArgumentParser):
                 "-f",
                 "--force",
                 action="store_true",
-                help="Force execution of task(s) even if they don't need to run",
+                help="Force execution of task(s) (e.g. overwrite files, ignore warnings, etc.)",
             )
 
     def _add_task_args(self) -> None:

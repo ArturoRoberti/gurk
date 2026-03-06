@@ -22,10 +22,12 @@ from .python.processing import (
     install_packages_from_txt_file,
 )
 from .python.task_parser import parse_task_args
+from .python.user_context import UserContext
 
 __all__ = [
     "BuiltinInstallCommands",
     "InstallCommandsBase",
+    "UserContext",
     "add_alias",
     "getent_passwd",
     "get_clean_lines",

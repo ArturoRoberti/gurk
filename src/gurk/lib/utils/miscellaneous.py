@@ -147,6 +147,8 @@ def overlay_dicts(dicts: ListOrTuple[dict]) -> dict:
             "Input 'dicts' must be a list of dictionaries, "
             f"got: {[type(d) for d in dicts]}"
         )
+    elif not dicts:
+        return {}
 
     # Overlay all dictionaries in order
     overlayed_dict = deepcopy(dicts[0])

@@ -16,7 +16,7 @@ import os
 import re
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
@@ -24,9 +24,11 @@ from gurk.lib.utils import PathLike, PatternCollection, typecheck
 
 from .types import YAML, CommentedDict
 
+T = TypeVar("T", bound=PathLike)
+
 
 @typecheck
-def resolve_package_path(raw_script: PathLike, /) -> PathLike | None:
+def resolve_package_path(raw_script: T, /) -> T | None:
     """
     Resolve paths that may refer to package resources. Package paths are in the format:
     ```
@@ -36,9 +38,9 @@ def resolve_package_path(raw_script: PathLike, /) -> PathLike | None:
     multiple times in the string, but only the first occurrence of it is replaced.
 
     :param raw_script: Raw script path
-    :type raw_script: PathLike
+    :type raw_script: T
     :return: Resolved script path or None if package not found. The output type matches the input type.
-    :rtype: PathLike | None
+    :rtype: T | None
     """
     # Return wrong types as-is
     if not isinstance(raw_script, (Path, str)):
