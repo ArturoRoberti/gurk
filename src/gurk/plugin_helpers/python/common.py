@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import subprocess
+import pwd
 from pathlib import Path
 from typing import Literal
 
@@ -47,29 +47,23 @@ def getent_passwd(
     :rtype: str
     :raises ValueError: If an invalid field is specified or the user is not found
     """
-    if field not in PasswdField.__args__:
-        raise ValueError(f"Invalid field: {field!r}")
-
-    # Retrieve the passwd entry using getent
     try:
-        output = subprocess.check_output(
-            ["getent", "passwd", str(user)],
-            text=True,
+        entry = (
+            pwd.getpwuid(user) if isinstance(user, int) else pwd.getpwnam(user)
         )
-    except subprocess.CalledProcessError:
+    except KeyError:
         raise ValueError(f"User {user!r} not found")
 
-    # Parse the output and extract the requested field
-    parts = output.strip().split(":")
-    INDEXES = {
-        "username": 0,
-        "uid": 2,
-        "gid": 3,
-        "gecos": 4,
-        "home": 5,
-        "shell": 6,
-    }
-    return parts[INDEXES[field]]
+    return str(
+        {
+            "username": entry.pw_name,
+            "uid": entry.pw_uid,
+            "gid": entry.pw_gid,
+            "gecos": entry.pw_gecos,
+            "home": entry.pw_dir,
+            "shell": entry.pw_shell,
+        }[field]
+    )
 
 
 @typecheck

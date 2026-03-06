@@ -22,7 +22,11 @@ YAML.indent(mapping=2, sequence=2, offset=0)
 YAML.Representer.add_representer(
     type(None),
     lambda self, data: self.represent_scalar("tag:yaml.org,2002:null", "null"),
-)  # conserve 'null'
+)  # use 'null' instead of nothing when dumping None
+YAML.Constructor.add_constructor(
+    "tag:yaml.org,2002:null",
+    lambda self, node: "~" if self.construct_scalar(node) == "~" else None,
+)  # load ~ as '~', not None
 
 
 # NOTE: '@typecheck' converts 'CommentedMap' to 'dict' at runtime, if annotated

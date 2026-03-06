@@ -18,7 +18,7 @@ from gurk.lib.utils import typecheck
 @typecheck
 def log_step(message: str, /, *, warning: bool = False) -> None:
     """
-        Log a step message without advancing progress. Only to be used from within tasks.
+    Log a step message without advancing progress. Only to be used from within tasks.
 
     :param message: Message to log
     :type message: str
