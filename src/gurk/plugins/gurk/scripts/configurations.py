@@ -108,6 +108,13 @@ def configure_filestructure(*args: list[str]) -> None:
                         warning=True,
                     )
                     continue
+                elif key == "/":
+                    log_step(
+                        f"Skipping top-level key {key!r} (unallowed "
+                        "root path key without subpaths)",
+                        warning=True,
+                    )
+                    continue
                 elif (
                     not task_args.gurk_configure_root_filestructure
                     and not _expanduser(key).startswith(_expanduser("~"))
