@@ -21,16 +21,16 @@ install_vscode() {
 	fi
 
 	# (STEP) Installing Requirement(s)
-	apt_install software-properties-common apt-transport-https wget
+	apt_install apt-transport-https wget
 
 	# (STEP) Adding VSCode APT Repository
-	wget -qO- https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg >/dev/null
-	sudo add-apt-repository -y "deb [arch=${SYSTEM_INFO[arch]}] https://packages.microsoft.com/repos/code stable main"
+	local gpg_file="/usr/share/keyrings/microsoft.gpg"
+	wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
+ 	 | sudo gpg --dearmor \
+ 	 | sudo tee $gpg_file >/dev/null
+	echo "deb [arch=${SYSTEM_INFO[arch]} signed-by=$gpg_file] https://packages.microsoft.com/repos/code stable main" \
+	  | sudo tee /etc/apt/sources.list.d/vscode.list
 	sudo apt-get update
-
-	# TODO: Fix issues with "classic APT format (.list)" vs. newer “deb822 format (.sources)" (found on fresh ubuntu24)
-	#       "Old" file is cat "/etc/apt/sources.list.d/archive_uri-https_packages_microsoft_com_repos_code-noble.list"
-	#       "New" file is cat "/etc/apt/sources.list.d/vscode.sources"
 
 	# (STEP) Installing VSCode
 	apt_install code
