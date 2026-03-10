@@ -14,7 +14,7 @@
 
 import shutil
 from pathlib import Path
-from subprocess import DEVNULL, CalledProcessError, check_call
+import subprocess
 from venv import EnvBuilder
 
 from gurk.lib.context import get_logger
@@ -97,9 +97,15 @@ def create_venv(venv_name: str, dependencies: list[str]) -> bool:
         else [f"gurk=={GURK_VERSION}"]
     )
     try:
-        check_call([pip_bin, "install", "--upgrade", "pip"], stdout=DEVNULL)
-        check_call([pip_bin, "install", *all_dependencies], stdout=DEVNULL)
-    except (KeyboardInterrupt, CalledProcessError) as e:
+        subprocess.check_call(
+            [pip_bin, "install", "--upgrade", "pip"],
+            stdout=subprocess.DEVNULL,
+        )
+        subprocess.check_call(
+            [pip_bin, "install", *all_dependencies],
+            stdout=subprocess.DEVNULL,
+        )
+    except (KeyboardInterrupt, subprocess.CalledProcessError) as e:
         logger.error(
             f"Failed to install dependencies for virtual environment '{venv_name}': {e}"
         )
@@ -147,7 +153,7 @@ def get_venv_package_version(venv_name: str, package_name: str) -> str | None:
     """
     python_bin = (get_venv_dir(venv_name) / "bin" / "python").as_posix()
     try:
-        return check_call(
+        return subprocess.run(
             [
                 python_bin,
                 "-c",
@@ -155,6 +161,7 @@ def get_venv_package_version(venv_name: str, package_name: str) -> str | None:
             ],
             capture_output=True,
             text=True,
+            check=True,
         ).stdout.strip()
     except Exception:
         return None
