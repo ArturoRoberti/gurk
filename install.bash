@@ -125,6 +125,7 @@ if [[ -z "$PYTHON" ]]; then
 		run_cmd apt-get update -qq
 		run_cmd apt-get install -y -qq "python$MIN_PYTHON"
 	fi
+	run_cmd apt-get install -y -qq "python$MIN_PYTHON-venv"
 	PYTHON="$(which "python$MIN_PYTHON")"
 fi
 
