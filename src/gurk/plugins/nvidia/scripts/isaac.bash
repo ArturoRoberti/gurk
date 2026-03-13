@@ -200,8 +200,8 @@ install_isaaclab() {
 	if check_install_isaaclab && [[ "$FORCE" == false ]]; then
 		log_step "IsaacLab is already installed - Exiting"
 		return 0
-	elif ! check_install_isaacsim || ! check_install_conda; then
-		log_step "IsaacSim and Conda must be installed before installing IsaacLab" true
+	elif ! check_install_isaacsim; then
+		log_step "IsaacSim must be installed before installing IsaacLab" true
 		return 1
 	fi
 	local isaacsim_path=$(check_install_isaacsim)
