@@ -23,6 +23,21 @@ from .types import GitQuery
 from .url import extract_url
 
 
+def is_git_installed() -> bool:
+    """
+    Check if Git is installed on the system.
+
+    :return: True if Git is installed, False otherwise
+    :rtype: bool
+    """
+    try:
+        subprocess.run(["git", "--version"], capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        return False
+    else:
+        return True
+
+
 @wraps(subprocess.run)
 def _git_run(
     *args: Any,
@@ -40,21 +55,6 @@ def _git_run(
     kwargs["env"]["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no"
 
     return subprocess.run(*args, **kwargs)
-
-
-def is_git_installed() -> bool:
-    """
-    Check if Git is installed on the system.
-
-    :return: True if Git is installed, False otherwise
-    :rtype: bool
-    """
-    try:
-        _git_run(["git", "--version"], capture_output=True, check=True)
-    except subprocess.CalledProcessError:
-        return False
-    else:
-        return True
 
 
 @cache

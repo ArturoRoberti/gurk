@@ -148,8 +148,7 @@ def parse_specification(specification: str) -> ParsedSpecification:
         return registered_plugin_specification
 
     # Git remote
-    git_installed = is_git_installed()
-    if git_installed:
+    if is_git_installed():
         git_remote_specification = check_specification_type(
             PluginSpecificationEnum.GIT_REMOTE, is_git_repo
         )
