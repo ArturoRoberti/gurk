@@ -12,7 +12,7 @@
 Please follow the instructions in the [Installation Guide](https://github.com/ArturoRoberti/gurk/tree/main/docs/knowledge/installation.md) or use the provided installation script:
 ```bash
 sudo apt update && sudo apt install curl
-curl -sSL https://raw.githubusercontent.com/ArturoRoberti/gurk/main/install.bash | sudo bash
+curl -sSL https://raw.githubusercontent.com/ArturoRoberti/gurk/main/install.bash | sudo bash [-s -- [OPTIONS]]
 ```
 
 # Usage
