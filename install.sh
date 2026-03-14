@@ -3,7 +3,7 @@ set -euo pipefail
 
 # gurk installation script
 # Supports Ubuntu 22.04+
-# Usage: curl -sSL https://raw.githubusercontent.com/ArturoRoberti/gurk/main/install.bash | sudo bash [-s -- [OPTIONS]]
+# Usage: curl -fsSL https://raw.githubusercontent.com/ArturoRoberti/gurk/main/install.sh | sudo bash [-s -- [OPTIONS]]
 REPO_URL="https://raw.githubusercontent.com/ArturoRoberti/gurk/main"
 
 # CLI options
@@ -12,8 +12,8 @@ FORCE=false
 
 usage() {
 	cat <<EOF
-Usage: install.bash [OPTIONS]
-       curl -sSL $REPO_URL/install.bash | sudo bash [-s -- [OPTIONS]]
+Usage: install.sh [OPTIONS]
+       curl -fsSL $REPO_URL/install.sh | sudo bash [-s -- [OPTIONS]]
 
 Install gurk via pipx on Ubuntu 22.04+.
 
@@ -101,7 +101,7 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
 fi
 
 # Read minimum Python version from pyproject.toml
-MIN_PYTHON=$(curl -sSL "$REPO_URL/pyproject.toml" | sed -n 's/^requires-python.*>=\([0-9.]*\)".*/\1/p')
+MIN_PYTHON=$(curl -fsSL "$REPO_URL/pyproject.toml" | sed -n 's/^requires-python.*>=\([0-9.]*\)".*/\1/p')
 MIN_MAJOR=${MIN_PYTHON%%.*}
 MIN_MINOR=${MIN_PYTHON##*.}
 
