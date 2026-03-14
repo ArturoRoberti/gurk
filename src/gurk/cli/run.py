@@ -37,12 +37,22 @@ from gurk.lib.core.plugins import (
 )
 from gurk.lib.shared.configs import load_toml
 from gurk.lib.shared.plugins import PluginSpecificationEnum
-from gurk.lib.shared.remotes import extract_url, is_git_installed, is_git_repo
+from gurk.lib.shared.remotes import (
+    extract_url,
+    is_git_installed,
+    is_git_repo,
+    parse_git_query,
+)
+from gurk.lib.shared.remotes.versioning import determine_ref
 from gurk.lib.shared.tasks import (
     ResolvedCustomTaskDict,
     ResolvedDefaultTaskDict,
 )
-from gurk.lib.utils import GURK_METADATA_FILENAME, identity
+from gurk.lib.utils import (
+    GIT_QUERY_VERSIONING_FIELDS,
+    GURK_METADATA_FILENAME,
+    identity,
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +73,8 @@ class ParsedSpecification:
 def parse_specification(specification: str) -> ParsedSpecification:
     """
     Parse a PluginSpecification string into its components.
+        :Developer NOTE: The specification via plugin name should be checked last, as
+        otherwise a registration might be accessed via its local/remote registration.
 
     :param specification: The PluginSpecification string to parse
     :type specification: str
@@ -80,8 +92,14 @@ def parse_specification(specification: str) -> ParsedSpecification:
     def check_specification_type(
         specification_type: PluginSpecificationEnum,
         check_function: Callable[[str], bool],
+        *,
         transform: Callable[[str], str] | None = None,
     ) -> ParsedSpecification | None:
+        """
+        Helper function to check if the specification matches a certain type, and if so, return the parsed components.
+            :Developer NOTE: The default option should be checked first, as
+            otherwise e.g. a local path may be misinterpreted as a subtask.
+        """
         if transform is None:
             transform = identity
         # No subspecification
@@ -126,10 +144,31 @@ def parse_specification(specification: str) -> ParsedSpecification:
     local_path_specification = check_specification_type(
         PluginSpecificationEnum.LOCAL_PATH,
         lambda path: Path(path).is_dir(),
-        lambda path: str(Path(path).expanduser()),
+        transform=lambda path: str(Path(path).expanduser()),
     )
     if local_path_specification:
         return local_path_specification
+
+    # Git remote
+    if is_git_installed():
+        git_remote_specification = check_specification_type(
+            PluginSpecificationEnum.GIT_REMOTE,
+            lambda remote: is_git_repo(remote)
+            and determine_ref(remote, to_commit=True) is not None
+            and len(
+                [
+                    f
+                    for f in GIT_QUERY_VERSIONING_FIELDS
+                    if parse_git_query(remote)[f] is not None
+                ]
+            )
+            <= 1,
+        )
+        if git_remote_specification:
+            return git_remote_specification
+        git_msg = ""
+    else:
+        git_msg = " (NOTE: Git is not installed, so it cannot be used for plugin specifications) "
 
     # Registered plugin name
     def check_registered_plugin_name(plugin_name: str) -> bool:
@@ -146,17 +185,6 @@ def parse_specification(specification: str) -> ParsedSpecification:
     )
     if registered_plugin_specification:
         return registered_plugin_specification
-
-    # Git remote
-    if is_git_installed():
-        git_remote_specification = check_specification_type(
-            PluginSpecificationEnum.GIT_REMOTE, is_git_repo
-        )
-        if git_remote_specification:
-            return git_remote_specification
-        git_msg = ""
-    else:
-        git_msg = " (NOTE: Git is not installed, so it cannot be used for plugin specifications) "
 
     # If none of the above checks succeeded, raise an error
     raise ArgumentTypeError(

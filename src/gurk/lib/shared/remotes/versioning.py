@@ -232,7 +232,7 @@ def determine_ref(
         # Get default branch
         ref = get_default_branch(parsed["url"])
 
-    if to_commit:
+    if to_commit and ref is not None:
         # Resolve to commit hash
         ref = get_commit(parsed["url"], ref)
 
