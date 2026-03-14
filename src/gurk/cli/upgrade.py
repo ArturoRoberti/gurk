@@ -14,7 +14,7 @@
 
 from pathlib import Path
 
-from gurk.lib.context import GurkContext, Logger, get_registries
+from gurk.lib.context import GurkContext, GurkLock, Logger, get_registries
 from gurk.lib.context.registry import (
     get_plugin_registration,
     is_plugin_registered,
@@ -54,14 +54,17 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with writing to plugins
-    with GurkContext(
-        logger=Logger(
-            verbose=args.verbose,
-            non_interactive=args.non_interactive,
-            description="Upgrading plugins",
-        ),
-        writable=True,
-    ) as ctx:
+    with (
+        GurkLock(),
+        GurkContext(
+            logger=Logger(
+                verbose=args.verbose,
+                non_interactive=args.non_interactive,
+                description="Upgrading plugins",
+            ),
+            writable=True,
+        ) as ctx,
+    ):
         # Check that git is installed
         if not is_git_installed():
             ctx.logger.fatal(

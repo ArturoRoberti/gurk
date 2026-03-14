@@ -17,12 +17,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from gurk.lib.context import GurkContext, Logger, get_plugin_directories
+from gurk.lib.context import (
+    GurkContext,
+    GurkLock,
+    Logger,
+    get_plugin_directories,
+)
 from gurk.lib.utils import EDITABLE_INSTALL
 
 
 @dataclass
 class SafeFileHandler:
+    """
+    A context manager that prevents any long-term modifications to plugin registries during testing.
+    """
+
     registries: dict[str, Path] = field(init=False, default_factory=dict)
 
     def __enter__(self):
@@ -66,8 +75,9 @@ def main(argv):
                 "to use this command via: 'pipx install -e .[dev]'"
             )
 
-    # Run pytests with a safe file handler to prevent any modifications to plugin registries during testing
+    # Run pytests
     with (
+        GurkLock(),
         SafeFileHandler(),
         GurkContext(
             logger=None,

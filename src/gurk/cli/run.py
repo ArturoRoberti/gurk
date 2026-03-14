@@ -22,6 +22,7 @@ from typing import get_type_hints
 
 from gurk.lib.context import (
     GurkContext,
+    GurkLock,
     Logger,
     get_plugin_registration,
     is_plugin_registered,
@@ -248,154 +249,156 @@ def main(argv, prog, description):
         default=os.getenv("SUDO_ASKPASS"),
         help="Path to a script that echoes the sudo password, used for running tasks that require sudo. Can also be set with the 'SUDO_ASKPASS' environment variable.",
     )
-    args = parser.parse_args(run_argv)
-
-    # Execute with writing to plugins
-    with GurkContext(
-        logger=Logger(
-            verbose=args.verbose,
-            non_interactive=args.non_interactive,
-            description="Processing plugin specification",
-            vary_timestamp="pytest" in sys.modules,
-        ),
-        writable=True,
-    ) as ctx:
-        if args.specification.specification_type in (
-            PluginSpecificationEnum.LOCAL_PATH,
-            PluginSpecificationEnum.GIT_REMOTE,
-        ):
-            # (Re)install plugin if necessary
-            if not install_plugin(
-                args.specification.plugin, reinstall=args.replace
+    with GurkLock():
+        args = parser.parse_args(run_argv)
+        # Execute with writing to plugins
+        with GurkContext(
+            logger=Logger(
+                verbose=args.verbose,
+                non_interactive=args.non_interactive,
+                description="Processing plugin specification",
+                vary_timestamp="pytest" in sys.modules,
+            ),
+            writable=True,
+        ) as ctx:
+            if args.specification.specification_type in (
+                PluginSpecificationEnum.LOCAL_PATH,
+                PluginSpecificationEnum.GIT_REMOTE,
             ):
-                ctx.logger.fatal(
-                    f"Failed to install plugin from '{args.specification.plugin}'."
-                )
-
-            # Get plugin specification
-            if (
-                args.specification.specification_type
-                == PluginSpecificationEnum.LOCAL_PATH
-            ):
-                try:
-                    plugin_spec = load_toml(
-                        Path(args.specification.plugin)
-                        / GURK_METADATA_FILENAME
-                    )["project"]["name"]
-                except Exception as e:
+                # (Re)install plugin if necessary
+                if not install_plugin(
+                    args.specification.plugin, reinstall=args.replace
+                ):
                     ctx.logger.fatal(
-                        f"Unexpected: Failed to load plugin name from local path '{args.specification.plugin}': {str(e)}"
-                    )
-            else:
-                plugin_spec = args.specification.plugin
-        else:
-            # Install plugin if registered as remote-only
-            if not is_plugin_installed(
-                args.specification.plugin, require_venv=False
-            ):
-                registration = get_plugin_registration(
-                    args.specification.plugin,
-                    home_registry=True,
-                    package_registry=True,
-                    require_local=False,
-                )
-                remote = next(iter(registration.values()))["remote"]
-                ctx.logger.debug(
-                    f"Plugin '{args.specification.plugin}' is not installed. Pulling from remote '{remote}'..."
-                )
-                if not install_plugin(remote, reinstall=True):
-                    ctx.logger.fatal(
-                        f"Failed to pull plugin '{args.specification.plugin}' from '{remote}'."
+                        f"Failed to install plugin from '{args.specification.plugin}'."
                     )
 
-            # Get plugin specification
-            plugin_spec = args.specification.plugin
-
-        # CHECK: Plugin should now be installed
-        if not is_plugin_installed(plugin_spec, require_venv=False):
-            ctx.logger.fatal(
-                f"Unexpected: Plugin '{plugin_spec}' is still not installed."
-            )
-
-        # Get plugin data
-        plugin_data = get_plugin_data(plugin_spec)
-
-        # Create task option to run based on specification
-        if args.specification.subtask:
-            # Run a specific task
-            task_name = f"{plugin_data['metadata']['name']}/{args.specification.subtask}"
-            ## Check that the task exists in the plugin
-            plugin_tasks = plugin_data["manifest"]["tasks"]
-            if task_name not in plugin_tasks:
-                msg = f"Plugin '{plugin_spec}' does not have a task named '{task_name}'."
-                if not plugin_tasks:
-                    msg += " This plugin defines no tasks."
+                # Get plugin specification
+                if (
+                    args.specification.specification_type
+                    == PluginSpecificationEnum.LOCAL_PATH
+                ):
+                    try:
+                        plugin_spec = load_toml(
+                            Path(args.specification.plugin)
+                            / GURK_METADATA_FILENAME
+                        )["project"]["name"]
+                    except Exception as e:
+                        ctx.logger.fatal(
+                            "Unexpected: Failed to load plugin name from local "
+                            f"path '{args.specification.plugin}': {str(e)}"
+                        )
                 else:
-                    msg += (
-                        f" Available tasks are: {list(plugin_tasks.keys())}."
+                    plugin_spec = args.specification.plugin
+            else:
+                # Install plugin if registered as remote-only
+                if not is_plugin_installed(
+                    args.specification.plugin, require_venv=False
+                ):
+                    registration = get_plugin_registration(
+                        args.specification.plugin,
+                        home_registry=True,
+                        package_registry=True,
+                        require_local=False,
                     )
-                ctx.logger.fatal(msg)
-            ## Define mock option with the specific task enabled
-            option = {task_name: {}}
-        else:
-            # Run the plugin default or specified option
-            manifest_options = plugin_data["manifest"]["options"]
-            option = manifest_options.get(args.specification.option)
-            if not option:
-                ctx.logger.fatal(
-                    f"Plugin '{plugin_spec}' does not have a run option specified "
-                    f"for '{args.specification.option}'. Available options "
-                    f"are: {list(manifest_options.keys())}."
-                )
-            ## For any common fields, if they are missing in the raw
-            ##  option, remove them (to be filled later) to use defaults
-            common_fields = set(
-                get_type_hints(ResolvedDefaultTaskDict).keys()
-            ) & set(get_type_hints(ResolvedCustomTaskDict).keys())
-            raw_plugin_yaml = get_raw_plugin_manifest(plugin_spec)
-            raw_option = raw_plugin_yaml["options"][args.specification.option]
-            for (_, task), raw_task in zip(
-                option.items(), raw_option.values()
-            ):
-                for field in common_fields:
-                    if field not in raw_task and field in task:
-                        del task[field]
+                    remote = next(iter(registration.values()))["remote"]
+                    ctx.logger.debug(
+                        f"Plugin '{args.specification.plugin}' is not "
+                        f"installed. Pulling from remote '{remote}'..."
+                    )
+                    if not install_plugin(remote, reinstall=True):
+                        ctx.logger.fatal(
+                            f"Failed to pull plugin '{args.specification.plugin}' from '{remote}'."
+                        )
 
-    # Execute without writing to plugins and with writing to logs
-    with GurkContext(
-        logger=Logger(
-            verbose=args.verbose,
-            non_interactive=args.non_interactive,
-            description="Running specification",
-            vary_timestamp="pytest" in sys.modules,
-        ),
-        writable=False,
-    ) as ctx:
-        if not (ctx.logger.can_prompt or ctx.logger.non_interactive):
-            ctx.logger.fatal(
-                "Cannot run tasks in interactive mode without a prompt-capable logger."
+                # Get plugin specification
+                plugin_spec = args.specification.plugin
+
+            # CHECK: Plugin should now be installed
+            if not is_plugin_installed(plugin_spec, require_venv=False):
+                ctx.logger.fatal(
+                    f"Unexpected: Plugin '{plugin_spec}' is still not installed."
+                )
+
+            # Get plugin data
+            plugin_data = get_plugin_data(plugin_spec)
+
+            # Create task option to run based on specification
+            if args.specification.subtask:
+                # Run a specific task
+                task_name = f"{plugin_data['metadata']['name']}/{args.specification.subtask}"
+                ## Check that the task exists in the plugin
+                plugin_tasks = plugin_data["manifest"]["tasks"]
+                if task_name not in plugin_tasks:
+                    msg = f"Plugin '{plugin_spec}' does not have a task named '{task_name}'."
+                    if not plugin_tasks:
+                        msg += " This plugin defines no tasks."
+                    else:
+                        msg += f" Available tasks are: {list(plugin_tasks.keys())}."
+                    ctx.logger.fatal(msg)
+                ## Define mock option with the specific task enabled
+                option = {task_name: {}}
+            else:
+                # Run the plugin default or specified option
+                manifest_options = plugin_data["manifest"]["options"]
+                option = manifest_options.get(args.specification.option)
+                if not option:
+                    ctx.logger.fatal(
+                        f"Plugin '{plugin_spec}' does not have a run option specified "
+                        f"for '{args.specification.option}'. Available options "
+                        f"are: {list(manifest_options.keys())}."
+                    )
+                ## For any common fields, if they are missing in the raw
+                ##  option, remove them (to be filled later) to use defaults
+                common_fields = set(
+                    get_type_hints(ResolvedDefaultTaskDict).keys()
+                ) & set(get_type_hints(ResolvedCustomTaskDict).keys())
+                raw_plugin_yaml = get_raw_plugin_manifest(plugin_spec)
+                raw_option = raw_plugin_yaml["options"][
+                    args.specification.option
+                ]
+                for (_, task), raw_task in zip(
+                    option.items(), raw_option.values()
+                ):
+                    for field in common_fields:
+                        if field not in raw_task and field in task:
+                            del task[field]
+
+        # Execute without writing to plugins and with writing to logs
+        with GurkContext(
+            logger=Logger(
+                verbose=args.verbose,
+                non_interactive=args.non_interactive,
+                description="Running specification",
+                vary_timestamp="pytest" in sys.modules,
+            ),
+            writable=False,
+        ) as ctx:
+            if not (ctx.logger.can_prompt or ctx.logger.non_interactive):
+                ctx.logger.fatal(
+                    "Cannot run tasks in interactive mode without a prompt-capable logger."
+                )
+
+            # Generate task argparser base
+            task_parser_base = GurkArgumentParser(
+                prog=f"{prog} {args.specification.specification}",
+                description=f"Options to run {args.specification.specification}",
+                add_verbose_arg=False,
+                add_non_interactive_arg=False,
+                add_force_arg=True,
+                add_task_args=False,
+                allow_complex_types=False,
             )
 
-        # Generate task argparser base
-        task_parser_base = GurkArgumentParser(
-            prog=f"{prog} {args.specification.specification}",
-            description=f"Options to run {args.specification.specification}",
-            add_verbose_arg=False,
-            add_non_interactive_arg=False,
-            add_force_arg=True,
-            add_task_args=False,
-            allow_complex_types=False,
-        )
+            # Run task(s)
+            runner.main(
+                option=option,
+                cli_args=remaining,
+                parser_base=task_parser_base,
+                askpass=args.askpass,
+            )
 
-        # Run task(s)
-        runner.main(
-            option=option,
-            cli_args=remaining,
-            parser_base=task_parser_base,
-            askpass=args.askpass,
-        )
-
-        # Final message
-        ctx.logger.done(
-            "All tasks completed - You may need to reboot for some changes to take effect"
-        )
+            # Final message
+            ctx.logger.done(
+                "All tasks completed - You may need to reboot for some changes to take effect"
+            )

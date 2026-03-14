@@ -17,6 +17,7 @@ from pathlib import Path
 
 from gurk.lib.context import (
     GurkContext,
+    GurkLock,
     Logger,
     get_plugin_directories,
     get_registries,
@@ -49,14 +50,17 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with writing to plugins
-    with GurkContext(
-        logger=Logger(
-            verbose=args.verbose,
-            non_interactive=args.non_interactive,
-            description="Removing plugins",
-        ),
-        writable=True,
-    ) as ctx:
+    with (
+        GurkLock(),
+        GurkContext(
+            logger=Logger(
+                verbose=args.verbose,
+                non_interactive=args.non_interactive,
+                description="Removing plugins",
+            ),
+            writable=True,
+        ) as ctx,
+    ):
         for plugin_name in args.plugins:
             # Only allow plugin names
             if Path(plugin_name).exists() or is_git_repo(plugin_name):

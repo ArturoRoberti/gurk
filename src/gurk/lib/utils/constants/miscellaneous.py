@@ -17,6 +17,7 @@ from pathlib import Path
 from .common import PACKAGE_NAME, PACKAGE_SRC_PATH
 
 PACKAGE_HOME_PATH = Path.home() / f".{PACKAGE_NAME}"
+GURK_LOCKFILE_PATH = PACKAGE_HOME_PATH / "core.lock"
 PACKAGE_VENVS_PATH = PACKAGE_HOME_PATH / "venvs"
 PACKAGE_VENVS_PATH.mkdir(parents=True, exist_ok=True)
 

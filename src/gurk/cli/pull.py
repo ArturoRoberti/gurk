@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from gurk.lib.context import GurkContext, Logger
+from gurk.lib.context import GurkContext, GurkLock, Logger
 from gurk.lib.core.plugins import (
     DefaultNamespace,
     GurkArgumentParser,
@@ -46,14 +46,17 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with writing to plugins
-    with GurkContext(
-        logger=Logger(
-            verbose=args.verbose,
-            non_interactive=args.non_interactive,
-            description="Pulling plugins",
-        ),
-        writable=True,
-    ) as ctx:
+    with (
+        GurkLock(),
+        GurkContext(
+            logger=Logger(
+                verbose=args.verbose,
+                non_interactive=args.non_interactive,
+                description="Pulling plugins",
+            ),
+            writable=True,
+        ) as ctx,
+    ):
         # Check that git is installed
         if not is_git_installed():
             ctx.logger.fatal(
