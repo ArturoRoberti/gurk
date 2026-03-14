@@ -118,10 +118,10 @@ def prompt_setup() -> None:
             from gurk.cli.setup import main as setup_main
 
             setup_main([], "", "")
-
-        # Mark setup as done
-        SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        SETUP_DONE_FILE.touch()
+        else:
+            # Mark setup as "done"
+            SETUP_DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            SETUP_DONE_FILE.touch()
 
 
 @typecheck
@@ -172,6 +172,7 @@ def main(
     else:
         askpass_prompted = False
 
+    logger.info("Ready to run tasks!")
     try:
         # Get sudo password
         askpass_path = None  # Set default value in case of early exception

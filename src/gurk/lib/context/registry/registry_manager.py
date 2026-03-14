@@ -34,16 +34,28 @@ from .registry_utils import (
     get_plugin_directories,
 )
 
-_current_registries = ContextVar("current_registries", default=None)
+_current_registry_manager: ContextVar["RegistryManager | None"] = ContextVar(
+    "current_registry_manager", default=None
+)
 
 
 class RegistryManager:
     """Context manager to set a registry manager globally."""
 
     def __init__(self, *, writable: bool):
+        # Allow writing to disk
         self.writable = writable
+
+        # Interface registry variable - deeopcopy for read-only
+        #   contexts, direct reference for writable contexts
+        self.active_registries = None
+
+        # Internal registry state
+        self._registries = None
+
+        # Context tracking
         self._token = None
-        self.registries = None
+        self._outer_manager = None
 
     def __enter__(self):
         # Check that a logger is active
@@ -55,31 +67,47 @@ class RegistryManager:
             )
 
         # Load registries and clean up invalidities
-        self.load_registries()
+        self.refresh_from_disk()
 
-        # make this globally visible
-        registries = (
-            self.registries
-            if self.writable
-            else _deepcopy_tuple(self.registries)
-        )
-        self._token = _current_registries.set(registries)
+        # Track nesting: save the outer manager and set self as the active one
+        self._outer_manager = _current_registry_manager.get()
+        self._token = _current_registry_manager.set(self)
 
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        # restore previous registrator
-        _current_registries.reset(self._token)
-
         # Write valid entries to registry file and clean up invalidities
-        if self.writable and (
-            exc_type is None
-            or (exc_type is SystemExit and getattr(exc, "code", None) == 0)
-        ):
+        is_clean_exit = exc_type is None or (
+            exc_type is SystemExit and getattr(exc, "code", None) == 0
+        )
+        if self.writable and is_clean_exit:
             self.dump_registries()
+
+        # Restore the previous manager
+        _current_registry_manager.reset(self._token)
+
+        # If this writable context wrote to disk, refresh the outer manager so
+        # it won't overwrite our changes when it eventually exits and dumps.
+        if self.writable and is_clean_exit and self._outer_manager is not None:
+            self._outer_manager.refresh_from_disk()
 
         # Propagate exceptions
         return False
+
+    def refresh_from_disk(self) -> None:
+        """
+        Reload registries from disk and update active_registries.
+
+        Called when a nested writable RegistryManager has written to disk on
+        exit, to ensure this manager's in-memory state reflects the new disk
+        state before this manager eventually dumps on its own exit.
+        """
+        self.load_registries()
+        self.active_registries = (
+            self._registries
+            if self.writable
+            else _deepcopy_tuple(self._registries)
+        )
 
     def _delete_invalid_registrations(self) -> None:
         """Delete invalid plugin registry entries from the given registries."""
@@ -88,7 +116,7 @@ class RegistryManager:
 
         # Delete registrations with invalid structure
         for is_package_registry, (registry_file, registry) in enumerate(
-            _zip_registry_files(self.registries)
+            _zip_registry_files(self._registries)
         ):
             for name, entry in deepcopy(registry).items():
                 if not _is_entry_valid(name, entry, registry_file):
@@ -115,7 +143,7 @@ class RegistryManager:
                         del registry[name]
 
         # Remove any home registry entries that also exist in the package registry
-        home_registry, package_registry = self.registries
+        home_registry, package_registry = self._registries
         for plugin_name in package_registry.keys():
             if plugin_name in home_registry:
                 logger.warning(
@@ -127,7 +155,7 @@ class RegistryManager:
         """Remove any plugin directories that are not registered in the currently active registrator's plugin registry."""
         local_plugin_paths = {
             _expand_registry_path(rf, v["local"])
-            for rf, r in _zip_registry_files(self.registries)
+            for rf, r in _zip_registry_files(self._registries)
             for v in r.values()
             if v.get("local") is not None
         }
@@ -152,7 +180,7 @@ class RegistryManager:
         Remove any plugin venv directories that do not correspond to a registered plugin in the currently active registrator's plugin registry.
         """
         # Get all registered plugin names with local paths
-        combined_registry = overlay_dicts(_deepcopy_tuple(self.registries))
+        combined_registry = overlay_dicts(_deepcopy_tuple(self._registries))
         installed_plugin_names = set(
             k
             for k, v in combined_registry.items()
@@ -188,15 +216,15 @@ class RegistryManager:
         :rtype: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
         """
         # Load registry files
-        self.registries: tuple[PluginRegistry, PluginRegistry] = tuple(
+        self._registries: tuple[PluginRegistry, PluginRegistry] = tuple(
             load_yaml(p) or {} for p in _get_registry_files()
         )
-        for ind, registry in enumerate(_deepcopy_tuple(self.registries)):
+        for ind, registry in enumerate(_deepcopy_tuple(self._registries)):
             if not isinstance(registry, dict):
-                self.registries[ind] = {}
+                self._registries[ind] = {}
 
         # Make 'local' entries Path objects and prepend registry path
-        for registry_file, registry in _zip_registry_files(self.registries):
+        for registry_file, registry in _zip_registry_files(self._registries):
             for _, entry in registry.items():
                 if isinstance(entry, dict) and entry.get("local") is not None:
                     entry["local"] = _expand_registry_path(
@@ -218,7 +246,7 @@ class RegistryManager:
         self.cleanup()
 
         # Make 'local' entries relative to the registry file
-        for registry_file, registry in _zip_registry_files(self.registries):
+        for registry_file, registry in _zip_registry_files(self._registries):
             for _, entry in registry.items():
                 if entry["local"] is not None:
                     entry["local"] = str(
@@ -228,21 +256,21 @@ class RegistryManager:
                     )
 
         # Dump each registry to its corresponding file
-        for registry_file, registry in _zip_registry_files(self.registries):
+        for registry_file, registry in _zip_registry_files(self._registries):
             dump_yaml(registry, registry_file)
 
 
 def _get_registries() -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
     """
     Get the currently active registrator's plugin registries without deepcopying
-    them (for internal use only). Also deletes invalid entries before returning.
+    them (for internal use only).
 
     :return: Tuple of plugin registries (home, package)
     :rtype: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
     :raises RuntimeError: If no registrator is initialized
     """
-    registries = _current_registries.get()
-    if registries is None:
+    manager = _current_registry_manager.get()
+    if manager is None:
         raise RuntimeError("RegistryManager not initialized")
 
-    return registries
+    return manager.active_registries
