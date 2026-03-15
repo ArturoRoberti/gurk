@@ -18,6 +18,8 @@ from importlib import resources
 from importlib.metadata import distribution, version
 from pathlib import Path
 
+from platformdirs import user_cache_path
+
 PACKAGE_NAME = "gurk"
 GURK_VERSION = version(PACKAGE_NAME)
 PACKAGE_SRC_PATH = Path(resources.files(PACKAGE_NAME)).expanduser().resolve()
@@ -31,5 +33,4 @@ try:
 except Exception:
     EDITABLE_INSTALL = False
 
-PACKAGE_CACHE_PATH = Path.home() / ".cache" / PACKAGE_NAME
-PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
+PACKAGE_CACHE_PATH = user_cache_path(PACKAGE_NAME, ensure_exists=True)

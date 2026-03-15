@@ -12,16 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pathlib import Path
+from platformdirs import user_config_path, user_data_path, user_log_path
 
 from .common import PACKAGE_NAME, PACKAGE_SRC_PATH
 
-PACKAGE_HOME_PATH = Path.home() / f".{PACKAGE_NAME}"
-GURK_LOCKFILE_PATH = PACKAGE_HOME_PATH / "core.lock"
-PACKAGE_VENVS_PATH = PACKAGE_HOME_PATH / "venvs"
+PACKAGE_CONFIG_PATH = user_config_path(PACKAGE_NAME, ensure_exists=True)
+GURK_LOCKFILE_PATH = PACKAGE_CONFIG_PATH / "core.lock"
+SETUP_DONE_FILE = PACKAGE_CONFIG_PATH / "setup.done"
+
+PACKAGE_DATA_PATH = user_data_path(PACKAGE_NAME, ensure_exists=True)
+PACKAGE_VENVS_PATH = PACKAGE_DATA_PATH / "venvs"
 PACKAGE_VENVS_PATH.mkdir(parents=True, exist_ok=True)
 
-SETUP_DONE_FILE = PACKAGE_HOME_PATH / "setup.done"
+PACKAGE_LOG_PATH = user_log_path(PACKAGE_NAME, ensure_exists=True)
 
 PACKAGE_BASH_HELPERS_PATH = (
     PACKAGE_SRC_PATH / "plugin_helpers" / "bash" / "helpers.bash"

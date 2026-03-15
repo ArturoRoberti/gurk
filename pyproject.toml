@@ -17,6 +17,7 @@ dependencies = [
   "filelock",
   "networkx",
   "packaging",
+  "platformdirs",
   "pydantic",
   "requests",
   "rich",

@@ -25,7 +25,7 @@ from gurk.lib.shared.plugins import (
 )
 from gurk.lib.shared.remotes import GitQueryDict, is_git_repo, parse_git_query
 from gurk.lib.utils import (
-    PACKAGE_HOME_PATH,
+    PACKAGE_DATA_PATH,
     PACKAGE_SRC_PATH,
     PathLike,
     full_isinstance,
@@ -87,7 +87,7 @@ def get_plugin_directories(
     :rtype: tuple[Path, Path] | Path
     :raises TypeError: If an expected plugin directory path exists but is not a directory
     """
-    parent_paths = (PACKAGE_HOME_PATH, PACKAGE_SRC_PATH)
+    parent_paths = (PACKAGE_DATA_PATH, PACKAGE_SRC_PATH)
 
     possible_plugin_paths = [p / "plugins" for p in parent_paths]
     for p in possible_plugin_paths:

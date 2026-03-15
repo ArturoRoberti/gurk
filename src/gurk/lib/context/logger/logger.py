@@ -37,6 +37,7 @@ from rich.prompt import Confirm, Prompt
 from gurk.lib.utils import (
     BASE_TIMESTAMP,
     NO_ANSWERS,
+    PACKAGE_LOG_PATH,
     YES_ANSWERS,
     get_timestamp,
     typecheck,
@@ -154,7 +155,7 @@ class Logger:
                 if self.vary_timestamp
                 else BASE_TIMESTAMP
             )
-            self._logdir = Path.home() / ".gurk" / "logs" / timestamp
+            self._logdir = PACKAGE_LOG_PATH / timestamp
             self._logdir.mkdir(parents=True, exist_ok=True)
             if self.verbose:
                 script_logdir = self._logdir / "modified_scripts"
