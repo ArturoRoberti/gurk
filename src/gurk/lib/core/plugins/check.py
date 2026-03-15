@@ -147,8 +147,8 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
         existing_plugin_registration = get_plugin_registration(
             plugin_name,
-            home_registry=True,
-            package_registry=True,
+            public=True,
+            private=True,
             require_local=False,
         )
         existing_plugin_entry = (
@@ -335,9 +335,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
         imports_graph.add_node(plugin_name)
         for imp in imports:
             # Check that imported plugins exist in the desired location
-            if not get_plugin_registration(
-                imp, home_registry=True, package_registry=True
-            ):
+            if not get_plugin_registration(imp, public=True, private=True):
                 msg = f"Imported plugin '{imp}' does not exist locally."
                 if is_git_repo(imp):
                     msg += f" You can pull it via 'gurk pull {imp}'."
@@ -351,7 +349,7 @@ def check_local_plugin(plugin_path: PathLike, verbose: bool = False) -> bool:
 
             # Check imported plugin
             imp_registration = get_plugin_registration(
-                imp, home_registry=True, package_registry=True
+                imp, public=True, private=True
             )
             imp_local = next(iter(imp_registration.values()))["local"]
             if not _check_local_plugin(imp_local):

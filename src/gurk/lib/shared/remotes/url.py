@@ -160,5 +160,11 @@ def is_url(url: str) -> bool:
     :return: True if the string is a valid URL, False otherwise
     :rtype: bool
     """
-    response = requests.get(url, timeout=30, headers={"Accept-Encoding": "*"})
-    return response.status_code == 200
+    try:
+        response = requests.get(
+            url, timeout=30, headers={"Accept-Encoding": "*"}
+        )
+    except requests.RequestException:
+        return False
+    else:
+        return response.status_code == 200

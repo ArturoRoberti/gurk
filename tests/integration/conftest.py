@@ -30,6 +30,7 @@ from .shared import (
     PreparedPluginRegistration,
     prepared_plugin_registration_id,
 )
+from .utils import TEMPLATE_PLUGIN_SPECIFICATION_OPTIONS
 
 
 ################################################################################################
@@ -121,4 +122,15 @@ def invalid_plugin_name_specification(
     request: pytest.FixtureRequest,
 ) -> Iterator[str]:
     """Fixture to set up an invalid plugin name for testing removal."""
+    yield request.param
+
+
+################################################################################################
+################################### Run Plugin (Specification) ##################################
+################################################################################################
+@pytest.fixture(params=TEMPLATE_PLUGIN_SPECIFICATION_OPTIONS)
+def run_plugin_specification_option(
+    request: pytest.FixtureRequest,
+) -> Iterator[str]:
+    """Fixture to set up various plugin specification options for testing plugin execution."""
     yield request.param

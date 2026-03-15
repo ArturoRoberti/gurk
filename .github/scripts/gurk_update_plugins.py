@@ -28,7 +28,7 @@ if __name__ == "__main__":
         if not all(
             upgrade_plugin(name, require_local=False)
             for name, entry in get_registries(
-                home_registry=False, package_registry=True
+                public=False, private=True
             ).items()
             if entry["remote"]
         ):

@@ -63,7 +63,7 @@ def get_raw_plugin_manifest(
     :rtype: PluginManifest | None
     """
     plugin_registration = get_plugin_registration(
-        plugin, home_registry=True, package_registry=True
+        plugin, public=True, private=True
     )
     if not plugin_registration:
         return None
@@ -104,7 +104,7 @@ def get_resolved_plugin_manifest(
 
     # Expand task paths
     plugin_registration = get_plugin_registration(
-        plugin, home_registry=True, package_registry=True
+        plugin, public=True, private=True
     )
     if not plugin_registration:
         return None
@@ -144,7 +144,7 @@ def _get_plugin_metadata(
     :rtype: ResolvedPluginMetadata | None
     """
     plugin_registration = get_plugin_registration(
-        plugin, home_registry=True, package_registry=True
+        plugin, public=True, private=True
     )
     if not plugin_registration:
         return None
@@ -184,7 +184,7 @@ def get_plugin_data(
         return f"ERROR loading plugin data for {plugin}: {message}"
 
     plugin_registration = get_plugin_registration(
-        plugin, home_registry=True, package_registry=True
+        plugin, public=True, private=True
     )
     if not plugin_registration:
         raise ModuleNotFoundError(

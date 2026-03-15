@@ -31,6 +31,7 @@ from .utils import ExpectedOutcome
 def test_run_local_plugin_validly(
     prepared_plugin_registration: PreparedPluginRegistration,
     local_plugin_path: str,
+    run_plugin_specification_option: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test 'gurk run <local-path>' under various registration conditions.
@@ -42,7 +43,9 @@ def test_run_local_plugin_validly(
         prepared_plugin_registration, local_plugin_path
     )
 
-    e, captured = gurk_run([local_plugin_path], capsys)
+    e, captured = gurk_run(
+        [local_plugin_path + run_plugin_specification_option], capsys
+    )
     assert_outcome(e, captured, expected_outcome)
 
 
@@ -66,6 +69,7 @@ def test_run_local_plugin_invalidly(
 def test_run_remote_plugin_validly(
     prepared_plugin_registration: PreparedPluginRegistration,
     valid_remote_plugin_specification: str,
+    run_plugin_specification_option: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test 'gurk run <remote-url>' under various registration conditions."""
@@ -73,7 +77,10 @@ def test_run_remote_plugin_validly(
         prepared_plugin_registration, valid_remote_plugin_specification
     )
 
-    e, captured = gurk_run([valid_remote_plugin_specification], capsys)
+    e, captured = gurk_run(
+        [valid_remote_plugin_specification + run_plugin_specification_option],
+        capsys,
+    )
     assert_outcome(e, captured, expected_outcome)
 
 
@@ -89,15 +96,16 @@ def test_run_remote_plugin_invalidly(
     causing 'gurk run' to call fatal() and exit with code 1.
     """
     e, captured = gurk_run([invalid_remote_plugin_specification], capsys)
-    assert_outcome(e, captured, ExpectedOutcome.FAILURE)
+    assert_outcome(e, captured, ExpectedOutcome.ARGPARSE)
 
 
 ################################################################################################
 ####################################### Plugin Name Spec #######################################
 ################################################################################################
-def test_run_plugin_by_name_validly(
+def test_run_named_plugin_validly(
     prepared_plugin_registration: PreparedPluginRegistration,
     valid_plugin_name_specification: str,
+    run_plugin_specification_option: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test 'gurk run <plugin-name>' under various registration conditions.
@@ -110,11 +118,14 @@ def test_run_plugin_by_name_validly(
         prepared_plugin_registration, valid_plugin_name_specification
     )
 
-    e, captured = gurk_run([valid_plugin_name_specification], capsys)
+    e, captured = gurk_run(
+        [valid_plugin_name_specification + run_plugin_specification_option],
+        capsys,
+    )
     assert_outcome(e, captured, expected_outcome)
 
 
-def test_run_plugin_by_name_invalidly(
+def test_run_named_plugin_invalidly(
     missing_plugin_registration: PreparedPluginRegistration,
     invalid_plugin_name_specification: str,
     capsys: pytest.CaptureFixture[str],

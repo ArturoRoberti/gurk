@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gurk"
-version = "2.0.9"
+version = "2.1.0"
 description = "Contains anything related to setting up a new computer (desktop) system"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,6 +17,7 @@ dependencies = [
   "filelock",
   "networkx",
   "packaging",
+  "platformdirs",
   "pydantic",
   "requests",
   "rich",

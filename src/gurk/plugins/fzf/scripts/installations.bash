@@ -49,9 +49,6 @@ install_loki_shell() {
 	if check_install_loki_shell && [[ "$FORCE" == false ]]; then
 		log_step "loki-shell is already installed - Exiting"
 		return 0
-	elif ! check_install_docker; then
-		log_step "Docker must be installed before installing loki-shell" true
-		return 1
 	fi
 
 	# (STEP) Installing Requirement(s)
@@ -59,7 +56,7 @@ install_loki_shell() {
 
 	# (STEP) Installing loki-shell (with docker)
 	git clone --depth 1 https://github.com/slim-bean/loki-shell.git ~/.loki-shell
-	printf "y\ny\n\n" | ~/.loki-shell/install
+	printf "\nyy\n" | ~/.loki-shell/install
 
 	# Verify installation
 	check_install_loki_shell

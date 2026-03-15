@@ -16,13 +16,17 @@ from enum import Enum
 
 
 class RegistryKind(Enum):
+    """Represents the kind of registry to use for a plugin specification."""
+
     # fmt: off
-    HOME    = 0
-    PACKAGE = 1
+    PUBLIC  = 0
+    PRIVATE = 1
     # fmt: on
 
 
 class ExpectedOutcome(Enum):
+    """Represents the expected outcome of a test case as (exit_code, contains_errors)."""
+
     SUCCESS = (0, False)
     PARTIAL = (0, True)
     FAILURE = (1, True)

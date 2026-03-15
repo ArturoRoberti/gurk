@@ -12,24 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import sys
 from importlib import resources
-from importlib.metadata import distribution, version
+from importlib.metadata import version
 from pathlib import Path
 
+from platformdirs import (
+    user_cache_path,
+    user_config_path,
+    user_data_path,
+    user_log_path,
+)
+
+# Package constants
 PACKAGE_NAME = "gurk"
 GURK_VERSION = version(PACKAGE_NAME)
 PACKAGE_SRC_PATH = Path(resources.files(PACKAGE_NAME)).expanduser().resolve()
 PIPX_PYTHON_PATH = Path(sys.executable)
-try:
-    EDITABLE_INSTALL: bool = (
-        json.loads(distribution(PACKAGE_NAME).read_text("direct_url.json"))
-        .get("dir_info", {})
-        .get("editable", False)
-    )
-except Exception:
-    EDITABLE_INSTALL = False
 
-PACKAGE_CACHE_PATH = Path.home() / ".cache" / PACKAGE_NAME
-PACKAGE_CACHE_PATH.mkdir(parents=True, exist_ok=True)
+# Package directories
+PACKAGE_CACHE_PATH = user_cache_path(PACKAGE_NAME, ensure_exists=True)
+PACKAGE_CONFIG_PATH = user_config_path(PACKAGE_NAME, ensure_exists=True)
+PACKAGE_DATA_PATH = user_data_path(PACKAGE_NAME, ensure_exists=True)
+PACKAGE_LOG_PATH = user_log_path(PACKAGE_NAME, ensure_exists=True)

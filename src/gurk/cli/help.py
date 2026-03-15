@@ -108,9 +108,7 @@ def main(argv, prog, description):
         if not any(vars(args).values()):
             # Load help from pyproject.toml
             gurk_toml = load_toml(
-                get_plugin_directories(
-                    home_registry=False, package_registry=True
-                )
+                get_plugin_directories(public=False, private=True)
                 / PACKAGE_NAME
                 / GURK_METADATA_FILENAME
             )
@@ -141,8 +139,8 @@ def main(argv, prog, description):
                     msg = f"Plugin '{plugin_name}' is not installed."
                     if is_plugin_registered(
                         plugin_name,
-                        home_registry=False,
-                        package_registry=True,
+                        public=False,
+                        private=True,
                         require_local=False,
                     ):
                         msg += " Unexpectedly, It is registered however."
@@ -228,7 +226,7 @@ def main(argv, prog, description):
         elif args.available_plugins:
             padded_print("Available Plugins", "cyan")
             combined_registry = get_registries(
-                home_registry=True, package_registry=True, combine=True
+                public=True, private=True, combine=True
             )
             for plugin_name, plugin_info in combined_registry.items():
                 richprint(f"{plugin_name}:", "green")

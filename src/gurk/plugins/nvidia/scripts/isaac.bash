@@ -62,21 +62,21 @@ install_isaacsim() {
 		return 1
 	fi
 
+	if [[ ${isaacsim_version} == 6.0.0 ]]; then
+		# TEMPORARY FIX: 6.0.0 not yet available for download, as it is dev version (01.01.2026)
+		# TODO: Find permanent fix for this
+		isaacsim_version="5.1.0"
+	fi
 	# (STEP) Downloading IsaacSim version $isaacsim_version (this may take a while)...
 	local download_url=""
 	local base_download_url="https://download.isaacsim.omniverse.nvidia.com/isaac-sim-standalone"
 	if [[ ${isaacsim_version} == 4.0.0 ]]; then
-		download_url="${base_download_url}%404.0.0-rc.21%2B4.0.13872.3e3cb0c9.gl.${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.release.zip"
+		download_url="${base_download_url}%40${isaacsim_version}-rc.21%2B4.0.13872.3e3cb0c9.gl.${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.release.zip"
 	elif [[ ${isaacsim_version} == 4.1.0 ]]; then
-		download_url="${base_download_url}%404.1.0-rc.7%2B4.1.14801.71533b68.gl.${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.release.zip"
+		download_url="${base_download_url}%40${isaacsim_version}-rc.7%2B4.1.14801.71533b68.gl.${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.release.zip"
 	elif [[ ${isaacsim_version} == 4.2.0 ]]; then
-		download_url="${base_download_url}%404.2.0-rc.18%2Brelease.16044.3b2ed111.gl.${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.release.zip"
+		download_url="${base_download_url}%40${isaacsim_version}-rc.18%2Brelease.16044.3b2ed111.gl.${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.release.zip"
 	else
-		if [[ ${isaacsim_version} == 6.0.0 ]]; then
-			# TEMPORARY FIX: 6.0.0 not yet available for download, as it is dev version (01.01.2026)
-			# TODO: Find permanent fix for this
-			isaacsim_version="5.1.0"
-		fi
 		download_url="${base_download_url}-${isaacsim_version}-${SYSTEM_INFO[type]}-${SYSTEM_INFO[kernel]}.zip"
 	fi
 	local download_path=$(mktemp --suffix=".zip")
@@ -85,10 +85,10 @@ install_isaacsim() {
 		return 1
 	fi
 
-	# (STEP) Unzipping IsaacSim to $HOME/isaac/isaacsim
+	# (STEP) Unzipping IsaacSim to $HOME/isaac/isaacsim (this may take a while)...
 	local install_path="$HOME/isaac/isaacsim"
 	mkdir -p "$install_path"
-	if ! unzip "$download_path" -d "$install_path"; then
+	if ! unzip -o "$download_path" -d "$install_path"; then
 		log_step "Failed to unzip IsaacSim version ${isaacsim_version} to ${install_path}" true
 		return 1
 	fi
@@ -200,8 +200,8 @@ install_isaaclab() {
 	if check_install_isaaclab && [[ "$FORCE" == false ]]; then
 		log_step "IsaacLab is already installed - Exiting"
 		return 0
-	elif ! check_install_isaacsim || ! check_install_conda; then
-		log_step "IsaacSim and Conda must be installed before installing IsaacLab" true
+	elif ! check_install_isaacsim; then
+		log_step "IsaacSim must be installed before installing IsaacLab" true
 		return 1
 	fi
 	local isaacsim_path=$(check_install_isaacsim)
@@ -247,10 +247,10 @@ install_isaaclab() {
 		return 1
 	fi
 
-	# (STEP) Unzipping IsaacLab to $HOME/isaac/isaaclab
+	# (STEP) Unzipping IsaacLab to $HOME/isaac/isaaclab (this may take a while)...
 	local install_path="$HOME/isaac/isaaclab"
 	local unzipped=$(mktemp -d)
-	if ! unzip "$download_path" -d "$unzipped"; then
+	if ! unzip -o "$download_path" -d "$unzipped"; then
 		log_step "Failed to unzip IsaacLab version ${isaaclab_version} to ${install_path}" true
 		return 1
 	fi
@@ -261,6 +261,7 @@ install_isaaclab() {
 	rm "$download_path"
 
 	# Create symlink to isaacsim
+	rm -rf "${install_path}/_isaac_sim" || true
 	ln -s "${isaacsim_path}" "${install_path}/_isaac_sim"
 
 	# (STEP) Creating conda environment

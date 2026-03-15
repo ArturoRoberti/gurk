@@ -184,9 +184,7 @@ def compute_affected_tasks() -> list[str]:
     changed_lines_map = _parse_diff_changed_lines(diff_text)
 
     # Find affected script blocks (functions/entrypoints)
-    pkg_plugin_dir = get_plugin_directories(
-        home_registry=False, package_registry=True
-    )
+    pkg_plugin_dir = get_plugin_directories(public=False, private=True)
     affected_script_blocks: dict[Path, set[str]] = {}
     for file_path in iter_scripts():
         affected_script_blocks[file_path] = _affected_blocks(

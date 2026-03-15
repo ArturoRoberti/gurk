@@ -229,8 +229,9 @@ class Processor:
                 != GURK_VERSION
             ):
                 logger.debug(
-                    f"Removing existing virtual environment for plugin '{plugin}' "
-                    "to ensure it is re-created with the current gurk version."
+                    f"Removing existing virtual environment for plugin '{plugin}' ({PACKAGE_NAME} "
+                    f"version: {get_venv_package_version(plugin, PACKAGE_NAME)}) to ensure it is "
+                    f"re-created with the current {PACKAGE_NAME} version ({GURK_VERSION})."
                 )
                 if not remove_venv(plugin):
                     logger.fatal(

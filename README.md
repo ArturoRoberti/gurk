@@ -9,11 +9,13 @@
 🖥️ gurk 🥒 - The user-friendly package manager allowing customizable and repeatable computer setup
 
 # Installation (Ubuntu 22.04+ only)
-Please follow the instructions in the [Installation Guide](https://github.com/ArturoRoberti/gurk/tree/main/docs/knowledge/installation.md) or use the provided installation script:
+Please use the provided installation script (recommended):
 ```bash
 sudo apt update && sudo apt install curl
-curl -sSL https://raw.githubusercontent.com/ArturoRoberti/gurk/main/install.bash | sudo bash
+curl -fsSL https://raw.githubusercontent.com/ArturoRoberti/gurk/main/install.sh | sudo bash
 ```
+
+or follow the instructions in the [Installation Guide](https://github.com/ArturoRoberti/gurk/tree/main/docs/knowledge/installation.md).
 
 # Usage
 Using gurk you can run various plugins and tasks via

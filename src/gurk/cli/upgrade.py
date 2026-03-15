@@ -14,7 +14,7 @@
 
 from pathlib import Path
 
-from gurk.lib.context import GurkContext, Logger, get_registries
+from gurk.lib.context import GurkContext, GurkLock, Logger, get_registries
 from gurk.lib.context.registry import (
     get_plugin_registration,
     is_plugin_registered,
@@ -54,14 +54,17 @@ def main(argv, prog, description):
     args = parser.parse_args(argv)
 
     # Execute with writing to plugins
-    with GurkContext(
-        logger=Logger(
-            verbose=args.verbose,
-            non_interactive=args.non_interactive,
-            description="Upgrading plugins",
-        ),
-        writable=True,
-    ) as ctx:
+    with (
+        GurkLock(),
+        GurkContext(
+            logger=Logger(
+                verbose=args.verbose,
+                non_interactive=args.non_interactive,
+                description="Upgrading plugins",
+            ),
+            writable=True,
+        ) as ctx,
+    ):
         # Check that git is installed
         if not is_git_installed():
             ctx.logger.fatal(
@@ -83,9 +86,13 @@ def main(argv, prog, description):
         else:
             # Get all local plugins to upgrade if none specified
             combined_registry = get_registries(
-                home_registry=True, package_registry=True, combine=True
+                public=True, private=True, combine=True
             )
-            plugins = combined_registry.keys()  # All plugin names
+            plugins = [  # All remote plugin names
+                plugin_name
+                for plugin_name, plugin_entry in combined_registry.items()
+                if plugin_entry["remote"] is not None
+            ]
 
         # Check 'exclude' plugins if specified
         normalized_exclude = set()
@@ -111,8 +118,8 @@ def main(argv, prog, description):
             # Check if plugin is registered
             if not is_plugin_registered(
                 plugin,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=False,
             ):
                 ctx.logger.error(
@@ -123,8 +130,8 @@ def main(argv, prog, description):
             # Get available plugin data from registration
             plugin_registration = get_plugin_registration(
                 plugin,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=False,
             )
             plugin_name, plugin_entry = next(iter(plugin_registration.items()))

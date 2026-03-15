@@ -30,7 +30,7 @@ else:
 
     PluginVersioning: TypeAlias = dict[str, dict[str, str]]
 
-# template plugin data
+# template plugin versioning information
 TEMPLATE_PLUGIN_REMOTE = (
     "https://github.com/ArturoRoberti/gurk_template_plugin.git"
 )
@@ -59,3 +59,6 @@ TEMPLATE_PLUGIN_VERSIONING: PluginVersioning = {
     "branch": {"exists": default_branch, "missing": "missing_branch"},
     "commit": {"exists": latest_default_commit, "missing": "missing_commit"},
 }
+
+# template plugin specification options
+TEMPLATE_PLUGIN_SPECIFICATION_OPTIONS = {"", "/some-task", ":some-option"}

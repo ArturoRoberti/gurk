@@ -25,11 +25,11 @@ install_vscode() {
 
 	# (STEP) Adding VSCode APT Repository
 	local gpg_file="/usr/share/keyrings/microsoft.gpg"
-	wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
- 	 | sudo gpg --dearmor \
- 	 | sudo tee $gpg_file >/dev/null
-	echo "deb [arch=${SYSTEM_INFO[arch]} signed-by=$gpg_file] https://packages.microsoft.com/repos/code stable main" \
-	  | sudo tee /etc/apt/sources.list.d/vscode.list
+	wget -qO- https://packages.microsoft.com/keys/microsoft.asc |
+		sudo gpg --dearmor |
+		sudo tee $gpg_file >/dev/null
+	echo "deb [arch=${SYSTEM_INFO[arch]} signed-by=$gpg_file] https://packages.microsoft.com/repos/code stable main" |
+		sudo tee /etc/apt/sources.list.d/vscode.list
 	sudo apt-get update
 
 	# (STEP) Installing VSCode

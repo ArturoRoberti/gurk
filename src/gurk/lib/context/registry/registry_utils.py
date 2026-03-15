@@ -25,7 +25,7 @@ from gurk.lib.shared.plugins import (
 )
 from gurk.lib.shared.remotes import GitQueryDict, is_git_repo, parse_git_query
 from gurk.lib.utils import (
-    PACKAGE_HOME_PATH,
+    PACKAGE_DATA_PATH,
     PACKAGE_SRC_PATH,
     PathLike,
     full_isinstance,
@@ -51,43 +51,43 @@ def _deepcopy_tuple(tup: tuple) -> tuple:
 @overload
 def get_plugin_directories(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[True] = ...,
+    private: Literal[True] = ...,
 ) -> tuple[Path, Path]: ...
 
 
 @overload
 def get_plugin_directories(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[False] = ...,
+    public: Literal[True] = ...,
+    private: Literal[False] = ...,
 ) -> Path: ...
 
 
 @overload
 def get_plugin_directories(
     *,
-    home_registry: Literal[False] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[False] = ...,
+    private: Literal[True] = ...,
 ) -> Path: ...
 
 
 @typecheck
 def get_plugin_directories(
-    *, home_registry: bool = True, package_registry: bool = True
+    *, public: bool = True, private: bool = True
 ) -> tuple[Path, Path] | Path:
     """
-    Get a tuple of plugin directories, with the home one first.
+    Get a tuple of plugin directories, with the public one first.
 
-    :param home_registry: Whether to include the home plugin directory
-    :type home_registry: bool
-    :param package_registry: Whether to include the package plugin directory
-    :type package_registry: bool
-    :return: Tuple of plugin directories (home, package), depending on the input
+    :param public: Whether to include the public plugin directory
+    :type public: bool
+    :param private: Whether to include the private plugin directory
+    :type private: bool
+    :return: Tuple of plugin directories (public, private), depending on the input
     :rtype: tuple[Path, Path] | Path
     :raises TypeError: If an expected plugin directory path exists but is not a directory
     """
-    parent_paths = (PACKAGE_HOME_PATH, PACKAGE_SRC_PATH)
+    parent_paths = (PACKAGE_DATA_PATH, PACKAGE_SRC_PATH)
 
     possible_plugin_paths = [p / "plugins" for p in parent_paths]
     for p in possible_plugin_paths:
@@ -100,16 +100,16 @@ def get_plugin_directories(
 
     return _filter_by_registries(
         tuple(possible_plugin_paths),
-        home_registry=home_registry,
-        package_registry=package_registry,
+        public=public,
+        private=private,
     )
 
 
 def _get_registry_files() -> tuple[Path, Path]:
     """
-    Get a tuple of plugin registries, with the home one first.
+    Get a tuple of plugin registries, with the public one first.
 
-    :return: Tuple of plugin registries (home, package)
+    :return: Tuple of plugin registries (public, private)
     :rtype: tuple[Path, Path]
     """
     plugin_registry_files = [
@@ -143,11 +143,11 @@ def _zip_registry_files(
     ZippedRegistry | ResolvedZippedRegistry,
 ]:
     """
-    Zip the plugin registries with their corresponding registry files, with the home one first.
+    Zip the plugin registries with their corresponding registry files, with the public one first.
 
-    :param registries: Tuple of plugin registries (home, package)
+    :param registries: Tuple of plugin registries (public, private)
     :type registries: tuple[PluginRegistry | ResolvedPluginRegistry, PluginRegistry | ResolvedPluginRegistry]
-    :return: Tuple of tuples of plugin registry files and their corresponding registries (home, package)
+    :return: Tuple of tuples of plugin registry files and their corresponding registries (public, private)
     :rtype: tuple[ZippedRegistry | ResolvedZippedRegistry, ZippedRegistry | ResolvedZippedRegistry]
     """
     return tuple(zip(_get_registry_files(), registries))
@@ -245,8 +245,8 @@ T = TypeVar("T")
 def _filter_by_registries(
     tup: tuple[T, T],
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[False] = ...,
+    public: Literal[True] = ...,
+    private: Literal[False] = ...,
     dcopy: bool = ...,
 ) -> T: ...
 
@@ -255,8 +255,8 @@ def _filter_by_registries(
 def _filter_by_registries(
     tup: tuple[T, T],
     *,
-    home_registry: Literal[False] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[False] = ...,
+    private: Literal[True] = ...,
     dcopy: bool = ...,
 ) -> T: ...
 
@@ -265,8 +265,8 @@ def _filter_by_registries(
 def _filter_by_registries(
     tup: tuple[T, T],
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[True] = ...,
+    private: Literal[True] = ...,
     dcopy: bool = ...,
 ) -> tuple[T, T]: ...
 
@@ -275,8 +275,8 @@ def _filter_by_registries(
 def _filter_by_registries(
     tup: tuple[T, T],
     *,
-    home_registry: bool,
-    package_registry: bool,
+    public: bool,
+    private: bool,
     dcopy: bool = False,
 ) -> tuple[T, T] | T:
     """
@@ -284,18 +284,18 @@ def _filter_by_registries(
 
     :param tup: Tuple to filter
     :type tup: tuple[T, T]
-    :param home_registry: Whether to include the home registry
-    :type home_registry: bool
-    :param package_registry: Whether to include the package registry
-    :type package_registry: bool
+    :param public: Whether to include the public registry
+    :type public: bool
+    :param private: Whether to include the private registry
+    :type private: bool
     :param dcopy: Whether to deepcopy the entries
     :type dcopy: bool
     :return: Filtered tuple or single entry, depending on the input
     :rtype: tuple[T, T] | T
     """
     filtered = []
-    if home_registry:
+    if public:
         filtered.append(deepcopy(tup[0]) if dcopy else tup[0])
-    if package_registry:
+    if private:
         filtered.append(deepcopy(tup[1]) if dcopy else tup[1])
     return filtered[0] if len(filtered) == 1 else tuple(filtered)

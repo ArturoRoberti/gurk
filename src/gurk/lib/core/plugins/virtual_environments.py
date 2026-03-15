@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import shutil
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from venv import EnvBuilder
 
 from gurk.lib.context import get_logger

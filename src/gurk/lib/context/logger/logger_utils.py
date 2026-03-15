@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from io import TextIOBase
 from typing import Literal, overload
 
 from rich.markup import escape
 
 from gurk.lib.shared.printers import richprint
-from gurk.lib.utils import typecheck
+from gurk.lib.utils import PatternCollection, typecheck
 
 from .logger_types import LoggerSeverity
 
@@ -38,8 +39,8 @@ def _filter_pydantic_wrapper(traceback_str: str) -> str:
 
     i = 0
     while i < len(lines):
-        # look ahead for a line containing _typecheck
-        if i + 1 < len(lines) and "_typecheck(" in lines[i + 1]:
+        m = PatternCollection.TRACEBACK_FILE.patterns.match(lines[i])
+        if m and m.group(1) == inspect.getfile(typecheck):
             # skip until we see validate_python
             while (
                 i < len(lines)

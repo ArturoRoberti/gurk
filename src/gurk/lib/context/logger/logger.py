@@ -37,6 +37,7 @@ from rich.prompt import Confirm, Prompt
 from gurk.lib.utils import (
     BASE_TIMESTAMP,
     NO_ANSWERS,
+    PACKAGE_LOG_PATH,
     YES_ANSWERS,
     get_timestamp,
     typecheck,
@@ -46,7 +47,9 @@ from gurk.lib.utils.miscellaneous import identity
 from .logger_types import LoggerSeverity, TaskTerminationType
 from .logger_utils import _filter_pydantic_wrapper, logrichprint
 
-_current_logger = ContextVar("current_logger", default=None)
+_current_logger: ContextVar["Logger | None"] = ContextVar(
+    "current_logger", default=None
+)
 
 
 class DummyLogger:
@@ -126,7 +129,8 @@ class Logger:
     _console_err:    Console  = field(init=False, repr=False)
     _progress:       Progress = field(init=False, repr=False)
 
-    _token:          Token    = field(init=False, repr=False)
+    _token:          Token           = field(init=False, repr=False)
+    _outer_logger:   'Logger | None' = field(init=False, repr=False, default=None)
     # fmt: on
 
     def __post_init__(self):
@@ -151,7 +155,7 @@ class Logger:
                 if self.vary_timestamp
                 else BASE_TIMESTAMP
             )
-            self._logdir = Path.home() / ".gurk" / "logs" / timestamp
+            self._logdir = PACKAGE_LOG_PATH / timestamp
             self._logdir.mkdir(parents=True, exist_ok=True)
             if self.verbose:
                 script_logdir = self._logdir / "modified_scripts"
@@ -166,6 +170,16 @@ class Logger:
             self._logfile.touch(exist_ok=True)
 
     def __enter__(self):
+        # Suspend the outer Logger's Live render to avoid nested render conflicts.
+        # Rich does not support concurrent Live instances; nested ones hide prompts
+        # and cause apparent stalls.
+        outer = _current_logger.get()
+        if isinstance(outer, Logger):
+            self._outer_logger = outer
+            outer_live = getattr(outer._progress, "live", None)
+            if outer_live and outer_live.is_started:
+                outer_live.stop()
+
         # start live-render
         self._progress.__enter__()
 
@@ -187,6 +201,12 @@ class Logger:
 
         # stop live-render
         self._progress.__exit__(exc_type, exc, tb)
+
+        # Resume outer Logger's Live render if it was suspended on entry
+        if self._outer_logger is not None:
+            outer_live = getattr(self._outer_logger._progress, "live", None)
+            if outer_live and not outer_live.is_started:
+                outer_live.start()
 
         # no exception or SystemExit → just propagate
         if exc_type in (None, SystemExit):

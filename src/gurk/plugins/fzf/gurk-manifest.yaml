@@ -5,12 +5,11 @@ tasks:
     description: Install fzf (allows fuzzy searching in terminal)
     script: scripts/installations.bash
     function: install_fzf
-    depends_on: [docker/install-docker]
   fzf/install-loki-shell:
     description: Install Loki shell (allows shared fuzzy searching over SSH, Docker, ...)
     script: scripts/installations.bash
     function: install_loki_shell
-    depends_on: [fzf/install-fzf]
+    depends_on: [fzf/install-fzf, docker/install-docker]
   fzf/uninstall-loki-shell:
     description: Uninstall loki-shell
     script: scripts/uninstallations.bash

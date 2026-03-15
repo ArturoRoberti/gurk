@@ -39,53 +39,53 @@ from .registry_utils import (
 @overload
 def get_registry_files(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[False] = ...,
+    public: Literal[True] = ...,
+    private: Literal[False] = ...,
 ) -> Path: ...
 
 
 @overload
 def get_registry_files(
     *,
-    home_registry: Literal[False] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[False] = ...,
+    private: Literal[True] = ...,
 ) -> Path: ...
 
 
 @overload
 def get_registry_files(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[True] = ...,
+    private: Literal[True] = ...,
 ) -> tuple[Path, Path]: ...
 
 
 @typecheck
 def get_registry_files(
-    *, home_registry: bool, package_registry: bool
+    *, public: bool, private: bool
 ) -> tuple[Path, Path] | Path:
     """
     Get the registry files corresponding to the requested registries.
 
-    :param home_registry: Whether to include the home plugin registry file
-    :type home_registry: bool
-    :param package_registry: Whether to include the package plugin registry file
-    :type package_registry: bool
-    :return: Tuple of plugin registry files (home, package), depending on the input
+    :param public: Whether to include the public plugin registry file
+    :type public: bool
+    :param private: Whether to include the private plugin registry file
+    :type private: bool
+    :return: Tuple of plugin registry files (public, private), depending on the input
     :rtype: tuple[Path, Path] | Path
     """
     return _filter_by_registries(
         _get_registry_files(),
-        home_registry=home_registry,
-        package_registry=package_registry,
+        public=public,
+        private=private,
     )
 
 
 @overload
 def get_registries(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[False] = ...,
+    public: Literal[True] = ...,
+    private: Literal[False] = ...,
     combine: Literal[False] = ...,
 ) -> ResolvedPluginRegistry: ...
 
@@ -93,8 +93,8 @@ def get_registries(
 @overload
 def get_registries(
     *,
-    home_registry: Literal[False] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[False] = ...,
+    private: Literal[True] = ...,
     combine: Literal[False] = ...,
 ) -> ResolvedPluginRegistry: ...
 
@@ -102,8 +102,8 @@ def get_registries(
 @overload
 def get_registries(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[True] = ...,
+    private: Literal[True] = ...,
     combine: Literal[False] = ...,
 ) -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]: ...
 
@@ -111,45 +111,43 @@ def get_registries(
 @overload
 def get_registries(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[True] = ...,
+    private: Literal[True] = ...,
     combine: Literal[True] = ...,
 ) -> ResolvedPluginRegistry: ...
 
 
 @typecheck
 def get_registries(
-    *, home_registry: bool, package_registry: bool, combine: bool = False
+    *, public: bool, private: bool, combine: bool = False
 ) -> tuple[ResolvedPluginRegistry, ...] | ResolvedPluginRegistry:
     """
     Get the currently active registrator's plugin registries.
 
-    :param home_registry: Whether to include the home plugin registry
-    :type home_registry: bool
-    :param package_registry: Whether to include the package plugin registry
-    :type package_registry: bool
-    :param combine: Whether to combine the home and package plugin registries into one, with the home registry prioritized
+    :param public: Whether to include the public plugin registry
+    :type public: bool
+    :param private: Whether to include the private plugin registry
+    :type private: bool
+    :param combine: Whether to combine the public and private plugin registries into one, with the public registry prioritized
     :type combine: bool
-    :return: Tuple of plugin registries (home, package), or a single (combined) registry, depending on the input
+    :return: Tuple of plugin registries (public, private), or a single (combined) registry, depending on the input
     :rtype: tuple[ResolvedPluginRegistry, ...] | ResolvedPluginRegistry
-    :raises ValueError: If neither home_registry nor package_registry is True, or if combine is True while not both home_registry and package_registry are True
+    :raises ValueError: If neither public nor private is True, or if combine is True while not both public and private are True
     :raises RuntimeError: If no registrator is initialized
     """
     # Validate input
-    if not home_registry and not package_registry:
+    if not public and not private:
+        raise ValueError("At least one of public or private must be True")
+    if combine and not (public and private):
         raise ValueError(
-            "At least one of home_registry or package_registry must be True"
-        )
-    if combine and not (home_registry and package_registry):
-        raise ValueError(
-            "Combine can only be True if both home_registry and package_registry are True"
+            "Combine can only be True if both public and private are True"
         )
 
     # Filter registries based on input
     filtered = _filter_by_registries(
         _get_registries(),
-        home_registry=home_registry,
-        package_registry=package_registry,
+        public=public,
+        private=private,
         dcopy=True,
     )
 
@@ -162,49 +160,49 @@ def get_registries(
 @overload
 def _get_zipped_registries(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[False] = ...,
+    public: Literal[True] = ...,
+    private: Literal[False] = ...,
 ) -> ResolvedZippedRegistry: ...
 
 
 @overload
 def _get_zipped_registries(
     *,
-    home_registry: Literal[False] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[False] = ...,
+    private: Literal[True] = ...,
 ) -> ResolvedZippedRegistry: ...
 
 
 @overload
 def _get_zipped_registries(
     *,
-    home_registry: Literal[True] = ...,
-    package_registry: Literal[True] = ...,
+    public: Literal[True] = ...,
+    private: Literal[True] = ...,
 ) -> tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]: ...
 
 
 @typecheck
 def _get_zipped_registries(
-    *, home_registry: bool, package_registry: bool
+    *, public: bool, private: bool
 ) -> (
     tuple[ResolvedZippedRegistry, ResolvedZippedRegistry]
     | ResolvedZippedRegistry
 ):
     """
-    Get a tuple of tuples of plugin registry files and their corresponding registries, with the home one first.
+    Get a tuple of tuples of plugin registry files and their corresponding registries, with the public one first.
 
-    :param home_registry: Whether to include the home plugin registry
-    :type home_registry: bool
-    :param package_registry: Whether to include the package plugin registry
-    :type package_registry: bool
-    :return: Tuple of tuples of plugin registry files and their corresponding registries (home, package), depending on the input
+    :param public: Whether to include the public plugin registry
+    :type public: bool
+    :param private: Whether to include the private plugin registry
+    :type private: bool
+    :return: Tuple of tuples of plugin registry files and their corresponding registries (public, private), depending on the input
     :rtype: tuple[ResolvedZippedRegistry, ResolvedZippedRegistry] | ResolvedZippedRegistry
     """
-    _registries = get_registries(home_registry=True, package_registry=True)
+    _registries = get_registries(public=True, private=True)
     return _filter_by_registries(
         _zip_registry_files(_registries),
-        home_registry=home_registry,
-        package_registry=package_registry,
+        public=public,
+        private=private,
     )
 
 
@@ -212,7 +210,7 @@ def _get_zipped_registries(
 def _get_plugin_registration(
     plugin: PluginSpecification,
     *,
-    package_registry: bool,
+    private: bool,
     require_local: bool,
 ) -> ResolvedPluginRegistry | None:
     """
@@ -220,8 +218,8 @@ def _get_plugin_registration(
 
     :param plugin: Name, PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
-    :param package_registry: Whether to check the package plugin registry (True) or the home plugin registry (False)
-    :type package_registry: bool
+    :param private: Whether to check the private plugin registry (True) or the public plugin registry (False)
+    :type private: bool
     :param require_local: Whether to only return entries with a local path
     :type require_local: bool
     :return: Registry entry if the plugin exists locally, None otherwise
@@ -230,7 +228,7 @@ def _get_plugin_registration(
     """
     # Get the plugin registry file and registry
     registry_file, registry = _get_zipped_registries(
-        home_registry=not package_registry, package_registry=package_registry
+        public=not private, private=private
     )
 
     # Access plugin entry
@@ -284,9 +282,7 @@ def get_available_plugin_names() -> set[str]:
     :return: List of available local plugin names
     :rtype: list[str]
     """
-    combined_registry = get_registries(
-        home_registry=True, package_registry=True, combine=True
-    )
+    combined_registry = get_registries(public=True, private=True, combine=True)
     return set(combined_registry.keys())
 
 
@@ -294,8 +290,8 @@ def get_available_plugin_names() -> set[str]:
 def get_plugin_registration(
     plugin: PluginSpecification,
     *,
-    home_registry: bool,
-    package_registry: bool,
+    public: bool,
+    private: bool,
     require_local: bool = True,
 ) -> ResolvedPluginRegistry | None:
     """
@@ -303,8 +299,8 @@ def get_plugin_registration(
 
     :param plugin: Name, PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
-    :param package_registry: Whether to check the package plugin registry (True) or the home plugin registry (False)
-    :type package_registry: bool
+    :param private: Whether to check the private plugin registry (True) or the public plugin registry (False)
+    :type private: bool
     :param require_local: Whether to only return entries with a local path
     :type require_local: bool
     :return: Registry entry if the plugin exists locally, None otherwise
@@ -315,11 +311,11 @@ def get_plugin_registration(
     registrations = tuple(
         _get_plugin_registration(
             plugin,
-            package_registry=pr,
+            private=pr,
             require_local=require_local,
         )
         for ind, pr in enumerate((False, True))
-        if (home_registry, package_registry)[ind]
+        if (public, private)[ind]
     )
     registrations = tuple(
         r for r in registrations if r
@@ -331,7 +327,7 @@ def get_plugin_registration(
         return None
     elif len(registrations) > 1:
         logger.debug(
-            f"WARNING: Multiple registry entries found for plugin '{plugin}'. Using the home one."
+            f"WARNING: Multiple registry entries found for plugin '{plugin}'. Using the public one."
         )
 
     return registrations[0]
@@ -341,8 +337,8 @@ def get_plugin_registration(
 def is_plugin_registered(
     plugin: PluginSpecification,
     *,
-    home_registry: bool,
-    package_registry: bool,
+    public: bool,
+    private: bool,
     require_local: bool = True,
 ) -> bool:
     """
@@ -350,10 +346,10 @@ def is_plugin_registered(
 
     :param plugin: Name, PathLike, or GitQuery of the plugin
     :type plugin: PluginSpecification
-    :param home_registry: Whether to check the home plugin registry (takes precedence over the package registry if both are True)
-    :type home_registry: bool
-    :param package_registry: Whether to check the package plugin registry
-    :type package_registry: bool
+    :param public: Whether to check the public plugin registry (takes precedence over the private registry if both are True)
+    :type public: bool
+    :param private: Whether to check the private plugin registry
+    :type private: bool
     :param require_local: Whether to only consider entries with a local path as registered
     :type require_local: bool
     :return: Whether the plugin is registered locally
@@ -362,8 +358,8 @@ def is_plugin_registered(
     """
     registration = get_plugin_registration(
         plugin,
-        home_registry=home_registry,
-        package_registry=package_registry,
+        public=public,
+        private=private,
         require_local=require_local,
     )
     return registration is not None
@@ -388,7 +384,7 @@ def update_registry(
     plugin_name: str,
     entry: LocalPluginRegistryEntry | RemotePluginRegistryEntry | None,
     *,
-    package_registry: bool | None = None,
+    private: bool | None = None,
     infer_local: bool = False,
     exist_ok: bool = True,
 ) -> bool:
@@ -399,8 +395,8 @@ def update_registry(
     :type plugin_name: str
     :param entry: Plugin registry entry to add or update, or None to remove the entry
     :type entry: LocalPluginRegistryEntry | RemotePluginRegistryEntry | None
-    :param package_registry: Whether to update the package plugin registry (if False, updates the home registry). If None, tries to determine on where the plugin is already registered and returns False if it cannot be determined (i.e. when adding a new plugin)
-    :type package_registry: bool | None
+    :param private: Whether to update the private plugin registry (if False, updates the public registry). If None, tries to determine on where the plugin is already registered and returns False if it cannot be determined (i.e. when adding a new plugin)
+    :type private: bool | None
     :param infer_local: Whether to infer the "local" value of the entry (does not apply when already specified or when removing an entry)
     :type infer_local: bool
     :param exist_ok: Whether to allow updating an existing entry (if False, raises an error if the entry already exists)
@@ -439,29 +435,29 @@ def update_registry(
     registries = _get_registries()
 
     # Determine registry
-    if package_registry is None:
+    if private is None:
         if is_plugin_registered(
             plugin_name,
-            home_registry=True,
-            package_registry=False,
+            public=True,
+            private=False,
             require_local=False,
         ):
-            package_registry = False
+            private = False
         elif is_plugin_registered(
             plugin_name,
-            home_registry=False,
-            package_registry=True,
+            public=False,
+            private=True,
             require_local=False,
         ):
-            package_registry = True
+            private = True
         else:
             logger.debug(
                 "Could not determine registry, since it is registered in "
-                "neither registry. Defaulting to home registry for new entry."
+                "neither registry. Defaulting to public registry for new entry."
             )
-            package_registry = False
-    registry_index = int(package_registry)
-    registry_str = "package" if package_registry else "home"
+            private = False
+    registry_index = int(private)
+    registry_str = "private" if private else "public"
     registry_file = _get_registry_files()[registry_index]
 
     # Update registry
@@ -475,8 +471,8 @@ def update_registry(
     else:
         if entry is None:
             # Remove registration
-            if package_registry and plugin_name in registries[registry_index]:
-                # Can't fully remove package plugins' registration
+            if private and plugin_name in registries[registry_index]:
+                # Can't fully remove private plugins' registration
                 if registries[registry_index][plugin_name].get("remote"):
                     registries[registry_index][plugin_name]["local"] = None
                     return True
