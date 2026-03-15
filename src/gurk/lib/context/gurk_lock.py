@@ -33,14 +33,15 @@ class GurkLock:
         try:
             self._file_lock.acquire(timeout=0)
         except Timeout:
-            richprint(
-                f"Stopping, as gurk lock ({GURK_LOCKFILE_PATH}) is already "
-                "held by another process. If you are sure that no other "
-                "gurk process is running, delete this file and try again.",
-                color=LoggerSeverity.FATAL.color,
-                file=sys.stderr,
-            )
-            raise SystemExit(1)
+            if "pytest" not in sys.modules:
+                richprint(
+                    f"Stopping, as gurk lock ({GURK_LOCKFILE_PATH}) is already "
+                    "held by another process. If you are sure that no other "
+                    "gurk process is running, delete this file and try again.",
+                    color=LoggerSeverity.FATAL.color,
+                    file=sys.stderr,
+                )
+                raise SystemExit(1)
 
         return self
 
