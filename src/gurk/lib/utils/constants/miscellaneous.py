@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from platformdirs import user_config_path, user_data_path, user_log_path
+import json
+from importlib.metadata import distribution
 
-from .common import PACKAGE_NAME, PACKAGE_SRC_PATH
+from .common import (
+    PACKAGE_CONFIG_PATH,
+    PACKAGE_DATA_PATH,
+    PACKAGE_NAME,
+    PACKAGE_SRC_PATH,
+)
 
-PACKAGE_CONFIG_PATH = user_config_path(PACKAGE_NAME, ensure_exists=True)
 GURK_LOCKFILE_PATH = PACKAGE_CONFIG_PATH / "core.lock"
 SETUP_DONE_FILE = PACKAGE_CONFIG_PATH / "setup.done"
 
-PACKAGE_DATA_PATH = user_data_path(PACKAGE_NAME, ensure_exists=True)
 PACKAGE_VENVS_PATH = PACKAGE_DATA_PATH / "venvs"
 PACKAGE_VENVS_PATH.mkdir(parents=True, exist_ok=True)
-
-PACKAGE_LOG_PATH = user_log_path(PACKAGE_NAME, ensure_exists=True)
 
 PACKAGE_BASH_HELPERS_PATH = (
     PACKAGE_SRC_PATH / "plugin_helpers" / "bash" / "helpers.bash"
@@ -32,6 +34,15 @@ PACKAGE_BASH_HELPERS_PATH = (
 
 GURK_MANIFEST_FILENAME = "gurk-manifest.yaml"
 GURK_METADATA_FILENAME = "pyproject.toml"
+
+try:
+    EDITABLE_INSTALL: bool = (
+        json.loads(distribution(PACKAGE_NAME).read_text("direct_url.json"))
+        .get("dir_info", {})
+        .get("editable", False)
+    )
+except Exception:
+    EDITABLE_INSTALL = False
 
 # Explanations:
 # - nvidia/install-isaaclab: Hangs (may be an issue with the install itself, not the runner)

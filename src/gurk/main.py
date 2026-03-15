@@ -17,6 +17,7 @@ import click
 from . import __version__ as GURK_VERSION
 from .cli import (
     check,
+    clean,
     help,
     pull,
     pytest,
@@ -105,6 +106,17 @@ def remove_cmd(ctx: click.Context):
     )
 
 
+@main.command(name="clean", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
+@click.pass_context
+def clean_cmd(ctx: click.Context):
+    """Remove gurk cache and log directories. Use --purge before uninstalling."""
+    clean.main(
+        argv=ctx.args,
+        prog=get_prog(ctx.info_name),
+        description=ctx.command.help,
+    )
+
+
 @main.command(name="help", context_settings=SUBCOMMAND_CONTEXT_SETTINGS)
 @click.pass_context
 def help_cmd(ctx: click.Context):
@@ -116,7 +128,7 @@ def help_cmd(ctx: click.Context):
     )
 
 
-for cmd in ["run", "setup", "upgrade", "pull", "remove", "help"]:
+for cmd in ["run", "setup", "upgrade", "pull", "remove", "clean", "help"]:
     main.commands[cmd].category = "Core Commands"
 
 
