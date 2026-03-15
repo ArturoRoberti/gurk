@@ -37,7 +37,7 @@ class PreparedPluginRegistration:
 
     # fmt: off
     entry: PluginRegistryEntry | None = field()
-    kind:                RegistryKind = field(default=RegistryKind.HOME)
+    kind:                RegistryKind = field(default=RegistryKind.PUBLIC)
     venv_exists:                 bool = field(default=False)
     # fmt: on
 
@@ -78,8 +78,8 @@ class PreparedPluginRegistration:
         # Resolve the local path (if any)
         if self.entry is not None and self.entry["local"] is not None:
             plugin_directory: Path = get_plugin_directories(
-                public=self.kind == RegistryKind.HOME,
-                private=self.kind == RegistryKind.PACKAGE,
+                public=self.kind == RegistryKind.PUBLIC,
+                private=self.kind == RegistryKind.PRIVATE,
             )
             self.entry["local"] = (
                 plugin_directory / self.entry["local"]
@@ -124,7 +124,7 @@ class PreparedPluginRegistration:
                         child.is_relative_to(
                             get_plugin_directories(public=False, private=True)
                         )
-                        == (self.kind == RegistryKind.PACKAGE)
+                        == (self.kind == RegistryKind.PRIVATE)
                     ):
                         registry[PYTEST_PLUGIN_NAME] = self.entry
                     else:

@@ -19,8 +19,8 @@ class RegistryKind(Enum):
     """Represents the kind of registry to use for a plugin specification."""
 
     # fmt: off
-    HOME    = 0
-    PACKAGE = 1
+    PUBLIC  = 0
+    PRIVATE = 1
     # fmt: on
 
 

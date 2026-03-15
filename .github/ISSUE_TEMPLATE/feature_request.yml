@@ -1,7 +1,7 @@
 name: "Feature Request"
 description: "Suggest a new feature"
 title: "[Feature] <title>"
-labels: [feature]
+labels: [enhancement]
 assignees: []
 body:
 - type: textarea
