@@ -115,17 +115,17 @@ class RegistryManager:
         logger = get_logger()
 
         # Delete registrations with invalid structure
-        for is_package_registry, (registry_file, registry) in enumerate(
+        for is_private_registry, (registry_file, registry) in enumerate(
             _zip_registry_files(self._registries)
         ):
             for name, entry in deepcopy(registry).items():
                 if not _is_entry_valid(name, entry, registry_file):
-                    local_msg = "local path of " if is_package_registry else ""
+                    local_msg = "local path of " if is_private_registry else ""
                     warn_msg = (
                         f"Removing {local_msg}invalid plugin registry entry "
                         f"'{name}' from {registry_file.as_posix()}."
                     )
-                    if not is_package_registry:
+                    if not is_private_registry:
                         logger.warning(warn_msg)
                         del registry[name]
                     elif (
@@ -136,20 +136,20 @@ class RegistryManager:
                         registry[name]["local"] = None
                     else:
                         logger.error(
-                            f"THIS SHOULD NOT HAPPEN: Package registry entry '{name}' "
+                            f"THIS SHOULD NOT HAPPEN: Private registry entry '{name}' "
                             f"in {registry_file.as_posix()} is VERY invalid, and is "
                             "thus being removed entirely. See DEBUG logs for details."
                         )
                         del registry[name]
 
-        # Remove any home registry entries that also exist in the package registry
-        home_registry, package_registry = self._registries
-        for plugin_name in package_registry.keys():
-            if plugin_name in home_registry:
+        # Remove any public registry entries that also exist in the private registry
+        public, private = self._registries
+        for plugin_name in private.keys():
+            if plugin_name in public:
                 logger.warning(
-                    f"Removing duplicate registry entry '{plugin_name}' from the home registry."
+                    f"Removing duplicate registry entry '{plugin_name}' from the public registry."
                 )
-                del home_registry[plugin_name]
+                del public[plugin_name]
 
     def _delete_unregistered_plugin_directories(self) -> None:
         """Remove any plugin directories that are not registered in the currently active registrator's plugin registry."""
@@ -212,7 +212,7 @@ class RegistryManager:
         """
         Load the plugin registries from their corresponding files, validating their structure and prepending the path to local entries.
 
-        :return: Tuple of plugin registries (home, package)
+        :return: Tuple of plugin registries (public, private)
         :rtype: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
         """
         # Load registry files
@@ -265,7 +265,7 @@ def _get_registries() -> tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]:
     Get the currently active registrator's plugin registries without deepcopying
     them (for internal use only).
 
-    :return: Tuple of plugin registries (home, package)
+    :return: Tuple of plugin registries (public, private)
     :rtype: tuple[ResolvedPluginRegistry, ResolvedPluginRegistry]
     :raises RuntimeError: If no registrator is initialized
     """

@@ -78,8 +78,8 @@ class PreparedPluginRegistration:
         # Resolve the local path (if any)
         if self.entry is not None and self.entry["local"] is not None:
             plugin_directory: Path = get_plugin_directories(
-                home_registry=self.kind == RegistryKind.HOME,
-                package_registry=self.kind == RegistryKind.PACKAGE,
+                public=self.kind == RegistryKind.HOME,
+                private=self.kind == RegistryKind.PACKAGE,
             )
             self.entry["local"] = (
                 plugin_directory / self.entry["local"]
@@ -122,9 +122,7 @@ class PreparedPluginRegistration:
                     registry: PluginRegistry = load_yaml(child)
                     if self.is_registered and (
                         child.is_relative_to(
-                            get_plugin_directories(
-                                home_registry=False, package_registry=True
-                            )
+                            get_plugin_directories(public=False, private=True)
                         )
                         == (self.kind == RegistryKind.PACKAGE)
                     ):

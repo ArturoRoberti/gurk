@@ -44,7 +44,7 @@ def expected_outcome_remove_name_specification(
         # No plugin is registered, thus any removal should be invalid
         return ExpectedOutcome.PARTIAL
     elif registration.kind == RegistryKind.PACKAGE:
-        # Package registry entries should not be removable
+        # Private registry entries should not be removable
         return ExpectedOutcome.PARTIAL
     else:
         # Expected success (regardless of venv existence)

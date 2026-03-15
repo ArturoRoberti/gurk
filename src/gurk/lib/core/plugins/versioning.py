@@ -101,8 +101,8 @@ def get_plugin_version(
     # Get registration
     plugin_registration = get_plugin_registration(
         plugin_spec,
-        home_registry=True,
-        package_registry=True,
+        public=True,
+        private=True,
         require_local=require_local,
     )
     if not plugin_registration:
@@ -155,8 +155,8 @@ def get_plugin_commit(plugin_spec: PluginSpecification) -> str | None:
     # Get plugin registration
     plugin_registration = get_plugin_registration(
         plugin_spec,
-        home_registry=True,
-        package_registry=True,
+        public=True,
+        private=True,
         require_local=False,
     )
     if not plugin_registration:

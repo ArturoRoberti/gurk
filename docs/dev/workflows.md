@@ -24,7 +24,7 @@ On every issue and PR, the [Workflow CI](../../.github/workflows/workflow_ci.yml
 	- `dev/<codeowner_lowercase>` for permanent branches of [CODEOWNERS](../../.github/CODEOWNERS)
 
 # Version Bumping
-At a daily interval, the [Version Bumping](../../.github/workflows/versioning.yml) workflow checks if any package plugin has a new release. If so, the package version is bumped to the remote version, and a PR is created with the changes (on which the CI runs).
+At a daily interval, the [Version Bumping](../../.github/workflows/versioning.yml) workflow checks if any private plugin has a new release. If so, the package version is bumped to the remote version, and a PR is created with the changes (on which the CI runs).
 
 # PyPI Publishing
-On every push to main, the new package code is automatically published to PyPI using the [PyPI Publishing](../../.github/workflows/pypi_publish.yml) workflow. If necessary, a version bump is automatically performed as well.
+Every push to main is automatically published to PyPI using the [PyPI Publishing](../../.github/workflows/pypi_publish.yml) workflow. If necessary, a version bump is automatically performed as well.

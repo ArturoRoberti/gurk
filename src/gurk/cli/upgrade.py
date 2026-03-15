@@ -86,7 +86,7 @@ def main(argv, prog, description):
         else:
             # Get all local plugins to upgrade if none specified
             combined_registry = get_registries(
-                home_registry=True, package_registry=True, combine=True
+                public=True, private=True, combine=True
             )
             plugins = combined_registry.keys()  # All plugin names
 
@@ -114,8 +114,8 @@ def main(argv, prog, description):
             # Check if plugin is registered
             if not is_plugin_registered(
                 plugin,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=False,
             ):
                 ctx.logger.error(
@@ -126,8 +126,8 @@ def main(argv, prog, description):
             # Get available plugin data from registration
             plugin_registration = get_plugin_registration(
                 plugin,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=False,
             )
             plugin_name, plugin_entry = next(iter(plugin_registration.items()))

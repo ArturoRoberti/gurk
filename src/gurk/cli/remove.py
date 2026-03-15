@@ -70,16 +70,12 @@ def main(argv, prog, description):
                 )
                 continue
 
-            # Exclude package plugins, as they should not be removed
-            package_registry = get_registries(
-                home_registry=False, package_registry=True
-            )
-            if plugin_name in package_registry:
-                registry_file = get_registry_files(
-                    home_registry=False, package_registry=True
-                )
+            # Exclude private plugins, as they should not be removed
+            private = get_registries(public=False, private=True)
+            if plugin_name in private:
+                registry_file = get_registry_files(public=False, private=True)
                 ctx.logger.error(
-                    f"Cannot remove '{plugin_name}', as it is a package plugin. If "
+                    f"Cannot remove '{plugin_name}', as it is a private plugin. If "
                     "you really want to remove this plugin, you can manually set "
                     f"its local path to 'null' in {registry_file.as_posix()}."
                 )
@@ -99,8 +95,8 @@ def main(argv, prog, description):
                 for item in dir.iterdir():
                     if item.is_dir() and not is_plugin_registered(
                         item,
-                        home_registry=is_home,
-                        package_registry=not is_home,
+                        public=is_home,
+                        private=not is_home,
                     ):
                         unregistered_paths.add(item)
                     elif item.is_file() and not item.name == "registry.yaml":

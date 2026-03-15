@@ -88,9 +88,7 @@ def is_plugin_installed(
     try:
         plugin_data = get_plugin_data(plugin_spec)
     except ModuleNotFoundError as e:
-        if is_plugin_registered(
-            plugin_spec, home_registry=True, package_registry=True
-        ):
+        if is_plugin_registered(plugin_spec, public=True, private=True):
             logger.debug(
                 f"Plugin '{plugin_spec}' is installed but invalid ({e}) - please fix or remove it"
             )
@@ -212,8 +210,8 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
     # Check if plugin with same name already exists
     if is_plugin_registered(
         plugin_name,
-        home_registry=True,
-        package_registry=True,
+        public=True,
+        private=True,
         require_local=True,
     ):
         logger.error(
@@ -257,8 +255,8 @@ def _install_local_plugin(plugin_path: PathLike) -> bool:
         return False
     registration = get_plugin_registration(
         plugin_name,
-        home_registry=True,
-        package_registry=True,
+        public=True,
+        private=True,
         require_local=False,
     )
     registration_entry = next(iter(registration.values()))
@@ -447,7 +445,7 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
 
     # Get plugin data
     plugin_registration = get_plugin_registration(
-        plugin, home_registry=True, package_registry=True, require_local=False
+        plugin, public=True, private=True, require_local=False
     )
     if not plugin_registration:
         raise ModuleNotFoundError(
@@ -475,7 +473,7 @@ def remove_plugin(plugin: PluginSpecification, verbose: bool = False) -> None:
             )
         else:
             logger.info(
-                f"Nothing to remove for (package) plugin '{plugin_name}'"
+                f"Nothing to remove for (private) plugin '{plugin_name}'"
             )
 
 
@@ -540,14 +538,14 @@ def install_plugin(
         # Check that there is no plugin with the same name registered with a remote
         if is_plugin_registered(
             plugin_spec,
-            home_registry=True,
-            package_registry=True,
+            public=True,
+            private=True,
             require_local=False,
         ):
             registration = get_plugin_registration(
                 plugin_spec,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=False,
             )
             entry = next(iter(registration.values()))
@@ -738,8 +736,8 @@ def upgrade_plugin(
     # Check that the plugin is registered
     if not is_plugin_registered(
         plugin_spec,
-        home_registry=True,
-        package_registry=True,
+        public=True,
+        private=True,
         require_local=require_local,
     ):
         logger.debug(f"Plugin '{plugin_spec}' is not registered. Skipping...")
@@ -750,8 +748,8 @@ def upgrade_plugin(
         iter(
             get_plugin_registration(
                 plugin_spec,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=require_local,
             ).values()
         )

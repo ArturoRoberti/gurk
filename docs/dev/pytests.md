@@ -1,5 +1,5 @@
 # Overview
-Apart from the user commands, this package currently also provides the `pytest` command for running tests. You can test the validity of package configs and scripts via
+Apart from the user commands, this package currently also provides the `pytest` command for running tests. You can test the validity of task configs and scripts via
 ```bash
 gurk pytest tests/tasks/test_tasks.py --tasks TASK1[,TASK2,TASK3,...]
 ```

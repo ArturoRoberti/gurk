@@ -176,8 +176,8 @@ def parse_specification(specification: str) -> ParsedSpecification:
         with GurkContext(logger=None, writable=False):
             return is_plugin_registered(
                 plugin_name,
-                home_registry=True,
-                package_registry=True,
+                public=True,
+                private=True,
                 require_local=False,
             )
 
@@ -297,8 +297,8 @@ def main(argv, prog, description):
                 ):
                     registration = get_plugin_registration(
                         args.specification.plugin,
-                        home_registry=True,
-                        package_registry=True,
+                        public=True,
+                        private=True,
                         require_local=False,
                     )
                     remote = next(iter(registration.values()))["remote"]
