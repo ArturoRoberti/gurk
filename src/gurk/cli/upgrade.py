@@ -88,7 +88,11 @@ def main(argv, prog, description):
             combined_registry = get_registries(
                 public=True, private=True, combine=True
             )
-            plugins = combined_registry.keys()  # All plugin names
+            plugins = [  # All remote plugin names
+                plugin_name
+                for plugin_name, plugin_entry in combined_registry.items()
+                if plugin_entry["remote"] is not None
+            ]
 
         # Check 'exclude' plugins if specified
         normalized_exclude = set()

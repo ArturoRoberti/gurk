@@ -744,7 +744,7 @@ def upgrade_plugin(
         return False
 
     # Check that the plugin has a registered remote URL
-    plugin_remote = next(
+    plugin_entry = next(
         iter(
             get_plugin_registration(
                 plugin_spec,
@@ -753,8 +753,9 @@ def upgrade_plugin(
                 require_local=require_local,
             ).values()
         )
-    )["remote"]
-    if plugin_remote is None:
+    )
+    plugin_remote = plugin_entry["remote"]
+    if plugin_entry is None:
         logger.error(f"Plugin '{plugin_spec}' is local-only. Skipping...")
         return False
 
@@ -799,7 +800,9 @@ def upgrade_plugin(
             f"Upgrading plugin '{plugin_spec}' from {current_version} to {latest_version}..."
         )
         # Get the current relevant files
-        current_relevant_files = get_relevant_plugin_files(plugin_spec)
+        current_relevant_files = get_relevant_plugin_files(
+            plugin_entry["local"]
+        )
         if current_relevant_files is None:
             logger.error(
                 f"Failed to get relevant files for plugin '{plugin_spec}'."
@@ -835,8 +838,8 @@ def upgrade_plugin(
             else:
                 files_differ = False
                 for cfile, lfile in zip(
-                    sorted(current_relevant_files),
-                    sorted(latest_relevant_files),
+                    sorted(abs_current_relevant_files),
+                    sorted(abs_latest_relevant_files),
                 ):
                     if (
                         cfile.name == GURK_METADATA_FILENAME
