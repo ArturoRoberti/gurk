@@ -133,7 +133,7 @@ install_gemini_cli() {
 
 		# (STEP) Installing Gemini CLI
 		npm install -g @google/gemini-cli
-	
+
 	elif [[ "$AGENTS_GEMINI_CLI_INSTALLATION_METHOD" == "conda" ]]; then
 		local env_name="gemini_env"
 		# (STEP) Creating Gemini CLI Conda environment: $env_name
