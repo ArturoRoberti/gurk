@@ -1,0 +1,39 @@
+imports: [conda]
+
+tasks:
+  agents/install-claude-code:
+    description: Install Claude Code
+    script: scripts/agents.bash
+    function: install_claude_code
+  agents/install-codex:
+    description: Install Codex
+    script: scripts/agents.bash
+    function: install_codex
+    args:
+      --agents-codex-installation-method:
+        help: Specify the installation method for Codex
+        choices: [curl, npm]
+        default: curl
+  agents/install-gemini-cli:
+    description: Install Gemini CLI
+    script: scripts/agents.bash
+    function: install_gemini_cli
+    depends_on: [conda/install-conda]
+    args:
+      --agents-gemini-cli-installation-method:
+        help: Specify the installation method for Gemini CLI
+        choices: [npm, conda]
+        default: npm
+  agents/install-copilot-cli:
+    description: Install Copilot CLI
+    script: scripts/agents.bash
+    function: install_copilot_cli
+    args:
+      --agents-copilot-cli-installation-method:
+        help: Specify the installation method for Copilot CLI
+        choices: [curl, npm]
+        default: curl
+
+options:
+  default:
+    agents/install-claude-code: {}
