@@ -26,3 +26,6 @@ ros:
 vscode:
   local: vscode
   remote: null
+agents:
+  local: agents
+  remote: null

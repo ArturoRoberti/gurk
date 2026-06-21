@@ -1,0 +1,4 @@
+[project]
+name = "agents"
+version = "1.0.0"
+description = "A gurk plugin to install various AI agents"
