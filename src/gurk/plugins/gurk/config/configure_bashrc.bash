@@ -1,30 +1,37 @@
-# Sourcing util
-_source_if_exists() {
-	[ -f "$1" ] && source "$1"
-}
-
-# Custom bash aliases and commands/scripts
-_source_if_exists ${HOME}/.cmds/aliases.bash
-export PATH=${PATH}:${HOME}/.cmds
-
 # Colors
-color() {
-	echo "\[\e[$1m\]"
+_shell_color() {
+	printf '\e[%sm' "$1"
 }
-NC=$(color 0)
+NC=$(_shell_color 0)
 ## Normal
-RED=$(color 0\;31)
-GREEN=$(color 0\;32)
-ORANGE=$(color 0\;33)
-BLUE=$(color 0\;34)
+RED=$(_shell_color '0;31')
+GREEN=$(_shell_color '0;32')
+ORANGE=$(_shell_color '0;33')
+BLUE=$(_shell_color '0;34')
 ## Bold
-BOLD_RED=$(color 1\;31)
-BOLD_GREEN=$(color 1\;32)
-BOLD_ORANGE=$(color 1\;33)
-BOLD_BLUE=$(color 1\;34)
+BOLD_RED=$(_shell_color '1;31')
+BOLD_GREEN=$(_shell_color '1;32')
+BOLD_ORANGE=$(_shell_color '1;33')
+BOLD_BLUE=$(_shell_color '1;34')
 
 # Shell coloring
-_parse_git_branch() {
-	git branch 2>/dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
+_git_ps1_safe() {
+	if declare -F __git_ps1 >/dev/null 2>&1; then
+		__git_ps1
+	fi
 }
-export PS1="${BOLD_GREEN}\u@\h${NC}:${BOLD_BLUE}\w${BOLD_RED}\$(_parse_git_branch)${NC}\$ "
+_container_name() {
+	if [ -n "$CONTAINER_NAME" ]; then
+		printf '{%s} ' "$CONTAINER_NAME"
+	elif [ -n "$CONTAINER_ID" ]; then
+		printf '{%s} ' "$CONTAINER_ID"
+	fi
+}
+_container_color() {
+	if [ -n "$CONTAINER_NAME" ] || [ -n "$CONTAINER_ID" ]; then
+		printf '%s' "$BOLD_ORANGE"
+	else
+		printf '%s' "$BOLD_GREEN"
+	fi
+}
+export PS1="\$(_container_name)\[\$(_container_color)\]\u@\h\[$NC\]:\[$BOLD_BLUE\]\w\[$BOLD_RED\]\$(_git_ps1_safe)\[$NC\]\$ "
